@@ -32,6 +32,10 @@ impl Statistics {
             }
 
             start += subwindow.len() as u64;
+
+            if subwindow.is_empty() {
+                break;
+            }
         }
 
         if let Some(&first_byte) = source.window_at(window.start, &mut [0; 1])?.first() {

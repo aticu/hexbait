@@ -23,8 +23,6 @@ pub use primitives::{render_glyph, render_hex, render_offset};
 ///
 /// Contains the context necessary to render a hexdump.
 pub struct HexdumpView {
-    /// The row number at which the hexdump should start.
-    start: u64,
     /// The number of rows that have been scrolled down from the start offset.
     scroll_offset: u64,
     /// The selection context of the hexview.
@@ -35,17 +33,22 @@ impl HexdumpView {
     /// Create a new hexdump context.
     pub fn new() -> HexdumpView {
         HexdumpView {
-            start: 0,
             scroll_offset: 0,
             selection_context: SelectionContext::new(),
         }
     }
 
     /// Renders a hexdump to the GUI.
-    pub fn render(&mut self, ui: &mut Ui, source: &mut impl DataSource, big_endian: &mut bool) {
+    pub fn render(
+        &mut self,
+        ui: &mut Ui,
+        source: &mut impl DataSource,
+        big_endian: &mut bool,
+        start: u64,
+    ) {
         let scale = 20.0;
         // start is in rows
-        let start = self.start * 16;
+        let start_in_bytes = start * 16;
 
         let rect = ui.max_rect().intersect(ui.cursor());
         let height = ui.available_height();
@@ -56,8 +59,8 @@ impl HexdumpView {
 
         let file_size = source.len();
 
-        if let Ok(window) = source.window_at(start, &mut buf) {
-            let file_size = file_size.unwrap_or_else(|_| start + window.len() as u64);
+        if let Ok(window) = source.window_at(start_in_bytes, &mut buf) {
+            let file_size = file_size.unwrap_or_else(|_| start_in_bytes + window.len() as u64);
 
             // determine how many rows we can at most scroll down
             let max_scroll = (window.len().div_ceil(16) as u64).saturating_sub(rows_onscreen);
@@ -93,7 +96,7 @@ impl HexdumpView {
                         self.selection_context.render_selection(
                             ui,
                             file_size,
-                            self.start + self.scroll_offset,
+                            start + self.scroll_offset,
                             rows_onscreen,
                             scale,
                         );
@@ -104,7 +107,13 @@ impl HexdumpView {
                             .skip(self.scroll_offset as usize)
                             .take(rows_onscreen as usize + 1)
                         {
-                            self.render_row(ui, start + (i as u64 * 16), row, file_size, scale);
+                            self.render_row(
+                                ui,
+                                start_in_bytes + (i as u64 * 16),
+                                row,
+                                file_size,
+                                scale,
+                            );
                         }
                     });
                     let mut selected_buf;
