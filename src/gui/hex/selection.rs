@@ -8,9 +8,7 @@ use egui::{
     pos2,
 };
 
-use crate::gui::color;
-
-use super::primitives::{char_height, char_width, large_space, small_space};
+use crate::gui::{color, settings::Settings};
 
 /// Contains the necessary context to manage selections in the hex view.
 pub(crate) struct SelectionContext {
@@ -89,7 +87,7 @@ impl SelectionContext {
         file_size: u64,
         screen_start_offset_in_rows: u64,
         rows_onscreen: u64,
-        scale: f32,
+        settings: &Settings,
     ) {
         let Some(mut selection) = self.selection() else {
             return;
@@ -112,10 +110,10 @@ impl SelectionContext {
         }
 
         let screen_rect = ui.max_rect().intersect(ui.cursor());
-        let char_height = char_height(scale);
-        let char_width = char_width(scale);
-        let large_space = large_space(scale);
-        let small_space = small_space(scale);
+        let char_height = settings.char_height();
+        let char_width = settings.char_width();
+        let large_space = settings.large_space();
+        let small_space = settings.small_space();
 
         let row_start = |offset: u64| {
             let row = offset / 16;
@@ -236,8 +234,8 @@ impl SelectionContext {
             painter.rect_filled(rect, 0.0, color::HIGHLIGHT_BACKGROUND_COLOR);
         }
 
-        let corner_radius = scale * 0.15;
-        let stroke_width = scale * 0.08;
+        let corner_radius = settings.corner_radius();
+        let stroke_width = settings.stroke_width();
         let trace_path = |points: Vec<Pos2>| {
             for (idx, &point) in points.iter().enumerate() {
                 let next_point = points[(idx + 1) % points.len()];

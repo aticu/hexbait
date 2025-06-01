@@ -1,17 +1,23 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use std::io::Read;
+
 use hexamine::{
-    data::DataSource as _,
-    gui::{hex::HexdumpView, zoombars::Zoombars},
+    data::{DataSource as _, Input},
+    gui::{
+        hex::HexdumpView, settings::Settings, signature_display::SignatureDisplay,
+        zoombars::Zoombars,
+    },
 };
 
 fn main() -> eframe::Result {
-    let arg = std::env::args().nth(1).unwrap();
-    let mut file = std::fs::File::open(arg).unwrap();
-    let len = file.len().unwrap();
-
-    let statistics = hexamine::statistics::Statistics::compute(&mut file, 0..len).unwrap();
-    let signature = statistics.to_signature();
+    let input = if let Some(arg) = std::env::args().nth(1) {
+        Input::File(std::fs::File::open(arg).unwrap())
+    } else {
+        let mut buf = Vec::new();
+        std::io::stdin().read_to_end(&mut buf).unwrap();
+        Input::Stdin(buf)
+    };
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
@@ -23,13 +29,12 @@ fn main() -> eframe::Result {
         Box::new(|_| {
             Ok(Box::new(MyApp {
                 frame_time: std::time::Duration::ZERO,
-                signature,
-                file,
+                settings: Settings::new(),
+                input,
                 hexdump_context: HexdumpView::new(),
                 big_endian: false,
-                selected: None,
-                selecting: false,
                 zoombars: Zoombars::new(),
+                signature_display: SignatureDisplay::new(),
             }))
         }),
     )
@@ -37,13 +42,12 @@ fn main() -> eframe::Result {
 
 struct MyApp {
     frame_time: std::time::Duration,
-    signature: hexamine::statistics::Signature,
-    file: std::fs::File,
+    settings: Settings,
+    input: Input,
     hexdump_context: HexdumpView,
     big_endian: bool,
-    selected: Option<std::ops::RangeInclusive<u64>>,
-    selecting: bool,
     zoombars: Zoombars,
+    signature_display: SignatureDisplay,
 }
 
 impl eframe::App for MyApp {
@@ -64,15 +68,23 @@ impl eframe::App for MyApp {
                 );
             }
 
-            let file_size = self.file.len().unwrap();
+            let file_size = self.input.len().unwrap();
+            // TODO: Test with input that is one row bigger than screen (and with input of exact
+            // size)
 
             self.zoombars.render(
                 ui,
                 file_size,
-                &mut self.file,
+                &mut self.input,
+                &self.settings,
                 |ui, source, start| {
-                    self.hexdump_context
-                        .render(ui, source, &mut self.big_endian, start);
+                    self.hexdump_context.render(
+                        ui,
+                        &self.settings,
+                        source,
+                        &mut self.big_endian,
+                        start,
+                    );
                 },
                 |ui, source, range| {
                     let statistics = hexamine::statistics::Statistics::compute(
@@ -81,14 +93,20 @@ impl eframe::App for MyApp {
                     )
                     .unwrap();
                     let signature = statistics.to_signature();
-                    hexamine::gui::signature_display::render_signature_display(ui, &signature);
+                    let rect = ui.max_rect().intersect(ui.cursor());
+
+                    self.signature_display.render(
+                        ui,
+                        rect,
+                        *range.start()..*range.end(),
+                        &signature,
+                        &self.settings,
+                    );
                 },
             );
 
             return;
-            // TODO: fix up size = 3.0 (two places)
             // TODO: factor out continuous color schemes into a function
-            // TODO: factor out scale
         });
         self.frame_time = start.elapsed();
     }

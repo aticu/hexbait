@@ -2,13 +2,13 @@
 
 use std::{
     fs::File,
-    io::{Error, Read as _, Seek as _, SeekFrom},
+    io::{self, Read as _, Seek as _, SeekFrom},
 };
 
 use super::DataSource;
 
 impl DataSource for File {
-    type Error = Error;
+    type Error = io::Error;
 
     fn len(&mut self) -> Result<u64, Self::Error> {
         self.seek(SeekFrom::End(0))
@@ -22,8 +22,8 @@ impl DataSource for File {
         let len = self.len()?;
 
         if offset > len {
-            return Err(Error::new(
-                std::io::ErrorKind::Other,
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
                 "offset is beyond input",
             ));
         }

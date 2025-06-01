@@ -1,7 +1,10 @@
 //! Models how the raw data is accessed in hexamine.
 
 mod file;
+mod input;
 mod slice;
+
+pub use input::Input;
 
 /// A data source for hexamine to work with.
 pub trait DataSource {

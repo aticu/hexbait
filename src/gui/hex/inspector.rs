@@ -2,18 +2,17 @@
 
 use egui::{Color32, FontId, Rect, RichText, Sense, Ui, vec2};
 
+use crate::gui::settings::Settings;
+
 /// Renders a data inspector, showing different views on the selected data.
 pub(crate) fn render_inspector(
     ui: &mut Ui,
     selected: Option<&[u8]>,
     big_endian: &mut bool,
-    scale: f32,
+    settings: &Settings,
 ) {
-    // the table does not need to be as big as the hex view
-    let scale = scale * 0.75;
-
-    let row_height = scale * 1.1;
-    let font = FontId::proportional(scale);
+    let row_height = settings.font_size() * 1.1;
+    let font = FontId::proportional(settings.font_size());
 
     ui.vertical(|ui| {
         ui.horizontal(|ui| {
@@ -186,12 +185,12 @@ pub(crate) fn render_inspector(
         TableBuilder::new(ui)
             .striped(true)
             .id_salt("inspector")
-            .column(Column::exact(scale * 11.0))
+            .column(Column::exact(settings.font_size() * 11.0))
             .column(Column::remainder())
             .drag_to_scroll(false)
             .header(row_height * 1.5, |mut header| {
                 let font = FontId {
-                    size: scale * 1.5,
+                    size: settings.large_font_size(),
                     ..font.clone()
                 };
 
@@ -226,8 +225,10 @@ pub(crate) fn render_inspector(
                             let g = buf[1];
                             let b = buf[2];
                             let color = Color32::from_rgba_premultiplied(r, g, b, 255);
-                            let rect =
-                                Rect::from_min_size(ui.cursor().min, vec2(scale * 8.0, scale));
+                            let rect = Rect::from_min_size(
+                                ui.cursor().min,
+                                vec2(settings.font_size() * 8.0, settings.font_size()),
+                            );
                             ui.painter().rect_filled(rect, 0.0, color);
                             ui.allocate_rect(rect, Sense::hover())
                                 .on_hover_ui_at_pointer(|ui| {
@@ -260,8 +261,10 @@ pub(crate) fn render_inspector(
                             let g = ((raw_g as f32 / 63.0) * 255.0).round() as u8;
                             let b = ((raw_b as f32 / 31.0) * 255.0).round() as u8;
                             let color = Color32::from_rgba_premultiplied(r, g, b, 255);
-                            let rect =
-                                Rect::from_min_size(ui.cursor().min, vec2(scale * 8.0, scale));
+                            let rect = Rect::from_min_size(
+                                ui.cursor().min,
+                                vec2(settings.font_size() * 8.0, settings.font_size()),
+                            );
                             ui.painter().rect_filled(rect, 0.0, color);
                             ui.allocate_rect(rect, Sense::hover())
                                 .on_hover_ui_at_pointer(|ui| {

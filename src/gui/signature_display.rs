@@ -1,78 +1,90 @@
-use egui::Ui;
+use std::ops::Range;
+
+use egui::{Rect, Sense, Ui, Vec2, show_tooltip_at_pointer, vec2};
 
 use crate::statistics::Signature;
 
-pub fn render_signature_display(ui: &mut Ui, signature: &Signature) {
-    const SIDE_LEN: f32 = 4.0;
-    let rect = egui::Rect::from_min_size(
-        ui.cursor().left_top(),
-        egui::vec2(SIDE_LEN * 256.0, SIDE_LEN * 256.0),
-    );
-    let response = ui.allocate_rect(rect, egui::Sense::hover());
+use super::{
+    cached_image::CachedImage,
+    hex::{render_glyph, render_hex},
+    settings::Settings,
+};
 
-    for first in 0..=255 {
-        for second in 0..=255 {
-            let rect = egui::Rect::from_min_size(
-                rect.left_top() + egui::vec2(SIDE_LEN * first as f32, SIDE_LEN * second as f32),
-                egui::vec2(SIDE_LEN, SIDE_LEN),
-            );
-            let painter = ui.painter().with_clip_rect(rect);
+/// Displays a data signature as an image of 2-gram probabilities.
+pub struct SignatureDisplay {
+    /// The image of the displayed signature.
+    cached_image: CachedImage<Range<u64>>,
+}
 
-            let intensity = signature.tuple(first, second);
-            let color = crate::gui::color::VIRIDIS[intensity as usize];
+impl SignatureDisplay {
+    /// Creates a new signature display.
+    pub fn new() -> SignatureDisplay {
+        SignatureDisplay {
+            cached_image: CachedImage::new(),
+        }
+    }
 
-            if let Some(pos) = response.hover_pos() {
-                if rect.contains(pos) {
-                    egui::show_tooltip_at_pointer(
-                        ui.ctx(),
-                        ui.layer_id(),
-                        "overview_hover".into(),
-                        |ui| {
-                            ui.vertical(|ui| {
-                                ui.horizontal(|ui| {
-                                    crate::gui::hex::render_hex(
-                                        ui,
-                                        20.0,
-                                        egui::Sense::hover(),
-                                        first,
-                                    );
-                                    crate::gui::hex::render_hex(
-                                        ui,
-                                        20.0,
-                                        egui::Sense::hover(),
-                                        second,
-                                    );
+    /// Renders the signature into the given rect.
+    pub fn render(
+        &mut self,
+        ui: &mut Ui,
+        rect: Rect,
+        range: Range<u64>,
+        signature: &Signature,
+        settings: &Settings,
+    ) {
+        let side_len_x = (rect.width().trunc() / 256.0).trunc();
+        let side_len_y = (rect.height().trunc() / 256.0).trunc();
+        let side_len = side_len_x.min(side_len_y);
 
-                                    ui.spacing_mut().item_spacing = egui::Vec2::ZERO;
-                                    ui.add_space(30.0);
+        let rect = Rect::from_min_size(
+            ui.cursor().left_top(),
+            vec2(side_len * 256.0, side_len * 256.0),
+        );
 
-                                    crate::gui::hex::render_glyph(
-                                        ui,
-                                        20.0,
-                                        egui::Sense::hover(),
-                                        first,
-                                    );
-                                    crate::gui::hex::render_glyph(
-                                        ui,
-                                        20.0,
-                                        egui::Sense::hover(),
-                                        second,
-                                    );
-                                });
-                                ui.label(
-                                    egui::RichText::new(format!(
-                                        "Relative Density: {:0.02}%",
-                                        intensity as f64 / 2.55,
-                                    ))
-                                    .color(color),
-                                );
-                            });
-                        },
-                    );
-                }
+        self.cached_image.paint_at(ui, rect, range, |x, y| {
+            let first = x / side_len as usize;
+            let second = y / side_len as usize;
+
+            let intensity = signature.tuple(first as u8, second as u8);
+            settings.scale_color_u8(intensity)
+        });
+        ui.advance_cursor_after_rect(rect);
+
+        let hover_positions = ui.ctx().input(|input| {
+            if let Some(pos) = input.pointer.latest_pos()
+                && rect.contains(pos)
+            {
+                let first = ((pos - rect.min).x / side_len) as u8;
+                let second = ((pos - rect.min).y / side_len) as u8;
+
+                Some((first, second))
+            } else {
+                None
             }
+        });
 
-            painter.rect_filled(rect, 0.0, color);
+        if let Some((first, second)) = hover_positions {
+            let intensity = signature.tuple(first, second);
+
+            show_tooltip_at_pointer(ui.ctx(), ui.layer_id(), "signature_display".into(), |ui| {
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        render_hex(ui, settings, Sense::hover(), first);
+                        render_hex(ui, settings, Sense::hover(), second);
+
+                        ui.spacing_mut().item_spacing = Vec2::ZERO;
+                        ui.add_space(settings.large_space());
+
+                        render_glyph(ui, settings, Sense::hover(), first);
+                        render_glyph(ui, settings, Sense::hover(), second);
+                    });
+                    ui.label(format!(
+                        "Relative Density: {:0.02}%",
+                        intensity as f64 / 2.55,
+                    ));
+                });
+            });
         }
     }
 }
