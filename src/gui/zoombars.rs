@@ -1,8 +1,8 @@
 //! Implements zoombars to zoom in on the content of a file.
 
-use std::ops::RangeInclusive;
+use std::{collections::HashMap, ops::RangeInclusive};
 
-use egui::{Align, Context, Layout, PointerButton, Rect, Ui, UiBuilder, vec2};
+use egui::{Align, Color32, Context, FontId, Layout, PointerButton, Rect, Ui, UiBuilder, vec2};
 
 use crate::data::DataSource;
 
@@ -16,6 +16,41 @@ pub struct Zoombars {
     selecting: bool,
     /// The zoombars to render.
     bars: Vec<Zoombar>,
+}
+
+// TODO: pretty this part up
+fn bin_byte_range(range: RangeInclusive<u64>) -> RangeInclusive<u64> {
+    const WINDOW_SIZE: usize = 1024;
+    let start = *range.start() & !(WINDOW_SIZE as u64 - 1);
+    let range_len = range.count() + WINDOW_SIZE & !(WINDOW_SIZE - 1);
+
+    start..=start + range_len as u64
+}
+
+fn entropy(source: &mut impl DataSource, range: RangeInclusive<u64>) -> Option<f32> {
+    let mut buf = vec![0; (range.end() - range.start()) as usize];
+
+    if let Ok(window) = source.window_at(*range.start(), &mut buf) {
+        let mut frequencies = [0usize; 256];
+
+        for &byte in window {
+            frequencies[byte as usize] += 1;
+        }
+
+        Some(
+            -frequencies
+                .into_iter()
+                .filter(|&count| count != 0)
+                .map(|count| {
+                    let p = count as f32 / window.len() as f32;
+                    p * p.log2()
+                })
+                .sum::<f32>()
+                / 8.0,
+        )
+    } else {
+        None
+    }
 }
 
 impl Zoombars {
@@ -38,6 +73,10 @@ impl Zoombars {
         render_overview: impl FnOnce(&mut Ui, &mut Source, RangeInclusive<u64>),
     ) {
         let rect = ui.max_rect().intersect(ui.cursor());
+
+        // be deliberately small to fit more text here
+        let size_text_height = settings.font_size() * 0.7;
+
         let total_rows = (rect.height().trunc() as u64).max(1);
         let total_bytes = total_rows * 16;
 
@@ -53,6 +92,8 @@ impl Zoombars {
         let mut file_range = 0..=file_size;
         let mut show_hex = false;
 
+        let mut entropy_cache = HashMap::new();
+
         ui.allocate_new_ui(
             UiBuilder::new()
                 .max_rect(rect)
@@ -63,8 +104,22 @@ impl Zoombars {
                     let is_second_last = i + 1 == last_bar;
 
                     let mut rect = ui.max_rect().intersect(ui.cursor());
+                    rect.min += vec2(0.0, size_text_height);
                     rect.set_width(16.0 * settings.bar_width_multiplier() as f32);
                     let rect = rect;
+
+                    ui.painter().text(
+                        rect.min,
+                        egui::Align2::LEFT_BOTTOM,
+                        format!(
+                            "{}B",
+                            size_format::SizeFormatterBinary::new(
+                                file_range.end() - file_range.start()
+                            )
+                        ),
+                        FontId::proportional(size_text_height),
+                        ui.style().noninteractive().text_color(),
+                    );
 
                     let mut selecting = self.selecting && is_second_last;
                     let was_selecting = selecting;
@@ -84,8 +139,18 @@ impl Zoombars {
                         &mut selecting,
                         file_range.clone(),
                         min_selection_size,
-                        file_size,
-                        settings,
+                        |byte_range| {
+                            let byte_range = bin_byte_range(byte_range);
+                            let entropy = entropy_cache
+                                .entry(byte_range.clone())
+                                .or_insert_with(|| entropy(source, byte_range));
+
+                            if let Some(entropy) = entropy {
+                                settings.scale_color_f32(*entropy)
+                            } else {
+                                todo!("pick a color to display when the info is not available")
+                            }
+                        },
                     );
 
                     let min_selection_size =
@@ -291,10 +356,9 @@ impl Zoombar {
         selecting: &mut bool,
         file_range: RangeInclusive<u64>,
         min_selection_size: f32,
-        file_size: u64,
-        settings: &Settings,
+        mut byte_range_color: impl FnMut(RangeInclusive<u64>) -> Color32,
     ) {
-        let total_points = rect.height().ceil() as u64 * 16;
+        let total_points = rect.height().trunc() as u64 * 16;
 
         self.handle_selection(rect, selecting, min_selection_size, ui.ctx());
 
@@ -304,6 +368,9 @@ impl Zoombar {
 
         let size = rect.width().trunc() as usize / 16;
 
+        let range_len = file_range.clone().count();
+        let bytes_per_pixel = (range_len as f64 / total_points as f64).round() as u64;
+
         self.cached_image.paint_at(
             ui,
             rect,
@@ -312,16 +379,19 @@ impl Zoombar {
                 let x = x / size;
 
                 let relative_offset = (y * 16 + x) as f64 / total_points as f64;
-                let start = *file_range.start();
-                let range_len = file_range.clone().count();
                 let offset_within_range = (relative_offset * range_len as f64) as u64;
-                let offset_within_file = (start + offset_within_range) as f64 / file_size as f64;
-                let raw_color = settings.scale_color_f32(offset_within_file as f32);
+
+                let start_in_file = *file_range.start() + offset_within_range;
+                let byte_range = start_in_file..=start_in_file + bytes_per_pixel;
+
+                let raw_color = byte_range_color(byte_range);
+
+                const HIGHLIGHT_STRENGTH: f64 = 0.2;
 
                 if selection_start <= y && y <= selection_end {
-                    raw_color
+                    color::lerp(raw_color, egui::Color32::WHITE, HIGHLIGHT_STRENGTH)
                 } else {
-                    color::lerp(raw_color, egui::Color32::BLACK, 0.5)
+                    color::lerp(raw_color, egui::Color32::BLACK, HIGHLIGHT_STRENGTH)
                 }
             },
         );

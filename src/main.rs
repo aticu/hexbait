@@ -2,12 +2,13 @@
 
 use std::io::Read;
 
-use hexamine::{
+use hexbait::{
     data::{DataSource as _, Input},
     gui::{
         hex::HexdumpView, settings::Settings, signature_display::SignatureDisplay,
         zoombars::Zoombars,
     },
+    statistics::Statistics,
 };
 
 fn main() -> eframe::Result {
@@ -87,11 +88,8 @@ impl eframe::App for MyApp {
                     );
                 },
                 |ui, source, range| {
-                    let statistics = hexamine::statistics::Statistics::compute(
-                        source,
-                        *range.start()..*range.end(),
-                    )
-                    .unwrap();
+                    let statistics =
+                        Statistics::compute(source, *range.start()..*range.end()).unwrap();
                     let signature = statistics.to_signature();
                     let rect = ui.max_rect().intersect(ui.cursor());
 

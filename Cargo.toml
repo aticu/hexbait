@@ -1,5 +1,5 @@
 [package]
-name = "hexamine"
+name = "hexbait"
 version = "0.1.0"
 edition = "2024"
 
@@ -11,3 +11,4 @@ egui = "0.31.1"
 egui_extras = { version = "0.31.1", default-features = false }
 chrono = "0.4.41"
 unicode_names2 = "1.3.0"
+size_format = "1.0.2"
