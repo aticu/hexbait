@@ -13,7 +13,7 @@ use super::{
 /// Displays a data signature as an image of 2-gram probabilities.
 pub struct SignatureDisplay {
     /// The image of the displayed signature.
-    cached_image: CachedImage<Range<u64>>,
+    cached_image: CachedImage<(Range<u64>, u8)>,
 }
 
 impl SignatureDisplay {
@@ -31,6 +31,7 @@ impl SignatureDisplay {
         rect: Rect,
         range: Range<u64>,
         signature: &Signature,
+        xor_value: u8,
         settings: &Settings,
     ) {
         let side_len_x = (rect.width().trunc() / 256.0).trunc();
@@ -42,13 +43,14 @@ impl SignatureDisplay {
             vec2(side_len * 256.0, side_len * 256.0),
         );
 
-        self.cached_image.paint_at(ui, rect, range, |x, y| {
-            let first = x / side_len as usize;
-            let second = y / side_len as usize;
+        self.cached_image
+            .paint_at(ui, rect, (range, xor_value), |x, y| {
+                let first = x / side_len as usize;
+                let second = y / side_len as usize;
 
-            let intensity = signature.tuple(first as u8, second as u8);
-            settings.scale_color_u8(intensity)
-        });
+                let intensity = signature.tuple(first as u8 ^ xor_value, second as u8 ^ xor_value);
+                settings.scale_color_u8(intensity)
+            });
         ui.advance_cursor_after_rect(rect);
 
         let hover_positions = ui.ctx().input(|input| {
@@ -65,7 +67,7 @@ impl SignatureDisplay {
         });
 
         if let Some((first, second)) = hover_positions {
-            let intensity = signature.tuple(first, second);
+            let intensity = signature.tuple(first ^ xor_value, second ^ xor_value);
 
             show_tooltip_at_pointer(ui.ctx(), ui.layer_id(), "signature_display".into(), |ui| {
                 ui.vertical(|ui| {

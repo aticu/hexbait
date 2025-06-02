@@ -19,7 +19,7 @@ impl Settings {
     pub fn new() -> Settings {
         Settings {
             scale: 20.0,
-            color_map: ColorMap::Magma,
+            color_map: ColorMap::Viridis,
         }
     }
 

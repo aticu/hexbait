@@ -21,11 +21,13 @@ fn main() -> eframe::Result {
     };
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([320.0, 240.0])
+            .with_maximized(true),
         ..Default::default()
     };
     eframe::run_native(
-        "My egui App",
+        "hexbait",
         options,
         Box::new(|_| {
             Ok(Box::new(MyApp {
@@ -36,6 +38,7 @@ fn main() -> eframe::Result {
                 big_endian: false,
                 zoombars: Zoombars::new(),
                 signature_display: SignatureDisplay::new(),
+                xor_value: 0,
             }))
         }),
     )
@@ -49,6 +52,7 @@ struct MyApp {
     big_endian: bool,
     zoombars: Zoombars,
     signature_display: SignatureDisplay,
+    xor_value: u8,
 }
 
 impl eframe::App for MyApp {
@@ -98,13 +102,15 @@ impl eframe::App for MyApp {
                         rect,
                         *range.start()..*range.end(),
                         &signature,
+                        self.xor_value,
                         &self.settings,
                     );
+
+                    ui.add(egui::Slider::new(&mut self.xor_value, 0..=255).text("xor value"));
                 },
             );
 
             return;
-            // TODO: factor out continuous color schemes into a function
         });
         self.frame_time = start.elapsed();
     }
