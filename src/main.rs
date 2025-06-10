@@ -8,7 +8,7 @@ use hexbait::{
         hex::HexdumpView, settings::Settings, signature_display::SignatureDisplay,
         zoombars::Zoombars,
     },
-    statistics::Statistics,
+    statistics::StatisticsHandler,
 };
 
 fn main() -> eframe::Result {
@@ -39,6 +39,7 @@ fn main() -> eframe::Result {
                 zoombars: Zoombars::new(),
                 signature_display: SignatureDisplay::new(),
                 xor_value: 0,
+                statistics_handler: StatisticsHandler::new(),
             }))
         }),
     )
@@ -53,6 +54,7 @@ struct MyApp {
     zoombars: Zoombars,
     signature_display: SignatureDisplay,
     xor_value: u8,
+    statistics_handler: StatisticsHandler,
 }
 
 impl eframe::App for MyApp {
@@ -74,8 +76,12 @@ impl eframe::App for MyApp {
             }
 
             let file_size = self.input.len().unwrap();
-            // TODO: Test with input that is one row bigger than screen (and with input of exact
-            // size)
+            // TODO: use caching for entropy calculation
+            // TODO: implement a custom "window" type
+            // TODO: change font to render more characters
+            // TODO: move statistics computing to a background thread
+            // TODO: try to speed up cache computation by looking up values from the smaller caches
+            // TODO: implement to-disk caching for some sizes to increase re-load times
 
             self.zoombars.render(
                 ui,
@@ -92,21 +98,28 @@ impl eframe::App for MyApp {
                     );
                 },
                 |ui, source, range| {
-                    let statistics =
-                        Statistics::compute(source, *range.start()..*range.end()).unwrap();
+                    let statistics = self
+                        .statistics_handler
+                        .get(source, *range.start()..*range.end())
+                        .unwrap();
                     let signature = statistics.to_signature();
                     let rect = ui.max_rect().intersect(ui.cursor());
 
-                    self.signature_display.render(
-                        ui,
-                        rect,
-                        *range.start()..*range.end(),
-                        &signature,
-                        self.xor_value,
-                        &self.settings,
-                    );
+                    ui.vertical(|ui| {
+                        self.signature_display.render(
+                            ui,
+                            rect,
+                            *range.start()..*range.end(),
+                            &signature,
+                            self.xor_value,
+                            &self.settings,
+                        );
 
-                    ui.add(egui::Slider::new(&mut self.xor_value, 0..=255).text("xor value"));
+                        let old = ui.spacing_mut().slider_width;
+                        ui.spacing_mut().slider_width = self.settings.font_size() * 20.0;
+                        ui.add(egui::Slider::new(&mut self.xor_value, 0..=255).text("xor value"));
+                        ui.spacing_mut().slider_width = old;
+                    });
                 },
             );
 

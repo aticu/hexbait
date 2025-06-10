@@ -2,7 +2,10 @@
 
 use std::{collections::HashMap, ops::RangeInclusive};
 
-use egui::{Align, Color32, Context, FontId, Layout, PointerButton, Rect, Ui, UiBuilder, vec2};
+use egui::{
+    Align, Color32, Context, FontId, Layout, PointerButton, Rect, Sense, Ui, UiBuilder,
+    show_tooltip_at_pointer, vec2,
+};
 
 use crate::data::DataSource;
 
@@ -133,7 +136,7 @@ impl Zoombars {
                     let min_selection_size =
                         (total_bytes as f32 / range_len as f32).min(maximum_min_selection_size);
 
-                    bar.render(
+                    let hovered_byte_range = bar.render(
                         ui,
                         rect,
                         &mut selecting,
@@ -146,12 +149,32 @@ impl Zoombars {
                                 .or_insert_with(|| entropy(source, byte_range));
 
                             if let Some(entropy) = entropy {
-                                settings.scale_color_f32(*entropy)
+                                settings.entropy_color(*entropy)
                             } else {
                                 todo!("pick a color to display when the info is not available")
                             }
                         },
                     );
+
+                    if let Some(byte_range) = hovered_byte_range {
+                        show_tooltip_at_pointer(
+                            ui.ctx(),
+                            ui.layer_id(),
+                            "signature_display".into(),
+                            |ui| {
+                                let byte_range = bin_byte_range(byte_range);
+                                let entropy = entropy_cache
+                                    .entry(byte_range.clone())
+                                    .or_insert_with(|| entropy(source, byte_range));
+
+                                if let Some(entropy) = entropy {
+                                    ui.label(format!("Entropy: {entropy:.02}"));
+                                } else {
+                                    ui.label(format!("Entropy unknown"));
+                                }
+                            },
+                        );
+                    }
 
                     let min_selection_size =
                         (total_bytes as f32 / range_len as f32).min(maximum_min_selection_size);
@@ -356,8 +379,8 @@ impl Zoombar {
         selecting: &mut bool,
         file_range: RangeInclusive<u64>,
         min_selection_size: f32,
-        mut byte_range_color: impl FnMut(RangeInclusive<u64>) -> Color32,
-    ) {
+        mut handle_byte_range: impl FnMut(RangeInclusive<u64>) -> Color32,
+    ) -> Option<RangeInclusive<u64>> {
         let total_points = rect.height().trunc() as u64 * 16;
 
         self.handle_selection(rect, selecting, min_selection_size, ui.ctx());
@@ -384,17 +407,32 @@ impl Zoombar {
                 let start_in_file = *file_range.start() + offset_within_range;
                 let byte_range = start_in_file..=start_in_file + bytes_per_pixel;
 
-                let raw_color = byte_range_color(byte_range);
+                let raw_color = handle_byte_range(byte_range);
 
-                const HIGHLIGHT_STRENGTH: f64 = 0.2;
+                const HIGHLIGHT_STRENGTH: f64 = 0.4;
 
                 if selection_start <= y && y <= selection_end {
-                    color::lerp(raw_color, egui::Color32::WHITE, HIGHLIGHT_STRENGTH)
+                    //color::lerp(raw_color, egui::Color32::WHITE, HIGHLIGHT_STRENGTH)
+                    raw_color
                 } else {
                     color::lerp(raw_color, egui::Color32::BLACK, HIGHLIGHT_STRENGTH)
                 }
             },
         );
-        ui.advance_cursor_after_rect(rect);
+
+        ui.allocate_rect(rect, Sense::hover())
+            .hover_pos()
+            .map(|pos| {
+                let x = (pos.x - rect.min.x) as usize / size;
+                let y = (pos.y - rect.min.y) as usize;
+
+                let relative_offset = (y * 16 + x) as f64 / total_points as f64;
+                let offset_within_range = (relative_offset * range_len as f64) as u64;
+
+                let start_in_file = *file_range.start() + offset_within_range;
+                let byte_range = start_in_file..=start_in_file + bytes_per_pixel;
+
+                byte_range
+            })
     }
 }

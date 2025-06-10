@@ -83,6 +83,19 @@ impl Settings {
         self.color_map.get_map()[(scalar.clamp(0.0, 1.0) * 255.0).round() as usize]
     }
 
+    /// A color representing an entropy.
+    pub fn entropy_color(&self, entropy: f32) -> Color32 {
+        // While the used color scales are perceptually similar, entropy distributions are not.
+        // In practice the upper end of the entropy spectrum contains many more nuances than the
+        // bottom.
+        // Thus here we use a power greater than 1 to better show differences between different
+        // higher entropy values.
+        // There is specific reason this particular value was chosen (it seemed best in trial and
+        // error).
+        let scaled_entropy = entropy.powf(1.0);
+        self.scale_color_f32(scaled_entropy)
+    }
+
     /// The width multiplier of the zoom and scrollbars.
     pub fn bar_width_multiplier(&self) -> usize {
         3
