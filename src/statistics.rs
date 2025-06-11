@@ -1,13 +1,10 @@
 //! Compute and represent statistics about windows of data.
 
-use std::{
-    fmt,
-    ops::{AddAssign, Range},
-};
+use std::{fmt, ops::AddAssign};
 
 use raw_bigrams::{RawBigrams, SmallRawBigrams};
 
-use crate::data::DataSource;
+use crate::{data::DataSource, window::Window};
 
 mod handler;
 mod raw_bigrams;
@@ -44,17 +41,19 @@ pub struct Statistics {
     /// The actual statistics.
     statistics: StatisticsKind,
     /// The window over which the statistics were calculated.
-    window: Range<u64>,
+    window: Window,
     /// The first byte in the window, if it is the first window.
     first_byte: Option<u8>,
 }
 
 impl Statistics {
-    /// Creates new empty statistics.
-    pub fn empty_at_with_capacity(offset: u64, capacity: u64) -> Statistics {
+    /// Creates new empty statistics starting at the beginning of the given window.
+    ///
+    /// The capacity of the window is chosen such that it will fit the whole given window.
+    pub fn empty_for_window(window: Window) -> Statistics {
         Statistics {
-            statistics: StatisticsKind::with_capacity(capacity),
-            window: offset..offset,
+            statistics: StatisticsKind::with_capacity(window.size()),
+            window: Window::from_start_len(window.start(), 0),
             first_byte: None,
         }
     }
@@ -62,9 +61,9 @@ impl Statistics {
     /// Computes statistics about a given window of data.
     pub fn compute<Source: DataSource>(
         source: &mut Source,
-        window: Range<u64>,
+        window: Window,
     ) -> Result<Statistics, Source::Error> {
-        let capacity = window.end.saturating_sub(window.start);
+        let capacity = window.size();
         let mut statistics = StatisticsKind::with_capacity(capacity);
 
         let (window, first_byte) = match &mut statistics {
@@ -84,13 +83,13 @@ impl Statistics {
     pub fn entropy(&self) -> f32 {
         match &self.statistics {
             StatisticsKind::Large(raw_statistics) => {
-                raw_statistics.entropy(self.window.clone(), self.first_byte)
+                raw_statistics.entropy(self.window, self.first_byte)
             }
             StatisticsKind::Medium(raw_statistics) => {
-                raw_statistics.entropy(self.window.clone(), self.first_byte)
+                raw_statistics.entropy(self.window, self.first_byte)
             }
             StatisticsKind::Small(raw_statistics) => {
-                raw_statistics.entropy(self.window.clone(), self.first_byte)
+                raw_statistics.entropy(self.window, self.first_byte)
             }
         }
     }
@@ -169,7 +168,7 @@ impl Statistics {
 
 impl fmt::Debug for Statistics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let len = self.window.end - self.window.start;
+        let size = self.window.size();
         f.debug_struct("Statistics")
             .field(
                 "kind",
@@ -180,7 +179,7 @@ impl fmt::Debug for Statistics {
                         StatisticsKind::Medium(_) => "medium",
                         StatisticsKind::Small(_) => "small",
                     },
-                    size_format::SizeFormatterBinary::new(len)
+                    size_format::SizeFormatterBinary::new(size)
                 ),
             )
             .field("window", &self.window)
@@ -192,15 +191,8 @@ impl fmt::Debug for Statistics {
 impl AddAssign<&Statistics> for Statistics {
     #[track_caller]
     fn add_assign(&mut self, rhs: &Statistics) {
-        let window = if self.window.end == rhs.window.start {
-            self.window.start..rhs.window.end
-        } else if rhs.window.end == self.window.start {
-            rhs.window.start..self.window.end
-        } else {
-            panic!(
-                "statistics must be adjacent to be added:\nlhs: {:?}\nrhs: {:?}",
-                self, rhs
-            );
+        let Some(window) = self.window.joined(rhs.window) else {
+            panic!("statistics must be adjacent to be added:\nlhs: {self:?}\nrhs: {rhs:?}",);
         };
 
         // TODO: This only works under the assumption that the left statistics instance is large

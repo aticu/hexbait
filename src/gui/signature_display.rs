@@ -1,8 +1,8 @@
-use std::ops::Range;
+//! Implements displaying of bigram signatures.
 
 use egui::{Rect, Sense, Ui, Vec2, show_tooltip_at_pointer, vec2};
 
-use crate::statistics::Signature;
+use crate::{statistics::Signature, window::Window};
 
 use super::{
     cached_image::CachedImage,
@@ -10,10 +10,10 @@ use super::{
     settings::Settings,
 };
 
-/// Displays a data signature as an image of 2-gram probabilities.
+/// Displays a data signature as an image of bigram probabilities.
 pub struct SignatureDisplay {
     /// The image of the displayed signature.
-    cached_image: CachedImage<(Range<u64>, u8)>,
+    cached_image: CachedImage<(Window, u8)>,
 }
 
 impl SignatureDisplay {
@@ -29,7 +29,7 @@ impl SignatureDisplay {
         &mut self,
         ui: &mut Ui,
         rect: Rect,
-        range: Range<u64>,
+        window: Window,
         signature: &Signature,
         xor_value: u8,
         settings: &Settings,
@@ -44,7 +44,7 @@ impl SignatureDisplay {
         );
 
         self.cached_image
-            .paint_at(ui, rect, (range, xor_value), |x, y| {
+            .paint_at(ui, rect, (window, xor_value), |x, y| {
                 let first = x / side_len as usize;
                 let second = y / side_len as usize;
 
@@ -88,5 +88,11 @@ impl SignatureDisplay {
                 });
             });
         }
+    }
+}
+
+impl Default for SignatureDisplay {
+    fn default() -> Self {
+        SignatureDisplay::new()
     }
 }

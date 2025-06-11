@@ -69,15 +69,13 @@ impl SelectionContext {
 
     /// Returns the current selection.
     pub(crate) fn selection(&self) -> Option<RangeInclusive<u64>> {
-        if let Some(selection) = &self.selection {
-            Some(if selection.start() <= selection.end() {
+        self.selection.as_ref().map(|selection| {
+            if selection.start() <= selection.end() {
                 selection.clone()
             } else {
                 *selection.end()..=*selection.start()
-            })
-        } else {
-            None
-        }
+            }
+        })
     }
 
     /// Renders the selection polygon on screen.
@@ -266,7 +264,7 @@ impl SelectionContext {
 
         trace_path(points_hex);
         trace_path(points_glyph);
-        if points2_hex.len() != 0 {
+        if !points2_hex.is_empty() {
             trace_path(points2_hex);
             trace_path(points2_glyph);
         }

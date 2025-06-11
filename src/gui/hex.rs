@@ -1,11 +1,9 @@
 //! Renders hexdumps in the GUI.
 
-use std::ops::RangeInclusive;
-
 use egui::{Align, Color32, Layout, Sense, Ui, UiBuilder, Vec2};
 use selection::SelectionContext;
 
-use crate::{data::DataSource, gui::color};
+use crate::{data::DataSource, gui::color, window::Window};
 
 mod inspector;
 mod primitives;
@@ -56,7 +54,8 @@ impl HexdumpView {
         let window_size = height.trunc() as u64 * 16;
         let rows_onscreen = (height / settings.char_height()).trunc() as u64;
 
-        let mut buf = vec![0; window_size as usize];
+        // add 16 more to show one row "beyond the screen"
+        let mut buf = vec![0; window_size as usize + 16];
 
         let file_size = source.len();
 
@@ -64,7 +63,8 @@ impl HexdumpView {
             let file_size = file_size.unwrap_or_else(|_| start_in_bytes + window.len() as u64);
 
             // determine how many rows we can at most scroll down
-            let max_scroll = (window.len().div_ceil(16) as u64).saturating_sub(rows_onscreen);
+            let max_height = (window.len() as u64).min(window_size).div_ceil(16);
+            let max_scroll = max_height.saturating_sub(rows_onscreen);
 
             // handle scrolling centrally here
             if ui.rect_contains_pointer(rect) {
@@ -119,8 +119,8 @@ impl HexdumpView {
                     });
                     let mut selected_buf;
                     let selected_buf = if let Some(selection) = self.selection() {
-                        selected_buf = vec![0; selection.clone().count()];
-                        source.window_at(*selection.start(), &mut selected_buf).ok()
+                        selected_buf = vec![0; selection.size() as usize];
+                        source.window_at(selection.start(), &mut selected_buf).ok()
                     } else {
                         None
                     };
@@ -134,8 +134,10 @@ impl HexdumpView {
     }
 
     /// Returns the current selection.
-    fn selection(&self) -> Option<RangeInclusive<u64>> {
-        self.selection_context.selection()
+    fn selection(&self) -> Option<Window> {
+        self.selection_context
+            .selection()
+            .map(|selection| Window::new(*selection.start(), *selection.end() + 1))
     }
 
     /// Renders a single row in a hexdump.
@@ -255,5 +257,11 @@ impl HexdumpView {
                     Color32::TRANSPARENT
                 }
             });
+    }
+}
+
+impl Default for HexdumpView {
+    fn default() -> Self {
+        HexdumpView::new()
     }
 }

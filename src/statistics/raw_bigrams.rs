@@ -3,10 +3,10 @@
 use std::{
     collections::BTreeMap,
     iter::Sum,
-    ops::{AddAssign, Range, SubAssign},
+    ops::{AddAssign, SubAssign},
 };
 
-use crate::data::DataSource;
+use crate::{data::DataSource, window::Window};
 
 /// Computed statistics about bigrams in a window of data.
 #[derive(Eq, PartialEq)]
@@ -36,8 +36,8 @@ where
     pub(super) fn compute<Source: DataSource>(
         &mut self,
         source: &mut Source,
-        window: Range<u64>,
-    ) -> Result<(Range<u64>, Option<u8>), Source::Error> {
+        window: Window,
+    ) -> Result<(Window, Option<u8>), Source::Error> {
         raw_compute(
             self,
             |this, first, second| this.add_count(first, second, Count::from(1u8)),
@@ -50,8 +50,8 @@ where
     }
 
     /// Computes the entropy from the collected statistics.
-    pub(super) fn entropy(&self, window: Range<u64>, first_byte: Option<u8>) -> f32 {
-        let window_size = (window.end - window.start) as f32;
+    pub(super) fn entropy(&self, window: Window, first_byte: Option<u8>) -> f32 {
+        let window_size = window.size() as f32;
         -(0..256)
             .map(|i| {
                 u64::from(self.follow[i].into_iter().sum::<Count>())
@@ -103,18 +103,18 @@ impl SmallRawBigrams {
     pub(super) fn compute<Source: DataSource>(
         &mut self,
         source: &mut Source,
-        window: Range<u64>,
-    ) -> Result<(Range<u64>, Option<u8>), Source::Error> {
+        window: Window,
+    ) -> Result<(Window, Option<u8>), Source::Error> {
         raw_compute(
             self,
             |this, first, second| this.add_count(first, second, 1),
             |this, first, second| {
-                if let Some(count) = this.follow.get_mut(&(second as u8, first as u8)) {
+                if let Some(count) = this.follow.get_mut(&(second, first)) {
                     *count -= 1;
                     if *count == 0 {
                         // remove the 0 count to keep the invariant that if a count exists, it is
                         // nonzero
-                        this.follow.remove(&(second as u8, first as u8));
+                        this.follow.remove(&(second, first));
                     }
                 }
             },
@@ -124,15 +124,15 @@ impl SmallRawBigrams {
     }
 
     /// Computes the entropy from the collected statistics.
-    pub(super) fn entropy(&self, window: Range<u64>, first_byte: Option<u8>) -> f32 {
-        let window_size = (window.end - window.start) as f32;
+    pub(super) fn entropy(&self, window: Window, first_byte: Option<u8>) -> f32 {
+        let window_size = window.size() as f32;
         -(0..=255)
             .map(|i| {
                 self.follow
                     .range((i, 0)..=(i, 255))
                     .map(|(_, &count)| u64::from(count))
                     .sum::<u64>()
-                    + (first_byte == Some(i as u8)) as u64
+                    + (first_byte == Some(i)) as u64
             })
             .filter(|&count| count > 0)
             .map(|count| count as f32 / window_size)
@@ -163,13 +163,13 @@ fn raw_compute<Source: DataSource, T>(
     mut increase_count: impl FnMut(&mut T, u8, u8),
     decrease_count: impl FnOnce(&mut T, u8, u8),
     source: &mut Source,
-    window: Range<u64>,
-) -> Result<(Range<u64>, Option<u8>), Source::Error> {
+    window: Window,
+) -> Result<(Window, Option<u8>), Source::Error> {
     const WINDOW_SIZE: usize = 4096;
 
-    let byte_before_window = if window.start > 0 {
+    let byte_before_window = if window.start() > 0 {
         source
-            .window_at(window.start - 1, &mut [0])?
+            .window_at(window.start() - 1, &mut [0])?
             .first()
             .copied()
     } else {
@@ -180,13 +180,11 @@ fn raw_compute<Source: DataSource, T>(
 
     // TODO: this can probably be optimized using SIMD, since this is completely independent of
     // any data but the previous byte (which is only required between subwindows)
-    let mut prev_byte = byte_before_window
-        .map(|byte| byte)
-        .unwrap_or(DEFAULT_PREV_BYTE);
-    let mut start = window.start;
-    while start < window.end {
+    let mut prev_byte = byte_before_window.unwrap_or(DEFAULT_PREV_BYTE);
+    let mut start = window.start();
+    while start < window.end() {
         let mut buf = [0; WINDOW_SIZE];
-        let max_size = std::cmp::min((window.end - start) as usize, WINDOW_SIZE);
+        let max_size = std::cmp::min((window.end() - start) as usize, WINDOW_SIZE);
 
         let subwindow = source.window_at(start, &mut buf[..max_size])?;
 
@@ -202,12 +200,12 @@ fn raw_compute<Source: DataSource, T>(
         }
     }
     // in case the originally given range was larger than the window
-    let window_size = start - window.start;
+    let window_size = start - window.start();
 
     let first_byte = 'first_byte: {
         if byte_before_window.is_none() {
             // if there is no byte before this window, we initialize `prev_byte`
-            if let Some(&first_byte) = source.window_at(window.start, &mut [0])?.first() {
+            if let Some(&first_byte) = source.window_at(window.start(), &mut [0])?.first() {
                 decrease_count(this, DEFAULT_PREV_BYTE, first_byte);
 
                 break 'first_byte Some(first_byte);
@@ -219,5 +217,8 @@ fn raw_compute<Source: DataSource, T>(
         None
     };
 
-    Ok((window.start..window.start + window_size, first_byte))
+    Ok((
+        Window::from_start_len(window.start(), window_size),
+        first_byte,
+    ))
 }

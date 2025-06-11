@@ -1,10 +1,10 @@
 //! Implements a handler that manages statistics for an input.
 
-use std::{ops::Range, sync::Arc};
+use std::sync::Arc;
 
 use quick_cache::sync::Cache;
 
-use crate::data::DataSource;
+use crate::{data::DataSource, window::Window};
 
 use super::Statistics;
 
@@ -45,16 +45,15 @@ impl StatisticsHandler {
 
     /// Returns the cached statistics for the given window or computes them.
     fn get_or_compute<Source: DataSource>(
-        &mut self,
+        &self,
         source: &mut Source,
-        window: Range<u64>,
+        window: Window,
     ) -> Result<(Arc<Statistics>, bool), Source::Error> {
-        let size = CacheSize::try_from(window.end - window.start).expect("not a valid cache size");
-        assert_eq!(window.start % size.size(), 0, "unaligned cache request");
-        let start = window.start;
+        let size = CacheSize::try_from(window.size()).expect("not a valid cache size");
+        assert_eq!(window.start() % size.size(), 0, "unaligned cache request");
 
         self.caches[size.index()]
-            .get(&start)
+            .get(&window.start())
             .map(|stats| Ok((stats, true)))
             .unwrap_or_else(|| {
                 Statistics::compute(source, window).map(|stats| (Arc::new(stats), false))
@@ -65,37 +64,37 @@ impl StatisticsHandler {
     ///
     /// Recomputes if necessary.
     fn get_or_cache<Source: DataSource>(
-        &mut self,
+        &self,
         source: &mut Source,
-        window: Range<u64>,
+        window: Window,
     ) -> Result<Arc<Statistics>, Source::Error> {
-        let (stats, cached) = self.get_or_compute(source, window.clone())?;
+        let (stats, cached) = self.get_or_compute(source, window)?;
         if cached {
             return Ok(stats);
         }
-        let size = CacheSize::try_from(window.end - window.start).expect("not a valid cache size");
+        let size = CacheSize::try_from(window.size()).expect("not a valid cache size");
 
-        self.caches[size.index()].insert(window.start, stats.clone());
+        self.caches[size.index()].insert(window.start(), stats.clone());
 
         Ok(stats)
     }
 
     /// Adds a section that is aligned to a cache size to the statistics.
     fn add_aligned_section<Source: DataSource>(
-        &mut self,
+        &self,
         stats: &mut Statistics,
         source: &mut Source,
-        window: Range<u64>,
+        window: Window,
         size: CacheSize,
     ) -> Result<(), Source::Error> {
         let size_u64 = size.size();
 
         let add_window =
-            |this: &mut Self, stats: &mut Statistics, source: &mut Source, start, end| {
-                for i in 0..(end - start) / size_u64 {
+            |this: &Self, stats: &mut Statistics, source: &mut Source, window: Window| {
+                for i in 0..window.size() / size_u64 {
                     let window_stats = this.get_or_cache(
                         source,
-                        start + i * size_u64..start + i * size_u64 + size_u64,
+                        Window::from_start_len(window.start() + i * size_u64, size_u64),
                     )?;
 
                     *stats += &window_stats;
@@ -105,53 +104,46 @@ impl StatisticsHandler {
             };
 
         if let Some(next_size) = size.next()
-            && let next_size_start = next_size.next_start(window.start)
-            && let next_size_end = next_size.prev_end(window.end)
-            && next_size_start < next_size_end
+            && let Some((before, aligned, after)) = window.align(next_size.size())
         {
-            add_window(self, stats, source, window.start, next_size_start)?;
-            self.add_aligned_section(stats, source, next_size_start..next_size_end, next_size)?;
-            add_window(self, stats, source, next_size_end, window.end)?;
+            add_window(self, stats, source, before)?;
+            self.add_aligned_section(stats, source, aligned, next_size)?;
+            add_window(self, stats, source, after)?;
         } else {
-            add_window(self, stats, source, window.start, window.end)?;
+            add_window(self, stats, source, window)?;
         }
 
         Ok(())
     }
 
-    /// Returns the statistics
+    /// Returns the statistics associated with the given window.
     pub fn get<Source: DataSource>(
-        &mut self,
+        &self,
         source: &mut Source,
-        window: Range<u64>,
+        window: Window,
     ) -> Result<Statistics, Source::Error> {
-        let len = window.end - window.start;
-        let mut output = Statistics::empty_at_with_capacity(window.start, len);
+        let mut output = Statistics::empty_for_window(window);
 
-        let first_cached_start = CacheSize::SMALLEST.next_start(window.start);
-        let last_cached_end = CacheSize::SMALLEST.prev_end(window.end);
-
-        if first_cached_start > last_cached_end {
-            output += &Statistics::compute(source, window.clone())?;
+        if let Some((before, aligned, after)) = window.align(CacheSize::SMALLEST.size()) {
+            if !before.is_empty() {
+                output += &Statistics::compute(source, before)?;
+            }
+            self.add_aligned_section(&mut output, source, aligned, CacheSize::SMALLEST)?;
+            if !after.is_empty() {
+                output += &Statistics::compute(source, after)?;
+            }
         } else {
-            if window.start < first_cached_start {
-                output += &Statistics::compute(source, window.start..first_cached_start)?;
-            }
-
-            self.add_aligned_section(
-                &mut output,
-                source,
-                first_cached_start..last_cached_end,
-                CacheSize::SMALLEST,
-            )?;
-
-            if last_cached_end < window.end {
-                output += &Statistics::compute(source, last_cached_end..window.end)?;
-            }
+            output += &Statistics::compute(source, window)?;
         }
 
         assert_eq!(output.window, window);
 
         Ok(output)
+    }
+}
+
+impl Default for StatisticsHandler {
+    fn default() -> Self {
+        StatisticsHandler::new()
     }
 }

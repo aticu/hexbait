@@ -77,7 +77,6 @@ impl eframe::App for MyApp {
 
             let file_size = self.input.len().unwrap();
             // TODO: use caching for entropy calculation
-            // TODO: implement a custom "window" type
             // TODO: change font to render more characters
             // TODO: move statistics computing to a background thread
             // TODO: try to speed up cache computation by looking up values from the smaller caches
@@ -97,11 +96,8 @@ impl eframe::App for MyApp {
                         start,
                     );
                 },
-                |ui, source, range| {
-                    let statistics = self
-                        .statistics_handler
-                        .get(source, *range.start()..*range.end())
-                        .unwrap();
+                |ui, source, window| {
+                    let statistics = self.statistics_handler.get(source, window).unwrap();
                     let signature = statistics.to_signature();
                     let rect = ui.max_rect().intersect(ui.cursor());
 
@@ -109,7 +105,7 @@ impl eframe::App for MyApp {
                         self.signature_display.render(
                             ui,
                             rect,
-                            *range.start()..*range.end(),
+                            window,
                             &signature,
                             self.xor_value,
                             &self.settings,
@@ -122,8 +118,6 @@ impl eframe::App for MyApp {
                     });
                 },
             );
-
-            return;
         });
         self.frame_time = start.elapsed();
     }

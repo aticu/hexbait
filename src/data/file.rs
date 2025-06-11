@@ -22,10 +22,7 @@ impl DataSource for File {
         let len = self.len()?;
 
         if offset > len {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "offset is beyond input",
-            ));
+            return Err(io::Error::other("offset is beyond input"));
         }
 
         let len_left = len - offset;

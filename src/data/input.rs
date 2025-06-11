@@ -20,8 +20,7 @@ impl DataSource for Input {
             Input::File(file) => file.len(),
             Input::Stdin(stdin) => {
                 let mut as_ref = &**stdin;
-                <&[u8] as DataSource>::len(&mut as_ref)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
+                <&[u8] as DataSource>::len(&mut as_ref).map_err(io::Error::other)
             }
         }
     }
@@ -35,8 +34,7 @@ impl DataSource for Input {
             Input::File(file) => file.window_at(offset, buf),
             Input::Stdin(stdin) => {
                 let mut as_ref = &**stdin;
-                <&[u8] as DataSource>::window_at(&mut as_ref, offset, buf)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
+                <&[u8] as DataSource>::window_at(&mut as_ref, offset, buf).map_err(io::Error::other)
             }
         }
     }

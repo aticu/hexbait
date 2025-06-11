@@ -7,6 +7,7 @@ use super::CacheSize;
 /// Example specification:
 ///
 /// ```
+/// # use hexbait::cache_sizes;
 /// cache_sizes! {
 ///     CacheSize {
 ///         32 KiB with 256 entries,
@@ -118,16 +119,6 @@ impl CacheSize {
 
     /// The smallest cache size.
     pub(super) const SMALLEST: CacheSize = CacheSize::try_from_index(0).unwrap();
-
-    /// The start of the next cache entry.
-    pub(super) const fn next_start(self, offset: u64) -> u64 {
-        self.prev_end(offset + (self.size() - 1))
-    }
-
-    /// The end of the previous cache entry.
-    pub(super) const fn prev_end(self, offset: u64) -> u64 {
-        offset & !(self.size() - 1)
-    }
 
     /// The next cache size.
     pub(super) const fn next(self) -> Option<CacheSize> {

@@ -7,7 +7,7 @@ use egui::{
     show_tooltip_at_pointer, vec2,
 };
 
-use crate::data::DataSource;
+use crate::{data::DataSource, window::Window};
 
 use super::{cached_image::CachedImage, color, settings::Settings};
 
@@ -22,18 +22,10 @@ pub struct Zoombars {
 }
 
 // TODO: pretty this part up
-fn bin_byte_range(range: RangeInclusive<u64>) -> RangeInclusive<u64> {
-    const WINDOW_SIZE: usize = 1024;
-    let start = *range.start() & !(WINDOW_SIZE as u64 - 1);
-    let range_len = range.count() + WINDOW_SIZE & !(WINDOW_SIZE - 1);
+fn entropy(source: &mut impl DataSource, window: Window) -> Option<f32> {
+    let mut buf = vec![0; window.size() as usize];
 
-    start..=start + range_len as u64
-}
-
-fn entropy(source: &mut impl DataSource, range: RangeInclusive<u64>) -> Option<f32> {
-    let mut buf = vec![0; (range.end() - range.start()) as usize];
-
-    if let Ok(window) = source.window_at(*range.start(), &mut buf) {
+    if let Ok(window) = source.window_at(window.start(), &mut buf) {
         let mut frequencies = [0usize; 256];
 
         for &byte in window {
@@ -73,7 +65,7 @@ impl Zoombars {
         source: &mut Source,
         settings: &Settings,
         render_hex: impl FnOnce(&mut Ui, &mut Source, u64),
-        render_overview: impl FnOnce(&mut Ui, &mut Source, RangeInclusive<u64>),
+        render_overview: impl FnOnce(&mut Ui, &mut Source, Window),
     ) {
         let rect = ui.max_rect().intersect(ui.cursor());
 
@@ -92,7 +84,7 @@ impl Zoombars {
 
         let maximum_min_selection_size = (total_rows - 1) as f32 / total_rows as f32;
 
-        let mut file_range = 0..=file_size;
+        let mut window = Window::new(0, file_size);
         let mut show_hex = false;
 
         let mut entropy_cache = HashMap::new();
@@ -114,12 +106,7 @@ impl Zoombars {
                     ui.painter().text(
                         rect.min,
                         egui::Align2::LEFT_BOTTOM,
-                        format!(
-                            "{}B",
-                            size_format::SizeFormatterBinary::new(
-                                file_range.end() - file_range.start()
-                            )
-                        ),
+                        format!("{}B", size_format::SizeFormatterBinary::new(window.size())),
                         FontId::proportional(size_text_height),
                         ui.style().noninteractive().text_color(),
                     );
@@ -127,26 +114,25 @@ impl Zoombars {
                     let mut selecting = self.selecting && is_second_last;
                     let was_selecting = selecting;
 
-                    let range_len = file_range.clone().count() as u64 - 1;
-                    if range_len <= total_bytes {
+                    if window.size() <= total_bytes {
                         show_hex = true;
                         break;
                     }
 
                     let min_selection_size =
-                        (total_bytes as f32 / range_len as f32).min(maximum_min_selection_size);
+                        (total_bytes as f32 / window.size() as f32).min(maximum_min_selection_size);
 
-                    let hovered_byte_range = bar.render(
+                    let hovered_row_window = bar.render(
                         ui,
                         rect,
                         &mut selecting,
-                        file_range.clone(),
+                        window,
                         min_selection_size,
-                        |byte_range| {
-                            let byte_range = bin_byte_range(byte_range);
+                        |row_window| {
+                            let row_window = row_window.expand_to_align(1024);
                             let entropy = entropy_cache
-                                .entry(byte_range.clone())
-                                .or_insert_with(|| entropy(source, byte_range));
+                                .entry(row_window)
+                                .or_insert_with(|| entropy(source, row_window));
 
                             if let Some(entropy) = entropy {
                                 settings.entropy_color(*entropy)
@@ -156,37 +142,37 @@ impl Zoombars {
                         },
                     );
 
-                    if let Some(byte_range) = hovered_byte_range {
+                    if let Some(row_window) = hovered_row_window {
                         show_tooltip_at_pointer(
                             ui.ctx(),
                             ui.layer_id(),
                             "signature_display".into(),
                             |ui| {
-                                let byte_range = bin_byte_range(byte_range);
+                                let row_window = row_window.expand_to_align(1024);
                                 let entropy = entropy_cache
-                                    .entry(byte_range.clone())
-                                    .or_insert_with(|| entropy(source, byte_range));
+                                    .entry(row_window)
+                                    .or_insert_with(|| entropy(source, row_window));
 
                                 if let Some(entropy) = entropy {
                                     ui.label(format!("Entropy: {entropy:.02}"));
                                 } else {
-                                    ui.label(format!("Entropy unknown"));
+                                    ui.label("Entropy unknown");
                                 }
                             },
                         );
                     }
 
                     let min_selection_size =
-                        (total_bytes as f32 / range_len as f32).min(maximum_min_selection_size);
+                        (total_bytes as f32 / window.size() as f32).min(maximum_min_selection_size);
                     let selection = bar.selection(min_selection_size);
 
-                    let new_start_offset = (range_len as f32 * selection.start()) as u64;
+                    let new_start_offset = (window.size() as f32 * selection.start()) as u64;
 
-                    let start = *file_range.start() + new_start_offset;
-                    let selection_size =
-                        ((selection.end() - selection.start()) as f64 * range_len as f64) as u64;
+                    let start = window.start() + new_start_offset;
+                    let selection_size = ((selection.end() - selection.start()) as f64
+                        * window.size() as f64) as u64;
 
-                    file_range = start..=std::cmp::min(start + selection_size, file_size);
+                    window = Window::new(start, std::cmp::min(start + selection_size, file_size));
 
                     if !was_selecting && selecting {
                         self.selecting = true;
@@ -209,13 +195,11 @@ impl Zoombars {
                 }
 
                 if show_hex {
-                    let raw_start_in_bytes = *file_range.start();
-                    let raw_end_in_bytes = *file_range.end();
-                    let start = if raw_start_in_bytes == 0 {
+                    let start = if window.start() == 0 {
                         // ensure that the correction below does not make the start invisible
 
                         0
-                    } else if raw_end_in_bytes > file_size - 16 {
+                    } else if window.end() > file_size - 16 {
                         // over-correct towards the end to ensure it's guaranteed to be visible
 
                         let rounded_up_size = if file_size % 16 == 0 {
@@ -226,15 +210,21 @@ impl Zoombars {
 
                         (rounded_up_size - total_bytes) / 16
                     } else {
-                        raw_start_in_bytes / 16
+                        window.start() / 16
                     };
 
                     render_hex(ui, source, start);
                 } else {
-                    render_overview(ui, source, file_range);
+                    render_overview(ui, source, window);
                 }
             },
         );
+    }
+}
+
+impl Default for Zoombars {
+    fn default() -> Self {
+        Zoombars::new()
     }
 }
 
@@ -245,7 +235,7 @@ struct Zoombar {
     /// Whether or not the user is currently dragging the selection.
     dragging: bool,
     /// A cached image of the zoombar.
-    cached_image: CachedImage<(RangeInclusive<f32>, RangeInclusive<u64>)>,
+    cached_image: CachedImage<(RangeInclusive<f32>, Window)>,
 }
 
 impl Zoombar {
@@ -377,11 +367,11 @@ impl Zoombar {
         ui: &mut Ui,
         rect: Rect,
         selecting: &mut bool,
-        file_range: RangeInclusive<u64>,
+        window: Window,
         min_selection_size: f32,
-        mut handle_byte_range: impl FnMut(RangeInclusive<u64>) -> Color32,
-    ) -> Option<RangeInclusive<u64>> {
-        let total_points = rect.height().trunc() as u64 * 16;
+        mut row_color: impl FnMut(Window) -> Color32,
+    ) -> Option<Window> {
+        let total_rows = rect.height().trunc() as u64;
 
         self.handle_selection(rect, selecting, min_selection_size, ui.ctx());
 
@@ -389,25 +379,20 @@ impl Zoombar {
         let selection_start = (rect.height() * *selection.start()).trunc() as usize;
         let selection_end = (rect.height() * *selection.end()).trunc() as usize;
 
-        let size = rect.width().trunc() as usize / 16;
-
-        let range_len = file_range.clone().count();
-        let bytes_per_pixel = (range_len as f64 / total_points as f64).round() as u64;
+        let bytes_per_row = (window.size() as f64 / total_rows as f64).round() as u64;
 
         self.cached_image.paint_at(
             ui,
             rect,
-            (self.selection(min_selection_size), file_range.clone()),
-            |x, y| {
-                let x = x / size;
+            (self.selection(min_selection_size), window),
+            |_, y| {
+                let relative_offset = y as f64 / total_rows as f64;
+                let offset_within_range = (relative_offset * window.size() as f64) as u64;
 
-                let relative_offset = (y * 16 + x) as f64 / total_points as f64;
-                let offset_within_range = (relative_offset * range_len as f64) as u64;
+                let row_window =
+                    Window::from_start_len(window.start() + offset_within_range, bytes_per_row);
 
-                let start_in_file = *file_range.start() + offset_within_range;
-                let byte_range = start_in_file..=start_in_file + bytes_per_pixel;
-
-                let raw_color = handle_byte_range(byte_range);
+                let raw_color = row_color(row_window);
 
                 const HIGHLIGHT_STRENGTH: f64 = 0.4;
 
@@ -423,16 +408,18 @@ impl Zoombar {
         ui.allocate_rect(rect, Sense::hover())
             .hover_pos()
             .map(|pos| {
-                let x = (pos.x - rect.min.x) as usize / size;
                 let y = (pos.y - rect.min.y) as usize;
 
-                let relative_offset = (y * 16 + x) as f64 / total_points as f64;
-                let offset_within_range = (relative_offset * range_len as f64) as u64;
+                let relative_offset = y as f64 / total_rows as f64;
+                let offset_within_range = (relative_offset * window.size() as f64) as u64;
 
-                let start_in_file = *file_range.start() + offset_within_range;
-                let byte_range = start_in_file..=start_in_file + bytes_per_pixel;
-
-                byte_range
+                Window::from_start_len(window.start() + offset_within_range, bytes_per_row)
             })
+    }
+}
+
+impl Default for Zoombar {
+    fn default() -> Self {
+        Zoombar::new()
     }
 }

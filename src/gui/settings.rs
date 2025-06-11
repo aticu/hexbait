@@ -101,3 +101,9 @@ impl Settings {
         3
     }
 }
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings::new()
+    }
+}

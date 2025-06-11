@@ -153,7 +153,7 @@ pub(crate) fn render_inspector(
                 let as_str = (0..buf.len())
                     .step_by(size_of::<u32>())
                     .filter_map(|i| read_int!(u32, offset = i))
-                    .map(|int| char::from_u32(int))
+                    .map(char::from_u32)
                     .collect::<Option<String>>();
 
                 as_str.filter(|s| !s.is_empty()).map(|s| format!("{s:?}"))

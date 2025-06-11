@@ -65,7 +65,7 @@ impl<T: PartialEq> CachedImage<T> {
                 let start = (width * y + x) * 4;
                 let color = render(x, y);
 
-                bytes[start + 0] = color.r();
+                bytes[start] = color.r();
                 bytes[start + 1] = color.g();
                 bytes[start + 2] = color.b();
                 bytes[start + 3] = color.a();
@@ -114,5 +114,11 @@ impl<T: PartialEq> CachedImage<T> {
 
         self.rendered(ui, width, height, params, render)
             .paint_at(ui, rect);
+    }
+}
+
+impl<T: PartialEq> Default for CachedImage<T> {
+    fn default() -> Self {
+        CachedImage::new()
     }
 }
