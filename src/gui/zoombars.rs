@@ -405,6 +405,22 @@ impl Zoombar {
             },
         );
 
+        /*
+        let highlight_position = 200_000;
+
+        if window.contains(highlight_position) {
+            let relative_offset =
+                (highlight_position - window.start()) as f32 / window.size() as f32;
+
+            ui.painter().circle(
+                rect.center_top() + vec2(0.0, relative_offset * rect.height()),
+                rect.width() / 16f32,
+                Color32::RED,
+                egui::Stroke::NONE,
+            );
+        }
+        */
+
         ui.allocate_rect(rect, Sense::hover())
             .hover_pos()
             .map(|pos| {

@@ -4,12 +4,14 @@ mod file;
 mod input;
 mod slice;
 
+use std::fmt;
+
 pub use input::Input;
 
 /// A data source for hexamine to work with.
 pub trait DataSource {
     /// The error type for fallible sources.
-    type Error;
+    type Error: fmt::Debug + fmt::Display;
 
     /// The length of the data.
     fn len(&mut self) -> Result<u64, Self::Error>;

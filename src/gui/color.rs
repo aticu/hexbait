@@ -2,11 +2,8 @@
 
 use egui::Color32;
 
-/// The background color to use for highlights.
-pub const HIGHLIGHT_BACKGROUND_COLOR: Color32 = Color32::from_gray(50);
-
-/// The foreground color to use for highlights.
-pub const HIGHLIGHT_FOREROUND_COLOR: Color32 = Color32::WHITE;
+/// The color to use for highlights.
+pub const HIGHLIGHT_COLOR: Color32 = Color32::WHITE;
 
 /// The colors of all byte values.
 pub const BYTE_COLORS: [Color32; 256] = {

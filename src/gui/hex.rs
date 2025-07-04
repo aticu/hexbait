@@ -1,11 +1,16 @@
 //! Renders hexdumps in the GUI.
 
-use egui::{Align, Color32, Layout, Sense, Ui, UiBuilder, Vec2};
+use egui::{Align, Color32, Layout, Rect, RichText, ScrollArea, Sense, Ui, UiBuilder, Vec2, vec2};
+use highlighting::highlight;
 use selection::SelectionContext;
 
-use crate::{data::DataSource, gui::color, window::Window};
+use crate::{
+    data::DataSource, gui::color, model::Endianness, parsing::eval::Provenance, window::Window,
+};
 
+mod highlighting;
 mod inspector;
+mod parse_result;
 mod primitives;
 mod selection;
 
@@ -25,6 +30,8 @@ pub struct HexdumpView {
     selection_context: SelectionContext,
     /// The cached image for the sidebar in the hex view.
     sidebar_cached_image: CachedImage<(u64, u64)>,
+    /// The currently hovered parsed bytes.
+    hovered_parsed_bytes: Option<Provenance>,
 }
 
 impl HexdumpView {
@@ -34,6 +41,7 @@ impl HexdumpView {
             scroll_offset: 0,
             selection_context: SelectionContext::new(),
             sidebar_cached_image: CachedImage::new(),
+            hovered_parsed_bytes: None,
         }
     }
 
@@ -43,7 +51,7 @@ impl HexdumpView {
         ui: &mut Ui,
         settings: &Settings,
         source: &mut impl DataSource,
-        big_endian: &mut bool,
+        endianness: &mut Endianness,
         start: u64,
     ) {
         // start is in rows
@@ -62,12 +70,20 @@ impl HexdumpView {
         if let Ok(window) = source.window_at(start_in_bytes, &mut buf) {
             let file_size = file_size.unwrap_or_else(|_| start_in_bytes + window.len() as u64);
 
+            let hex_rect_width = (16 * settings.bar_width_multiplier()) as f32
+                + ui.spacing().item_spacing.x
+                + ((16 + 32 + 16) as f32 * settings.char_width())
+                + (2 as f32 * settings.large_space())
+                + (17 as f32 * settings.small_space());
+
+            let scroll_rect = rect.with_max_x(rect.min.x + hex_rect_width);
+
             // determine how many rows we can at most scroll down
             let max_height = (window.len() as u64).min(window_size).div_ceil(16);
             let max_scroll = max_height.saturating_sub(rows_onscreen);
 
             // handle scrolling centrally here
-            if ui.rect_contains_pointer(rect) {
+            if ui.rect_contains_pointer(scroll_rect) {
                 let raw_scroll_delta = ui.ctx().input(|input| input.smooth_scroll_delta).y;
                 let scroll_delta = (-raw_scroll_delta / 2.0).trunc() as i64;
                 if scroll_delta < 0 {
@@ -91,6 +107,8 @@ impl HexdumpView {
                     .max_rect(rect)
                     .layout(Layout::left_to_right(Align::Min)),
                 |ui| {
+                    let max_rect = ui.max_rect();
+
                     self.render_sidebar(ui, window, rows_onscreen, max_scroll, start, settings);
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing = Vec2::ZERO;
@@ -101,6 +119,20 @@ impl HexdumpView {
                             rows_onscreen,
                             settings,
                         );
+
+                        if let Some(hovered_parsed_bytes) = &self.hovered_parsed_bytes {
+                            for range in hovered_parsed_bytes.byte_ranges() {
+                                highlight(
+                                    ui,
+                                    range,
+                                    Color32::GOLD,
+                                    file_size,
+                                    start + self.scroll_offset,
+                                    rows_onscreen,
+                                    settings,
+                                );
+                            }
+                        }
 
                         for (i, row) in window
                             .chunks(16)
@@ -124,7 +156,70 @@ impl HexdumpView {
                     } else {
                         None
                     };
-                    render_inspector(ui, selected_buf, big_endian, settings);
+
+                    // TODO: handle case where this is too small
+                    let rest_rect = max_rect.intersect(ui.cursor());
+                    let half_height = rest_rect.height() / 2.0;
+
+                    let top_rect =
+                        Rect::from_min_size(rest_rect.min, vec2(rest_rect.width(), half_height));
+
+                    let bottom_rect = Rect::from_min_size(
+                        rest_rect.min + vec2(0.0, half_height),
+                        vec2(rest_rect.width(), half_height),
+                    );
+
+                    ui.allocate_new_ui(
+                        UiBuilder::new()
+                            .max_rect(top_rect)
+                            .layout(Layout::left_to_right(Align::Min)),
+                        |ui| {
+                            ScrollArea::vertical()
+                                .id_salt("inspector_scroll")
+                                .max_height(half_height)
+                                .show(ui, |ui| {
+                                    ui.vertical(|ui| {
+                                        render_inspector(ui, selected_buf, endianness, settings);
+                                    });
+                                });
+                        },
+                    );
+
+                    ui.allocate_new_ui(
+                        UiBuilder::new()
+                            .max_rect(bottom_rect)
+                            .layout(Layout::left_to_right(Align::Min)),
+                        |ui| {
+                            ScrollArea::both()
+                                .id_salt("parser_scroll")
+                                .max_height(half_height)
+                                .show(ui, |ui| {
+                                    self.hovered_parsed_bytes = None;
+
+                                    return;
+
+                                    // TODO: fix this so it doesn't always start at zero
+                                    let mut context =
+                                        crate::parsing::eval::ParseContext::with_offset(0.into());
+                                    let value = context
+                                        .parse(&crate::parsing::tmp_pe_file(), source)
+                                        .unwrap();
+                                    let hovered = parse_result::show_value(
+                                        ui,
+                                        crate::parsing::eval::Path::new(),
+                                        None,
+                                        &value,
+                                        settings,
+                                    );
+
+                                    if let Some(hovered) = hovered
+                                        && let Some(value) = value.subvalue_at_path(&hovered)
+                                    {
+                                        self.hovered_parsed_bytes = Some(value.provenance.clone());
+                                    }
+                                });
+                        },
+                    );
                 },
             );
         } else {
@@ -152,10 +247,32 @@ impl HexdumpView {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing = Vec2::ZERO;
 
+            let render_offset_info = |ui: &mut Ui, byte_offset: u64, selection: Option<Window>| {
+                ui.label(
+                    RichText::new(format!(
+                        "offset from file start: 0x{byte_offset:x} ({byte_offset})"
+                    ))
+                    .size(settings.font_size()),
+                );
+                if let Some(selection) = selection {
+                    let selection_offset = byte_offset as i64 - selection.start() as i64;
+                    ui.label(
+                        RichText::new(format!(
+                            "offset from selection start: {}0x{:x} ({selection_offset})",
+                            if selection_offset < 0 { "-" } else { "" },
+                            selection_offset.abs()
+                        ))
+                        .size(settings.font_size()),
+                    );
+                }
+            };
+
             // offset
             render_offset(ui, settings, Sense::hover(), offset).on_hover_ui(|ui| {
                 let percentage = offset as f64 / file_size as f64 * 100.0;
-                ui.label(format!("{percentage:.02}% of file"));
+                ui.label(
+                    RichText::new(format!("{percentage:.02}% of file")).size(settings.font_size()),
+                );
             });
             ui.add_space(settings.large_space());
 
@@ -173,6 +290,7 @@ impl HexdumpView {
 
                 response.on_hover_ui(|ui| {
                     render_glyph(ui, settings, Sense::hover(), byte);
+                    render_offset_info(ui, byte_offset, self.selection());
                 });
 
                 if i < 15 {
@@ -212,6 +330,7 @@ impl HexdumpView {
 
                 response.on_hover_ui(|ui| {
                     render_hex(ui, settings, Sense::hover(), byte);
+                    render_offset_info(ui, byte_offset, self.selection());
                 });
             }
         });

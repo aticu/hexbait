@@ -62,6 +62,11 @@ impl Window {
         self.start() == self.end()
     }
 
+    /// Determines if the contains the given offset.
+    pub fn contains(self, offset: u64) -> bool {
+        self.start() <= offset && offset < self.end()
+    }
+
     /// Expands this window such that both the start and end are aligned to `align`.
     ///
     /// `align` must be a power of two.

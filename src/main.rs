@@ -8,6 +8,7 @@ use hexbait::{
         hex::HexdumpView, settings::Settings, signature_display::SignatureDisplay,
         zoombars::Zoombars,
     },
+    model::Endianness,
     statistics::StatisticsHandler,
 };
 
@@ -35,7 +36,7 @@ fn main() -> eframe::Result {
                 settings: Settings::new(),
                 input,
                 hexdump_context: HexdumpView::new(),
-                big_endian: false,
+                endianness: Endianness::native(),
                 zoombars: Zoombars::new(),
                 signature_display: SignatureDisplay::new(),
                 xor_value: 0,
@@ -50,7 +51,7 @@ struct MyApp {
     settings: Settings,
     input: Input,
     hexdump_context: HexdumpView,
-    big_endian: bool,
+    endianness: Endianness,
     zoombars: Zoombars,
     signature_display: SignatureDisplay,
     xor_value: u8,
@@ -81,6 +82,8 @@ impl eframe::App for MyApp {
             // TODO: move statistics computing to a background thread
             // TODO: try to speed up cache computation by looking up values from the smaller caches
             // TODO: implement to-disk caching for some sizes to increase re-load times
+            // TODO: implement search
+            // TODO: fix up main file
 
             self.zoombars.render(
                 ui,
@@ -92,7 +95,7 @@ impl eframe::App for MyApp {
                         ui,
                         &self.settings,
                         source,
-                        &mut self.big_endian,
+                        &mut self.endianness,
                         start,
                     );
                 },
