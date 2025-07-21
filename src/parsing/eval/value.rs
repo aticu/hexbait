@@ -7,7 +7,7 @@ use crate::parsing::language::{Int, ast::Symbol};
 use super::{Path, PathComponent, Provenance};
 
 /// Represents a parsed value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Value {
     /// The kind of the value.
     pub kind: ValueKind,
@@ -16,8 +16,10 @@ pub struct Value {
 }
 
 /// The different kinds of values that can be parsed.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ValueKind {
+    /// A boolean value.
+    Boolean(bool),
     /// An integer value.
     Integer(Int),
     /// A float value.
@@ -33,6 +35,7 @@ pub enum ValueKind {
 impl fmt::Debug for ValueKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Boolean(val) => write!(f, "{val:?}"),
             Self::Integer(int) => write!(f, "{int} (0x{int:x})"),
             Self::Float(float) => float.fmt(f),
             Self::Bytes(bytes) => match bytes.len() {
@@ -66,6 +69,18 @@ impl fmt::Debug for ValueKind {
 }
 
 impl Value {
+    /// Expects the value to be an boolean, panicking if this is false.
+    ///
+    /// # Panics
+    /// This function will panic if the value is not a boolean.
+    #[track_caller]
+    pub fn expect_bool(&self) -> bool {
+        match &self.kind {
+            ValueKind::Boolean(value) => *value,
+            _ => panic!("expected value to be a boolean"),
+        }
+    }
+
     /// Expects the value to be an integer, panicking if this is false.
     ///
     /// # Panics

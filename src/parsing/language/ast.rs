@@ -7,6 +7,7 @@ pub use expr::*;
 mod expr;
 
 /// A node to be parsed.
+#[derive(Debug)]
 pub struct Node {
     /// The name of the node.
     pub name: Symbol,
@@ -17,6 +18,7 @@ pub struct Node {
 }
 
 /// The kind of a node that can be parsed.
+#[derive(Debug)]
 pub enum NodeKind {
     /// Fixed bytes are expected.
     FixedBytes {
@@ -51,6 +53,13 @@ pub enum NodeKind {
         node: Box<Node>,
         /// The number of times to parse the node.
         count: Expr,
+    },
+    /// Repeats while the provided condition is true.
+    RepeatWhile {
+        /// The node to parse.
+        node: Box<Node>,
+        /// The condition that is checked.
+        condition: Expr,
     },
 }
 

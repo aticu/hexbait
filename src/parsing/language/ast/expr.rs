@@ -2,7 +2,7 @@
 
 use crate::parsing::language::Int;
 
-use super::Symbol;
+use super::{Node, Symbol};
 
 /// Represents an expression in the AST.
 #[derive(Debug)]
@@ -11,9 +11,18 @@ pub struct Expr {
     pub kind: ExprKind,
 }
 
+/// The type of unary operation to perform.
+#[derive(Debug)]
+pub enum UnOp {
+    /// Logical negation.
+    Not,
+}
+
 /// The type of binary operation to perform.
 #[derive(Debug)]
 pub enum BinOp {
+    /// Perform an equality check.
+    Eq,
     /// Perform addition.
     Add,
     /// Perform subtraction.
@@ -35,6 +44,13 @@ pub enum ExprKind {
     },
     /// The expression refers to the current offset.
     Offset,
+    /// The expression is a unary operation.
+    UnOp {
+        /// The operand of the expression.
+        operand: Box<Expr>,
+        /// The operator of the expression.
+        op: UnOp,
+    },
     /// The expression is a binary operation.
     BinOp {
         /// The left operand of the expression.
@@ -55,5 +71,10 @@ pub enum ExprKind {
         field_holder: Box<Expr>,
         /// The field that is being held.
         field: Symbol,
+    },
+    /// Parses the given node without modifying the offset.
+    ParseAt {
+        /// The node to parse.
+        node: Box<Node>,
     },
 }

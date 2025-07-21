@@ -76,8 +76,12 @@ impl ParseContext {
     }
 
     /// Evaluates the given expression.
-    pub fn eval_expr(&self, expr: &ast::Expr) -> Value {
-        match &expr.kind {
+    pub fn eval_expr<Source: DataSource>(
+        &self,
+        expr: &ast::Expr,
+        source: &mut Source,
+    ) -> Result<Value, ParseErr<Source::Error>> {
+        let result = match &expr.kind {
             ExprKind::ConstantInt { value } => Value {
                 kind: ValueKind::Integer(value.clone()),
                 provenance: Provenance::empty(),
@@ -90,20 +94,32 @@ impl ParseContext {
                 kind: ValueKind::Integer(self.offset.next_whole_byte().into()),
                 provenance: Provenance::empty(),
             },
-            ExprKind::BinOp { left, right, op } => {
-                let left = self.eval_expr(left);
-                let right = self.eval_expr(right);
-                let combined_provenance = &left.provenance + &right.provenance;
-                let left = left.expect_int();
-                let right = right.expect_int();
+            ExprKind::UnOp { operand, op } => {
+                let operand = self.eval_expr(operand, source)?;
 
                 match op {
+                    ast::UnOp::Not => Value {
+                        kind: ValueKind::Boolean(!operand.expect_bool()),
+                        provenance: operand.provenance,
+                    },
+                }
+            }
+            ExprKind::BinOp { left, right, op } => {
+                let left = self.eval_expr(left, source)?;
+                let right = self.eval_expr(right, source)?;
+                let combined_provenance = &left.provenance + &right.provenance;
+
+                match op {
+                    ast::BinOp::Eq => Value {
+                        kind: ValueKind::Boolean(left.kind == right.kind),
+                        provenance: combined_provenance,
+                    },
                     ast::BinOp::Add => Value {
-                        kind: ValueKind::Integer(left + right),
+                        kind: ValueKind::Integer(left.expect_int() + right.expect_int()),
                         provenance: combined_provenance,
                     },
                     ast::BinOp::Sub => Value {
-                        kind: ValueKind::Integer(left - right),
+                        kind: ValueKind::Integer(left.expect_int() - right.expect_int()),
                         provenance: combined_provenance,
                     },
                 }
@@ -111,7 +127,7 @@ impl ParseContext {
             ExprKind::VariableUse { var } => {
                 for (name, value) in &self.parsed_values {
                     if name == var {
-                        return value.clone();
+                        return Ok(value.clone());
                     }
                 }
 
@@ -121,17 +137,20 @@ impl ParseContext {
                 field_holder,
                 field,
             } => {
-                let field_holder = self.eval_expr(field_holder);
+                let field_holder = self.eval_expr(field_holder, source)?;
 
                 for (name, value) in field_holder.expect_struct() {
                     if name == field {
-                        return value.clone();
+                        return Ok(value.clone());
                     }
                 }
 
                 unreachable!("this should be impossible because of static analysis")
             }
-        }
+            ExprKind::ParseAt { node } => self.child().parse(node, source)?,
+        };
+
+        Ok(result)
     }
 
     /// Parses the given node into the current node context.
@@ -141,7 +160,7 @@ impl ParseContext {
         source: &mut Source,
     ) -> Result<Value, ParseErr<Source::Error>> {
         if let Some(offset) = &node.offset {
-            let offset_val = self.eval_expr(offset);
+            let offset_val = self.eval_expr(offset, source)?;
             let offset = offset_val.expect_int();
 
             if let Ok(offset) = u64::try_from(offset) {
@@ -154,7 +173,7 @@ impl ParseContext {
 
         let value = match &node.kind {
             NodeKind::FixedBytes { expected } => {
-                let expected = self.eval_expr(expected);
+                let expected = self.eval_expr(expected, source)?;
                 let bytes = expected.expect_bytes();
 
                 let (window, parsed_bytes) = read_bytes(
@@ -173,7 +192,7 @@ impl ParseContext {
                 }
             }
             NodeKind::FixedLength { length } => {
-                let length_val = self.eval_expr(length);
+                let length_val = self.eval_expr(length, source)?;
                 let length = length_val.expect_int();
 
                 let (window, parsed_bytes) =
@@ -268,7 +287,7 @@ impl ParseContext {
                 }
             }
             NodeKind::RepeatCount { node, count } => {
-                let count_val = self.eval_expr(count);
+                let count_val = self.eval_expr(count, source)?;
                 let count = count_val.expect_int();
                 let mut nodes = Vec::new();
 
@@ -283,6 +302,22 @@ impl ParseContext {
                 } else {
                     // TODO: handle expectation failures here (count is larger than fits into
                     // memory)
+                }
+
+                Value {
+                    kind: ValueKind::Array(nodes),
+                    provenance,
+                }
+            }
+            NodeKind::RepeatWhile { node, condition } => {
+                let mut nodes = Vec::new();
+
+                let mut provenance = Provenance::empty();
+
+                while self.eval_expr(condition, source)?.expect_bool() {
+                    let parsed_node = self.parse(node, source)?;
+                    provenance += &parsed_node.provenance;
+                    nodes.push(parsed_node);
                 }
 
                 Value {

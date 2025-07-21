@@ -28,7 +28,10 @@ pub fn show_value(
     let mut child_hovered = None;
 
     match &value.kind {
-        ValueKind::Integer(_) | ValueKind::Float(_) | ValueKind::Bytes(_) => {
+        ValueKind::Boolean(_)
+        | ValueKind::Integer(_)
+        | ValueKind::Float(_)
+        | ValueKind::Bytes(_) => {
             let hovered = ui
                 .label(
                     egui::RichText::new(format!("{name_prefix}{:?},", value.kind))

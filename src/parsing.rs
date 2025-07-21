@@ -1,6 +1,6 @@
 //! Implements the parsing capabilities of hexbait.
 
-use language::ast::BinOp;
+use language::ast::{BinOp, UnOp};
 
 pub mod eval;
 pub mod language;
@@ -480,7 +480,7 @@ pub fn tmp_mft_entry() -> language::ast::Node {
                 },
                 Node {
                     name: "attributes".into(),
-                    kind: NodeKind::RepeatCount {
+                    kind: NodeKind::RepeatWhile {
                         node: Box::new(Node {
                             name: "attribute".into(),
                             kind: NodeKind::Struct {
@@ -566,8 +566,35 @@ pub fn tmp_mft_entry() -> language::ast::Node {
                             },
                             offset: None,
                         }),
-                        count: Expr {
-                            kind: ExprKind::ConstantInt { value: 4.into() },
+                        condition: Expr {
+                            kind: ExprKind::UnOp {
+                                operand: Box::new(Expr {
+                                    kind: ExprKind::BinOp {
+                                        left: Box::new(Expr {
+                                            kind: ExprKind::ParseAt {
+                                                node: Box::new(Node {
+                                                    name: "next_type".into(),
+                                                    kind: NodeKind::FixedLength {
+                                                        length: Expr {
+                                                            kind: ExprKind::ConstantInt {
+                                                                value: 4.into(),
+                                                            },
+                                                        },
+                                                    },
+                                                    offset: None,
+                                                }),
+                                            },
+                                        }),
+                                        right: Box::new(Expr {
+                                            kind: ExprKind::ConstantBytes {
+                                                value: vec![0xff, 0xff, 0xff, 0xff],
+                                            },
+                                        }),
+                                        op: BinOp::Eq,
+                                    },
+                                }),
+                                op: UnOp::Not,
+                            },
                         },
                     },
                     offset: Some(Expr {
