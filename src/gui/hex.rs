@@ -53,6 +53,7 @@ impl HexdumpView {
         source: &mut impl DataSource,
         endianness: &mut Endianness,
         start: u64,
+        (parse_type, parse_offset): (&str, Option<u64>),
     ) {
         // start is in rows
         let start_in_bytes = start * 16;
@@ -73,8 +74,8 @@ impl HexdumpView {
             let hex_rect_width = (16 * settings.bar_width_multiplier()) as f32
                 + ui.spacing().item_spacing.x
                 + ((16 + 32 + 16) as f32 * settings.char_width())
-                + (2 as f32 * settings.large_space())
-                + (17 as f32 * settings.small_space());
+                + (2.0 * settings.large_space())
+                + (17.0 * settings.small_space());
 
             let scroll_rect = rect.with_max_x(rect.min.x + hex_rect_width);
 
@@ -196,14 +197,21 @@ impl HexdumpView {
                                 .show(ui, |ui| {
                                     self.hovered_parsed_bytes = None;
 
-                                    return;
+                                    let parse_node = match parse_type {
+                                        "PE file" => crate::parsing::tmp_pe_file(),
+                                        "NTFS header" => crate::parsing::tmp_ntfs_header(),
+                                        "$MFT entry" => crate::parsing::tmp_mft_entry(),
+                                        _ => return,
+                                    };
+                                    let Some(parse_offset) = parse_offset else {
+                                        return;
+                                    };
 
-                                    // TODO: fix this so it doesn't always start at zero
                                     let mut context =
-                                        crate::parsing::eval::ParseContext::with_offset(0.into());
-                                    let value = context
-                                        .parse(&crate::parsing::tmp_pe_file(), source)
-                                        .unwrap();
+                                        crate::parsing::eval::ParseContext::with_offset(
+                                            parse_offset.into(),
+                                        );
+                                    let value = context.parse(&parse_node, source).unwrap();
                                     let hovered = parse_result::show_value(
                                         ui,
                                         crate::parsing::eval::Path::new(),

@@ -41,6 +41,8 @@ fn main() -> eframe::Result {
                 signature_display: SignatureDisplay::new(),
                 xor_value: 0,
                 statistics_handler: StatisticsHandler::new(),
+                parse_type: "none",
+                parse_offset: String::from("0"),
             }))
         }),
     )
@@ -56,6 +58,8 @@ struct MyApp {
     signature_display: SignatureDisplay,
     xor_value: u8,
     statistics_handler: StatisticsHandler,
+    parse_type: &'static str,
+    parse_offset: String,
 }
 
 impl eframe::App for MyApp {
@@ -75,6 +79,21 @@ impl eframe::App for MyApp {
                     ui.visuals().text_color(),
                 );
             }
+
+            ui.horizontal(|ui| {
+                ui.label("Parse as:");
+                egui::ComboBox::from_label("")
+                    .selected_text(self.parse_type)
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.parse_type, "none", "none");
+                        ui.selectable_value(&mut self.parse_type, "PE file", "PE file");
+                        ui.selectable_value(&mut self.parse_type, "$MFT entry", "$MFT entry");
+                        ui.selectable_value(&mut self.parse_type, "NTFS header", "NTFS header");
+                    });
+
+                ui.label("Parse offset:");
+                ui.text_edit_singleline(&mut self.parse_offset);
+            });
 
             let file_size = self.input.len().unwrap();
             // TODO: use caching for entropy calculation
@@ -97,6 +116,7 @@ impl eframe::App for MyApp {
                         source,
                         &mut self.endianness,
                         start,
+                        (self.parse_type, self.parse_offset.parse().ok()),
                     );
                 },
                 |ui, source, window| {

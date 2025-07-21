@@ -47,6 +47,8 @@ pub struct ParseContext {
     endianness: Endianness,
     /// The current offset used for parsing.
     offset: Offset,
+    /// The offset at which parsing started.
+    start_offset: Offset,
     /// The parsed values.
     parsed_values: Vec<(Symbol, Value)>,
 }
@@ -54,9 +56,11 @@ pub struct ParseContext {
 impl ParseContext {
     /// Creates a new empty parsing context.
     pub fn with_offset(offset: Offset) -> ParseContext {
+        let start_offset = offset.clone();
         ParseContext {
             endianness: Endianness::Little,
             offset,
+            start_offset,
             parsed_values: Vec::new(),
         }
     }
@@ -66,6 +70,7 @@ impl ParseContext {
         ParseContext {
             endianness: self.endianness,
             offset: self.offset.clone(),
+            start_offset: self.start_offset.clone(),
             parsed_values: Vec::new(),
         }
     }
@@ -140,7 +145,8 @@ impl ParseContext {
             let offset = offset_val.expect_int();
 
             if let Ok(offset) = u64::try_from(offset) {
-                self.offset.in_bytes = offset;
+                // add the start offset here, since the nodes cannot possibly know about that
+                self.offset.in_bytes = offset + self.start_offset.next_whole_byte();
             } else {
                 // TODO: handle expectation failures
             }
@@ -157,7 +163,7 @@ impl ParseContext {
                     u64::try_from(bytes.len()).unwrap(),
                 )?;
 
-                if &parsed_bytes != bytes {
+                if parsed_bytes != bytes {
                     // TODO: handle expectation failures
                 }
 

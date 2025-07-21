@@ -61,6 +61,7 @@ impl Default for Provenance {
 impl Add for &Provenance {
     type Output = Provenance;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: &Provenance) -> Self::Output {
         Provenance {
             byte_ranges: &self.byte_ranges | &rhs.byte_ranges,
@@ -69,6 +70,7 @@ impl Add for &Provenance {
 }
 
 impl AddAssign<&Provenance> for Provenance {
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: &Self) {
         self.byte_ranges |= &rhs.byte_ranges;
     }

@@ -586,3 +586,120 @@ pub fn tmp_mft_entry() -> language::ast::Node {
         offset: None,
     }
 }
+
+// TODO: remove when this can be parsed from a text file
+pub fn tmp_ntfs_header() -> language::ast::Node {
+    use crate::parsing::language::ast::{Expr, ExprKind, Node, NodeKind};
+    Node {
+        name: "ntfs_header".into(),
+        kind: NodeKind::Struct {
+            nodes: vec![
+                Node {
+                    name: "boot_entry_point".into(),
+                    kind: NodeKind::FixedLength {
+                        length: Expr {
+                            kind: ExprKind::ConstantInt { value: 3.into() },
+                        },
+                    },
+                    offset: None,
+                },
+                Node {
+                    name: "file_system_signature".into(),
+                    kind: NodeKind::FixedBytes {
+                        expected: Expr {
+                            kind: ExprKind::ConstantBytes {
+                                value: b"NTFS    ".into(),
+                            },
+                        },
+                    },
+                    offset: None,
+                },
+                Node {
+                    name: "bytes_per_sector".into(),
+                    kind: NodeKind::Integer {
+                        bit_width: 16,
+                        signed: false,
+                    },
+                    offset: None,
+                },
+                Node {
+                    name: "sectors_per_cluster_block".into(),
+                    kind: NodeKind::Integer {
+                        bit_width: 8,
+                        signed: false,
+                    },
+                    offset: None,
+                },
+                Node {
+                    name: "number_of_sectors".into(),
+                    kind: NodeKind::Integer {
+                        bit_width: 64,
+                        signed: false,
+                    },
+                    offset: Some(Expr {
+                        kind: ExprKind::ConstantInt { value: 40.into() },
+                    }),
+                },
+                Node {
+                    name: "mft_cluster_block_number".into(),
+                    kind: NodeKind::Integer {
+                        bit_width: 64,
+                        signed: false,
+                    },
+                    offset: None,
+                },
+                Node {
+                    name: "mft_mirr_cluster_block_number".into(),
+                    kind: NodeKind::Integer {
+                        bit_width: 64,
+                        signed: false,
+                    },
+                    offset: None,
+                },
+                Node {
+                    name: "mft_entry_size".into(),
+                    kind: NodeKind::Integer {
+                        bit_width: 8,
+                        signed: false,
+                    },
+                    offset: None,
+                },
+                Node {
+                    name: "index_entry_size".into(),
+                    kind: NodeKind::Integer {
+                        bit_width: 8,
+                        signed: false,
+                    },
+                    offset: Some(Expr {
+                        kind: ExprKind::ConstantInt { value: 68.into() },
+                    }),
+                },
+                Node {
+                    name: "volume_serial_number".into(),
+                    kind: NodeKind::FixedLength {
+                        length: Expr {
+                            kind: ExprKind::ConstantInt { value: 8.into() },
+                        },
+                    },
+                    offset: Some(Expr {
+                        kind: ExprKind::ConstantInt { value: 72.into() },
+                    }),
+                },
+                Node {
+                    name: "sector_signature".into(),
+                    kind: NodeKind::FixedBytes {
+                        expected: Expr {
+                            kind: ExprKind::ConstantBytes {
+                                value: b"\x55\xaa".into(),
+                            },
+                        },
+                    },
+                    offset: Some(Expr {
+                        kind: ExprKind::ConstantInt { value: 510.into() },
+                    }),
+                },
+            ],
+        },
+        offset: None,
+    }
+}
