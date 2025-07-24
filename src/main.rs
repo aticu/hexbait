@@ -43,6 +43,7 @@ fn main() -> eframe::Result {
                 statistics_handler: StatisticsHandler::new(),
                 parse_type: "none",
                 parse_offset: String::from("0"),
+                sync_parse_offset_to_selection_start: true,
             }))
         }),
     )
@@ -60,6 +61,7 @@ struct MyApp {
     statistics_handler: StatisticsHandler,
     parse_type: &'static str,
     parse_offset: String,
+    sync_parse_offset_to_selection_start: bool,
 }
 
 impl eframe::App for MyApp {
@@ -86,13 +88,37 @@ impl eframe::App for MyApp {
                     .selected_text(self.parse_type)
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut self.parse_type, "none", "none");
-                        ui.selectable_value(&mut self.parse_type, "PE file", "PE file");
-                        ui.selectable_value(&mut self.parse_type, "$MFT entry", "$MFT entry");
-                        ui.selectable_value(&mut self.parse_type, "NTFS header", "NTFS header");
+                        ui.selectable_value(&mut self.parse_type, "pe_file", "pe_file");
+                        ui.selectable_value(&mut self.parse_type, "ntfs_header", "ntfs_header");
+                        ui.selectable_value(&mut self.parse_type, "mft_entry", "mft_entry");
+                        ui.selectable_value(
+                            &mut self.parse_type,
+                            "mft_index_entry",
+                            "mft_index_entry",
+                        );
+                        ui.selectable_value(
+                            &mut self.parse_type,
+                            "bitlocker_header",
+                            "bitlocker_header",
+                        );
+                        ui.selectable_value(
+                            &mut self.parse_type,
+                            "bitlocker_information",
+                            "bitlocker_information",
+                        );
                     });
 
                 ui.label("Parse offset:");
                 ui.text_edit_singleline(&mut self.parse_offset);
+                ui.checkbox(
+                    &mut self.sync_parse_offset_to_selection_start,
+                    "Sync parse offset to selection start",
+                );
+
+                ui.checkbox(
+                    self.settings.linear_byte_colors_mut(),
+                    "Use linear byte colors",
+                );
             });
 
             let file_size = self.input.len().unwrap();
@@ -103,6 +129,8 @@ impl eframe::App for MyApp {
             // TODO: implement to-disk caching for some sizes to increase re-load times
             // TODO: implement search
             // TODO: fix up main file
+
+            let mut parse_offset = self.parse_offset.parse().ok();
 
             self.zoombars.render(
                 ui,
@@ -116,7 +144,7 @@ impl eframe::App for MyApp {
                         source,
                         &mut self.endianness,
                         start,
-                        (self.parse_type, self.parse_offset.parse().ok()),
+                        (self.parse_type, &mut parse_offset),
                     );
                 },
                 |ui, source, window| {
@@ -141,6 +169,12 @@ impl eframe::App for MyApp {
                     });
                 },
             );
+
+            if self.sync_parse_offset_to_selection_start {
+                if let Some(parse_offset) = parse_offset {
+                    self.parse_offset = parse_offset.to_string();
+                }
+            }
         });
         self.frame_time = start.elapsed();
     }

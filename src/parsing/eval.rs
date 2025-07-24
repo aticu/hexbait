@@ -42,26 +42,35 @@ impl From<u64> for Offset {
 
 /// The parsing context.
 #[derive(Debug)]
-pub struct ParseContext {
+pub struct ParseContext<'parent> {
     /// The endianness used for parsing.
     endianness: Endianness,
     /// The current offset used for parsing.
     offset: Offset,
     /// The offset at which parsing started.
     start_offset: Offset,
+    /// The named nodes that are known to the context.
+    named_nodes: Vec<(Symbol, Node)>,
     /// The parsed values.
     parsed_values: Vec<(Symbol, Value)>,
+    /// The last value that was parsed in a loop.
+    last_repetition_value: Option<Value>,
+    /// The parent context.
+    parent: Option<&'parent ParseContext<'parent>>,
 }
 
-impl ParseContext {
+impl ParseContext<'_> {
     /// Creates a new empty parsing context.
-    pub fn with_offset(offset: Offset) -> ParseContext {
+    pub fn with_offset(offset: Offset) -> ParseContext<'static> {
         let start_offset = offset.clone();
         ParseContext {
             endianness: Endianness::Little,
             offset,
             start_offset,
+            named_nodes: Vec::new(),
             parsed_values: Vec::new(),
+            last_repetition_value: None,
+            parent: None,
         }
     }
 
@@ -72,7 +81,24 @@ impl ParseContext {
             offset: self.offset.clone(),
             start_offset: self.start_offset.clone(),
             parsed_values: Vec::new(),
+            named_nodes: Vec::new(),
+            last_repetition_value: None,
+            parent: Some(self),
         }
+    }
+
+    /// Adds the given named node into the context.
+    pub fn add_named_node(&mut self, name: Symbol, node: Node) {
+        self.named_nodes.push((name, node));
+    }
+
+    /// Returns the node with the given name.
+    pub fn get_named_node(&self, name: &Symbol) -> Option<&Node> {
+        self.named_nodes
+            .iter()
+            .find(|(node_name, _)| node_name == name)
+            .map(|(_, node)| node)
+            .or_else(|| self.parent.and_then(|parent| parent.get_named_node(name)))
     }
 
     /// Evaluates the given expression.
@@ -91,9 +117,29 @@ impl ParseContext {
                 provenance: Provenance::empty(),
             },
             ExprKind::Offset => Value {
-                kind: ValueKind::Integer(self.offset.next_whole_byte().into()),
+                kind: ValueKind::Integer(
+                    (self.offset.next_whole_byte() - self.start_offset.next_whole_byte()).into(),
+                ),
                 provenance: Provenance::empty(),
             },
+            ExprKind::Parent => {
+                let parent = self
+                    .parent
+                    .expect("expected parent to exist because of static analysis");
+                let mut provenance = Provenance::empty();
+                for (_, value) in &parent.parsed_values {
+                    provenance += &value.provenance;
+                }
+
+                Value {
+                    kind: ValueKind::Struct(parent.parsed_values.clone()),
+                    provenance: Provenance::empty(),
+                }
+            }
+            ExprKind::Last => self
+                .last_repetition_value
+                .clone()
+                .expect("expected last to exist because of static analysis"),
             ExprKind::UnOp { operand, op } => {
                 let operand = self.eval_expr(operand, source)?;
 
@@ -114,6 +160,26 @@ impl ParseContext {
                         kind: ValueKind::Boolean(left.kind == right.kind),
                         provenance: combined_provenance,
                     },
+                    ast::BinOp::Neq => Value {
+                        kind: ValueKind::Boolean(left.kind != right.kind),
+                        provenance: combined_provenance,
+                    },
+                    ast::BinOp::Gt => Value {
+                        kind: ValueKind::Boolean(left.expect_int() > right.expect_int()),
+                        provenance: combined_provenance,
+                    },
+                    ast::BinOp::Geq => Value {
+                        kind: ValueKind::Boolean(left.expect_int() >= right.expect_int()),
+                        provenance: combined_provenance,
+                    },
+                    ast::BinOp::Lt => Value {
+                        kind: ValueKind::Boolean(left.expect_int() < right.expect_int()),
+                        provenance: combined_provenance,
+                    },
+                    ast::BinOp::Leq => Value {
+                        kind: ValueKind::Boolean(left.expect_int() <= right.expect_int()),
+                        provenance: combined_provenance,
+                    },
                     ast::BinOp::Add => Value {
                         kind: ValueKind::Integer(left.expect_int() + right.expect_int()),
                         provenance: combined_provenance,
@@ -121,6 +187,40 @@ impl ParseContext {
                     ast::BinOp::Sub => Value {
                         kind: ValueKind::Integer(left.expect_int() - right.expect_int()),
                         provenance: combined_provenance,
+                    },
+                    ast::BinOp::Mul => Value {
+                        kind: ValueKind::Integer(left.expect_int() * right.expect_int()),
+                        provenance: combined_provenance,
+                    },
+                    ast::BinOp::Div => Value {
+                        kind: ValueKind::Integer(left.expect_int() / right.expect_int()),
+                        provenance: combined_provenance,
+                    },
+                    ast::BinOp::Mod => Value {
+                        kind: ValueKind::Integer(left.expect_int() % right.expect_int()),
+                        provenance: combined_provenance,
+                    },
+                    ast::BinOp::And => match (left.kind, right.kind) {
+                        (ValueKind::Integer(left), ValueKind::Integer(right)) => Value {
+                            kind: ValueKind::Integer(left & right),
+                            provenance: combined_provenance,
+                        },
+                        (ValueKind::Boolean(left), ValueKind::Boolean(right)) => Value {
+                            kind: ValueKind::Boolean(left & right),
+                            provenance: combined_provenance,
+                        },
+                        _ => unreachable!("static analysis should catch this"),
+                    },
+                    ast::BinOp::Or => match (left.kind, right.kind) {
+                        (ValueKind::Integer(left), ValueKind::Integer(right)) => Value {
+                            kind: ValueKind::Integer(left | right),
+                            provenance: combined_provenance,
+                        },
+                        (ValueKind::Boolean(left), ValueKind::Boolean(right)) => Value {
+                            kind: ValueKind::Boolean(left | right),
+                            provenance: combined_provenance,
+                        },
+                        _ => unreachable!("static analysis should catch this"),
                     },
                 }
             }
@@ -148,6 +248,17 @@ impl ParseContext {
                 unreachable!("this should be impossible because of static analysis")
             }
             ExprKind::ParseAt { node } => self.child().parse(node, source)?,
+            ExprKind::If {
+                condition,
+                true_branch,
+                false_branch,
+            } => {
+                if self.eval_expr(condition, source)?.expect_bool() {
+                    self.eval_expr(true_branch, source)?
+                } else {
+                    self.eval_expr(false_branch, source)?
+                }
+            }
         };
 
         Ok(result)
@@ -167,6 +278,7 @@ impl ParseContext {
                 // add the start offset here, since the nodes cannot possibly know about that
                 self.offset.in_bytes = offset + self.start_offset.next_whole_byte();
             } else {
+                eprintln!("Expected the new offset to be greater than zero, but it is {offset}");
                 // TODO: handle expectation failures
             }
         }
@@ -184,6 +296,7 @@ impl ParseContext {
 
                 if parsed_bytes != bytes {
                     // TODO: handle expectation failures
+                    eprintln!("fixed bytes did not match");
                 }
 
                 Value {
@@ -194,6 +307,14 @@ impl ParseContext {
             NodeKind::FixedLength { length } => {
                 let length_val = self.eval_expr(length, source)?;
                 let length = length_val.expect_int();
+
+                let length = if let Ok(length) = u64::try_from(length) {
+                    length
+                } else {
+                    // TODO: handle expectation failures
+                    eprintln!("Expected length to be greater than 0, but it is {length}");
+                    0
+                };
 
                 let (window, parsed_bytes) =
                     read_bytes(source, &mut self.offset, u64::try_from(length).unwrap())?;
@@ -268,14 +389,22 @@ impl ParseContext {
                 }
                 _ => unreachable!("only 32-bit and 64-bit floats are supported"),
             },
+            NodeKind::NamedNode { name } => {
+                let node: Node = self
+                    .get_named_node(name)
+                    .expect("expected named node to exist")
+                    .clone();
+
+                self.parse(&node, source)?
+            }
             NodeKind::Struct { nodes } => {
                 let mut child_ctx = self.child();
 
                 let mut provenance = Provenance::empty();
-                for node in nodes {
+                for (name, node) in nodes {
                     let value = child_ctx.parse(node, source)?;
                     provenance += &value.provenance;
-                    child_ctx.parsed_values.push((node.name.clone(), value));
+                    child_ctx.parsed_values.push((name.clone(), value));
                 }
 
                 let parsed_values = child_ctx.parsed_values;
@@ -314,15 +443,60 @@ impl ParseContext {
 
                 let mut provenance = Provenance::empty();
 
-                while self.eval_expr(condition, source)?.expect_bool() {
+                loop {
+                    // TODO: this implementation of last would probably fail on nested loops,
+                    // figure out a better solution for this
+                    if self.last_repetition_value.is_some() || !condition.contains_last() {
+                        if !self.eval_expr(condition, source)?.expect_bool() {
+                            break;
+                        }
+                    }
+
                     let parsed_node = self.parse(node, source)?;
                     provenance += &parsed_node.provenance;
-                    nodes.push(parsed_node);
+                    if let Some(last_value) = self.last_repetition_value.take() {
+                        nodes.push(last_value);
+                    }
+                    self.last_repetition_value = Some(parsed_node);
+                }
+
+                if let Some(last_value) = self.last_repetition_value.take() {
+                    nodes.push(last_value);
                 }
 
                 Value {
                     kind: ValueKind::Array(nodes),
                     provenance,
+                }
+            }
+            NodeKind::ParseIf {
+                condition,
+                true_node,
+                false_node,
+            } => {
+                if self.eval_expr(condition, source)?.expect_bool() {
+                    self.parse(true_node, source)?
+                } else {
+                    self.parse(false_node, source)?
+                }
+            }
+            NodeKind::Switch {
+                scrutinee,
+                branches,
+                default,
+            } => {
+                let scrutinee = self.eval_expr(scrutinee, source)?;
+
+                'value: {
+                    for (value_expr, node) in branches {
+                        let value = self.eval_expr(value_expr, source)?;
+
+                        if value.kind == scrutinee.kind {
+                            break 'value self.parse(node, source)?;
+                        }
+                    }
+
+                    self.parse(default, source)?
                 }
             }
         };

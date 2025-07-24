@@ -29,7 +29,7 @@ pub struct HexdumpView {
     /// The selection context of the hexview.
     selection_context: SelectionContext,
     /// The cached image for the sidebar in the hex view.
-    sidebar_cached_image: CachedImage<(u64, u64)>,
+    sidebar_cached_image: CachedImage<(u64, u64, bool)>,
     /// The currently hovered parsed bytes.
     hovered_parsed_bytes: Option<Provenance>,
 }
@@ -53,7 +53,7 @@ impl HexdumpView {
         source: &mut impl DataSource,
         endianness: &mut Endianness,
         start: u64,
-        (parse_type, parse_offset): (&str, Option<u64>),
+        (parse_type, parse_offset): (&str, &mut Option<u64>),
     ) {
         // start is in rows
         let start_in_bytes = start * 16;
@@ -197,21 +197,77 @@ impl HexdumpView {
                                 .show(ui, |ui| {
                                     self.hovered_parsed_bytes = None;
 
-                                    let parse_node = match parse_type {
-                                        "PE file" => crate::parsing::tmp_pe_file(),
-                                        "NTFS header" => crate::parsing::tmp_ntfs_header(),
-                                        "$MFT entry" => crate::parsing::tmp_mft_entry(),
-                                        _ => return,
-                                    };
-                                    let Some(parse_offset) = parse_offset else {
+                                    let current_parse_offset = *parse_offset;
+                                    if let Some(window) = self.selection() {
+                                        *parse_offset = Some(window.start());
+                                    }
+                                    let Some(parse_offset) = current_parse_offset else {
                                         return;
                                     };
+                                    if parse_type == "none" {
+                                        return;
+                                    }
 
                                     let mut context =
                                         crate::parsing::eval::ParseContext::with_offset(
                                             parse_offset.into(),
                                         );
-                                    let value = context.parse(&parse_node, source).unwrap();
+                                    context.add_named_node(
+                                        "pe_file".into(),
+                                        crate::parsing::tmp_pe_file(),
+                                    );
+                                    context.add_named_node(
+                                        "ntfs_header".into(),
+                                        crate::parsing::tmp_ntfs_header(),
+                                    );
+                                    context.add_named_node(
+                                        "mft_entry".into(),
+                                        crate::parsing::tmp_mft_entry(),
+                                    );
+                                    context.add_named_node(
+                                        "mft_attr_stdinfo".into(),
+                                        crate::parsing::tmp_mft_standard_information(),
+                                    );
+                                    context.add_named_node(
+                                        "mft_attr_filename".into(),
+                                        crate::parsing::tmp_mft_file_name(),
+                                    );
+                                    context.add_named_node(
+                                        "mft_index_node_header".into(),
+                                        crate::parsing::tmp_mft_index_node_header(),
+                                    );
+                                    context.add_named_node(
+                                        "mft_index_root".into(),
+                                        crate::parsing::tmp_mft_index_root(),
+                                    );
+                                    context.add_named_node(
+                                        "mft_index_entry".into(),
+                                        crate::parsing::tmp_mft_index_entry(),
+                                    );
+                                    context.add_named_node(
+                                        "bitlocker_header".into(),
+                                        crate::parsing::tmp_bitlocker_header(),
+                                    );
+                                    context.add_named_node(
+                                        "bitlocker_information".into(),
+                                        crate::parsing::tmp_bitlocker_information(),
+                                    );
+                                    let value = match context.parse(
+                                        &crate::parsing::language::ast::Node {
+                                            kind:
+                                                crate::parsing::language::ast::NodeKind::NamedNode {
+                                                    name: parse_type.into(),
+                                                },
+                                            offset: None,
+                                        },
+                                        source,
+                                    ) {
+                                        Ok(value) => value,
+                                        Err(err) => {
+                                            eprintln!("failed parsing: {err}");
+                                            return;
+                                        }
+                                    };
                                     let hovered = parse_result::show_value(
                                         ui,
                                         crate::parsing::eval::Path::new(),
@@ -371,8 +427,11 @@ impl HexdumpView {
 
         let highlight_row_range = self.scroll_offset..self.scroll_offset + rows_onscreen;
 
-        self.sidebar_cached_image
-            .paint_at(ui, rect, (start, self.scroll_offset), |x, y| {
+        self.sidebar_cached_image.paint_at(
+            ui,
+            rect,
+            (start, self.scroll_offset, settings.linear_byte_colors()),
+            |x, y| {
                 let x = x / bar_width_multiplier;
                 if let Some(&byte) = window.get(y * 16 + x) {
                     if highlight_row_range.contains(&(y as u64)) {
@@ -383,7 +442,8 @@ impl HexdumpView {
                 } else {
                     Color32::TRANSPARENT
                 }
-            });
+            },
+        );
     }
 }
 

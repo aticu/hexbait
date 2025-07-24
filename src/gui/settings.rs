@@ -12,6 +12,8 @@ pub struct Settings {
     scale: f32,
     /// The color map to use.
     color_map: ColorMap,
+    /// Whether to use linear colors for bytes.
+    linear_byte_colors: bool,
 }
 
 impl Settings {
@@ -20,7 +22,18 @@ impl Settings {
         Settings {
             scale: 20.0,
             color_map: ColorMap::Viridis,
+            linear_byte_colors: false,
         }
+    }
+
+    /// Mutable access to the field determining whether linear byte colors are used.
+    pub fn linear_byte_colors_mut(&mut self) -> &mut bool {
+        &mut self.linear_byte_colors
+    }
+
+    /// Whether linear byte colors are used.
+    pub fn linear_byte_colors(&self) -> bool {
+        self.linear_byte_colors
     }
 
     /// The font size of normal text.
@@ -70,7 +83,11 @@ impl Settings {
 
     /// A representative color for the given byte value.
     pub fn byte_color(&self, byte: u8) -> Color32 {
-        BYTE_COLORS[byte as usize]
+        if self.linear_byte_colors {
+            self.scale_color_u8(byte)
+        } else {
+            BYTE_COLORS[byte as usize]
+        }
     }
 
     /// A color along a scale from `0u8` to `255u8`.

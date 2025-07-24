@@ -5,32 +5,52 @@ use crate::parsing::language::Int;
 use super::{Node, Symbol};
 
 /// Represents an expression in the AST.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expr {
     /// The kind of the expression.
     pub kind: ExprKind,
 }
 
 /// The type of unary operation to perform.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnOp {
     /// Logical negation.
     Not,
 }
 
 /// The type of binary operation to perform.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BinOp {
     /// Perform an equality check.
     Eq,
+    /// Perform a negated equality check.
+    Neq,
+    /// Perform a check whether the left operand is greater than the right operand.
+    Gt,
+    /// Perform a check whether the left operand is greater than or equal to the right operand.
+    Geq,
+    /// Perform a check whether the left operand is less than the right operand.
+    Lt,
+    /// Perform a check whether the left operand is less than or equal to the right operand.
+    Leq,
     /// Perform addition.
     Add,
     /// Perform subtraction.
     Sub,
+    /// Perform multiplication.
+    Mul,
+    /// Perform division.
+    Div,
+    /// Perform a modulo operation.
+    Mod,
+    /// Perform a logical or bitwise AND operation.
+    And,
+    /// Perform a logical or bitwise OR operation.
+    Or,
 }
 
 /// The kind of an expression.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExprKind {
     /// The expression is a constant integer value.
     ConstantInt {
@@ -44,6 +64,10 @@ pub enum ExprKind {
     },
     /// The expression refers to the current offset.
     Offset,
+    /// The currently parsed parent context.
+    Parent,
+    /// The last parsed entry in a repetition.
+    Last,
     /// The expression is a unary operation.
     UnOp {
         /// The operand of the expression.
@@ -77,4 +101,40 @@ pub enum ExprKind {
         /// The node to parse.
         node: Box<Node>,
     },
+    /// A conditional expression.
+    If {
+        /// The condition that determines the branch to take.
+        condition: Box<Expr>,
+        /// The expression that is computed if the condition is true.
+        true_branch: Box<Expr>,
+        /// The expression that is computed if the condition is false.
+        false_branch: Box<Expr>,
+    },
+}
+
+impl Expr {
+    /// Whether this expression contains a `last` expression.
+    pub fn contains_last(&self) -> bool {
+        match &self.kind {
+            ExprKind::ConstantInt { .. }
+            | ExprKind::ConstantBytes { .. }
+            | ExprKind::Offset
+            | ExprKind::Parent
+            | ExprKind::VariableUse { .. }
+            | ExprKind::ParseAt { .. } => false,
+            ExprKind::Last => true,
+            ExprKind::UnOp { operand, .. } => operand.contains_last(),
+            ExprKind::BinOp { left, right, .. } => left.contains_last() || right.contains_last(),
+            ExprKind::FieldAccess { field_holder, .. } => field_holder.contains_last(),
+            ExprKind::If {
+                condition,
+                true_branch,
+                false_branch,
+            } => {
+                condition.contains_last()
+                    || true_branch.contains_last()
+                    || false_branch.contains_last()
+            }
+        }
+    }
 }

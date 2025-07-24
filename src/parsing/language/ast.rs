@@ -7,10 +7,8 @@ pub use expr::*;
 mod expr;
 
 /// A node to be parsed.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Node {
-    /// The name of the node.
-    pub name: Symbol,
     /// The kind of node.
     pub kind: NodeKind,
     /// Parse this at the given offset instead of after the next field.
@@ -18,7 +16,7 @@ pub struct Node {
 }
 
 /// The kind of a node that can be parsed.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NodeKind {
     /// Fixed bytes are expected.
     FixedBytes {
@@ -42,10 +40,15 @@ pub enum NodeKind {
         /// The bit width to use.
         bit_width: u32,
     },
+    /// Parses the given named node.
+    NamedNode {
+        /// The name of the node to parse.
+        name: Symbol,
+    },
     /// A composite node consisting of multiple named subnodes.
     Struct {
         /// The nodes that make up the struct.
-        nodes: Vec<Node>,
+        nodes: Vec<(Symbol, Node)>,
     },
     /// Repeats a node `count` times.
     RepeatCount {
@@ -60,6 +63,24 @@ pub enum NodeKind {
         node: Box<Node>,
         /// The condition that is checked.
         condition: Expr,
+    },
+    /// Parses different nodes depending on a condition.
+    ParseIf {
+        /// The condition that determines which node is parsed.
+        condition: Expr,
+        /// The node to parse if the condition is true.
+        true_node: Box<Node>,
+        /// The node to parse if the condition is false.
+        false_node: Box<Node>,
+    },
+    /// Parses different values depending on a condition.
+    Switch {
+        /// The expression to evaluate for the switch.
+        scrutinee: Expr,
+        /// The branches of this switch with their expressions and the corresponding nodes.
+        branches: Vec<(Expr, Node)>,
+        /// The node to parse in case no branch matches.
+        default: Box<Node>,
     },
 }
 
