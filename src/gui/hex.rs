@@ -252,6 +252,14 @@ impl HexdumpView {
                                         "bitlocker_information".into(),
                                         crate::parsing::tmp_bitlocker_information(),
                                     );
+                                    context.add_named_node(
+                                        "vhdx_region_table".into(),
+                                        crate::parsing::tmp_vhdx_region_table(),
+                                    );
+                                    context.add_named_node(
+                                        "vhdx_metadata_table".into(),
+                                        crate::parsing::tmp_vhdx_metadata_table(),
+                                    );
                                     let value = match context.parse(
                                         &crate::parsing::language::ast::Node {
                                             kind:

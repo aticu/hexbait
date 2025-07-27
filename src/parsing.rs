@@ -6,8 +6,6 @@ pub mod eval;
 pub mod language;
 
 // TODO: implement a frontend for parsing `Node`s from text
-// TODO: implement re-usable types
-// TODO: implement "parse until" arrays
 // TODO: implement display options (enum that name certain values)
 // TODO: implement bitwise fields
 // TODO: implement custom data streams
@@ -2294,53 +2292,358 @@ pub fn tmp_bitlocker_information() -> language::ast::Node {
                 (
                     "datums".into(),
                     Node {
-                        kind: NodeKind::Struct {
-                            nodes: vec![
-                                (
-                                    "size".into(),
-                                    Node {
-                                        kind: NodeKind::Integer {
-                                            bit_width: 16,
-                                            signed: false,
-                                        },
-                                        offset: None
-                                    }
-                                ),
-                                (
-                                    "entry_type".into(),
-                                    Node {
-                                        kind: NodeKind::Integer {
-                                            bit_width: 16,
-                                            signed: false,
-                                        },
-                                        offset: None
-                                    }
-                                ),
-                                (
-                                    "value_type".into(),
-                                    Node {
-                                        kind: NodeKind::Integer {
-                                            bit_width: 16,
-                                            signed: false,
-                                        },
-                                        offset: None
-                                    }
-                                ),
-                                (
-                                    "error_status".into(),
-                                    Node {
-                                        kind: NodeKind::Integer {
-                                            bit_width: 16,
-                                            signed: false,
-                                        },
-                                        offset: None
-                                    }
-                                ),
-                            ],
+                        kind: NodeKind::RepeatWhile {
+                            node: Box::new(Node {
+                                kind: NodeKind::Struct {
+                                    nodes: vec![
+                                        (
+                                            "size".into(),
+                                            Node {
+                                                kind: NodeKind::Integer {
+                                                    bit_width: 16,
+                                                    signed: false,
+                                                },
+                                                offset: None
+                                            }
+                                        ),
+                                        (
+                                            "entry_type".into(),
+                                            Node {
+                                                kind: NodeKind::Integer {
+                                                    bit_width: 16,
+                                                    signed: false,
+                                                },
+                                                offset: None
+                                            }
+                                        ),
+                                        (
+                                            "value_type".into(),
+                                            Node {
+                                                kind: NodeKind::Integer {
+                                                    bit_width: 16,
+                                                    signed: false,
+                                                },
+                                                offset: None
+                                            }
+                                        ),
+                                        (
+                                            "error_status".into(),
+                                            Node {
+                                                kind: NodeKind::Integer {
+                                                    bit_width: 16,
+                                                    signed: false,
+                                                },
+                                                offset: None
+                                            }
+                                        ),
+                                        (
+                                            "content".into(),
+                                            Node {
+                                                kind: NodeKind::Switch {
+                                                    scrutinee: Expr {
+                                                        kind: ExprKind::VariableUse {
+                                                            var: "value_type".into(),
+                                                        }
+                                                    },
+                                                    branches: vec![
+                                                    ],
+                                                    default: Box::new(Node {
+                                                        kind: NodeKind::FixedLength {
+                                                            length: Expr {
+                                                                kind: ExprKind::BinOp {
+                                                                    left: Box::new(Expr {
+                                                                        kind: ExprKind::VariableUse {
+                                                                            var: "size".into(),
+                                                                        }
+                                                                    }),
+                                                                    right: Box::new(Expr {
+                                                                        kind: ExprKind::ConstantInt {
+                                                                            value: 8.into(),
+                                                                        }
+                                                                    }),
+                                                                    op: BinOp::Sub
+                                                                }
+                                                            }
+                                                        },
+                                                        offset: None
+                                                    })
+                                                },
+                                                offset: None
+                                            }
+                                        )
+                                    ],
+                                },
+                                offset: None
+                            }),
+                            condition: Expr {
+                                kind: ExprKind::BinOp {
+                                    left: Box::new(Expr {
+                                        kind: ExprKind::Offset,
+                                    }),
+                                    right: Box::new(Expr {
+                                        kind: ExprKind::BinOp {
+                                            left: Box::new(Expr {
+                                                kind: ExprKind::FieldAccess {
+                                                    field_holder: Box::new(Expr {
+                                                        kind: ExprKind::VariableUse {
+                                                            var: "dataset".into(),
+                                                        }
+                                                    }),
+                                                    field: "size".into()
+                                                },
+                                            }),
+                                            right: Box::new(Expr {
+                                                kind: ExprKind::ConstantInt {
+                                                    value: 0x40.into(),
+                                                }
+                                            }),
+                                            op: BinOp::Add,
+                                        }
+                                    }),
+                                    op: BinOp::Lt,
+                                }
+                            },
                         },
                         offset: None
                     }
                 )
+            ],
+        },
+        offset: None,
+    }
+}
+
+// TODO: remove when this can be parsed from a text file
+pub fn tmp_vhdx_region_table() -> language::ast::Node {
+    Node {
+        kind: NodeKind::Struct {
+            nodes: vec![
+                (
+                    "signature".into(),
+                    Node {
+                        kind: NodeKind::FixedBytes {
+                            expected: Expr {
+                                kind: ExprKind::ConstantBytes {
+                                    value: b"regi".into(),
+                                },
+                            },
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "checksum".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 32,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "number_of_entries".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 32,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "reserved".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 32,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "entries".into(),
+                    Node {
+                        kind: NodeKind::RepeatCount {
+                            node: Box::new(Node {
+                                kind: NodeKind::Struct {
+                                    nodes: vec![
+                                        (
+                                            "region_type_identifier".into(),
+                                            Node {
+                                                kind: NodeKind::FixedLength {
+                                                    length: Expr {
+                                                        kind: ExprKind::ConstantInt {
+                                                            value: 16.into(),
+                                                        },
+                                                    },
+                                                },
+                                                offset: None,
+                                            },
+                                        ),
+                                        (
+                                            "region_data_offset".into(),
+                                            Node {
+                                                kind: NodeKind::Integer {
+                                                    bit_width: 64,
+                                                    signed: false,
+                                                },
+                                                offset: None,
+                                            },
+                                        ),
+                                        (
+                                            "region_data_size".into(),
+                                            Node {
+                                                kind: NodeKind::Integer {
+                                                    bit_width: 32,
+                                                    signed: false,
+                                                },
+                                                offset: None,
+                                            },
+                                        ),
+                                        (
+                                            "is_required_flag".into(),
+                                            Node {
+                                                kind: NodeKind::Integer {
+                                                    bit_width: 32,
+                                                    signed: false,
+                                                },
+                                                offset: None,
+                                            },
+                                        ),
+                                    ],
+                                },
+                                offset: None,
+                            }),
+                            count: Expr {
+                                kind: ExprKind::VariableUse {
+                                    var: "number_of_entries".into(),
+                                }
+                            }
+                        },
+                        offset: None,
+                    },
+                ),
+            ],
+        },
+        offset: None,
+    }
+}
+
+// TODO: remove when this can be parsed from a text file
+pub fn tmp_vhdx_metadata_table() -> language::ast::Node {
+    Node {
+        kind: NodeKind::Struct {
+            nodes: vec![
+                (
+                    "signature".into(),
+                    Node {
+                        kind: NodeKind::FixedBytes {
+                            expected: Expr {
+                                kind: ExprKind::ConstantBytes {
+                                    value: b"metadata".into(),
+                                },
+                            },
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "unknown".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 16,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "number_of_entries".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 16,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "unknown2".into(),
+                    Node {
+                        kind: NodeKind::FixedLength {
+                            length: Expr {
+                                kind: ExprKind::ConstantInt {
+                                    value: 20.into(),
+                                },
+                            },
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "entries".into(),
+                    Node {
+                        kind: NodeKind::RepeatCount {
+                            node: Box::new(Node {
+                                kind: NodeKind::Struct {
+                                    nodes: vec![
+                                        (
+                                            "metadata_item_identifier".into(),
+                                            Node {
+                                                kind: NodeKind::FixedLength {
+                                                    length: Expr {
+                                                        kind: ExprKind::ConstantInt {
+                                                            value: 16.into(),
+                                                        },
+                                                    },
+                                                },
+                                                offset: None,
+                                            },
+                                        ),
+                                        (
+                                            "metadata_item_offset".into(),
+                                            Node {
+                                                kind: NodeKind::Integer {
+                                                    bit_width: 32,
+                                                    signed: false,
+                                                },
+                                                offset: None,
+                                            },
+                                        ),
+                                        (
+                                            "metadata_item_size".into(),
+                                            Node {
+                                                kind: NodeKind::Integer {
+                                                    bit_width: 32,
+                                                    signed: false,
+                                                },
+                                                offset: None,
+                                            },
+                                        ),
+                                        (
+                                            "unknown".into(),
+                                            Node {
+                                                kind: NodeKind::Integer {
+                                                    bit_width: 64,
+                                                    signed: false,
+                                                },
+                                                offset: None,
+                                            },
+                                        ),
+                                    ],
+                                },
+                                offset: None,
+                            }),
+                            count: Expr {
+                                kind: ExprKind::VariableUse {
+                                    var: "number_of_entries".into(),
+                                }
+                            }
+                        },
+                        offset: None,
+                    },
+                ),
             ],
         },
         offset: None,

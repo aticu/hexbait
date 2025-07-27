@@ -106,6 +106,16 @@ impl eframe::App for MyApp {
                             "bitlocker_information",
                             "bitlocker_information",
                         );
+                        ui.selectable_value(
+                            &mut self.parse_type,
+                            "vhdx_region_table",
+                            "vhdx_region_table",
+                        );
+                        ui.selectable_value(
+                            &mut self.parse_type,
+                            "vhdx_metadata_table",
+                            "vhdx_metadata_table",
+                        );
                     });
 
                 ui.label("Parse offset:");

@@ -87,6 +87,30 @@ pub(crate) fn render_inspector(
             "64-bit float",
             read_int!(u64).map(|int| format!("{:?}", f64::from_bits(int))),
         ),
+        (
+            "GUID",
+            (buf.len() >= 16).then(|| {
+                format!(
+                    "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+                    buf[3],
+                    buf[2],
+                    buf[1],
+                    buf[0],
+                    buf[5],
+                    buf[4],
+                    buf[7],
+                    buf[6],
+                    buf[8],
+                    buf[9],
+                    buf[10],
+                    buf[11],
+                    buf[12],
+                    buf[13],
+                    buf[14],
+                    buf[15],
+                )
+            })
+        ),
         ("UTF-8 character", {
             let c = match std::str::from_utf8(buf) {
                 Ok(s) => s.chars().next(),
