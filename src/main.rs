@@ -116,6 +116,7 @@ impl eframe::App for MyApp {
                             "vhdx_metadata_table",
                             "vhdx_metadata_table",
                         );
+                        ui.selectable_value(&mut self.parse_type, "vmdk_header", "vmdk_header");
                     });
 
                 ui.label("Parse offset:");

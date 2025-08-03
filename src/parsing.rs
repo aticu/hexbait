@@ -2649,3 +2649,199 @@ pub fn tmp_vhdx_metadata_table() -> language::ast::Node {
         offset: None,
     }
 }
+
+// TODO: remove when this can be parsed from a text file
+pub fn tmp_vmdk_header() -> language::ast::Node {
+    Node {
+        kind: NodeKind::Struct {
+            nodes: vec![
+                (
+                    "signature".into(),
+                    Node {
+                        kind: NodeKind::FixedBytes {
+                            expected: Expr {
+                                kind: ExprKind::ConstantBytes {
+                                    value: b"KDMV".into(),
+                                },
+                            },
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "version".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 32,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "flags".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 32,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "maximum_data_number_of_sectors".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 64,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "grain_number_of_sectors".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 64,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "descriptor_sector_number".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 64,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "descriptor_number_of_sectors".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 64,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "number_of_grains_table_entries".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 32,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "secondary_grain_directory_sector_number".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 64,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "grain_directory_sector_number".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 64,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "metadata_number_of_sectors".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 64,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "is_dirty".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 8,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "eol1".into(),
+                    Node {
+                        kind: NodeKind::FixedBytes {
+                            expected: Expr {
+                                kind: ExprKind::ConstantBytes {
+                                    value: b"\n".into(),
+                                },
+                            },
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "non_eol".into(),
+                    Node {
+                        kind: NodeKind::FixedLength {
+                            length: Expr {
+                                kind: ExprKind::ConstantInt {
+                                    value: 1.into(),
+                                },
+                            },
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "eol2".into(),
+                    Node {
+                        kind: NodeKind::FixedBytes {
+                            expected: Expr {
+                                kind: ExprKind::ConstantBytes {
+                                    value: b"\r\n".into(),
+                                },
+                            },
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "compression_method".into(),
+                    Node {
+                        kind: NodeKind::Integer {
+                            bit_width: 16,
+                            signed: false,
+                        },
+                        offset: None,
+                    },
+                ),
+                (
+                    "padding".into(),
+                    Node {
+                        kind: NodeKind::FixedLength {
+                            length: Expr {
+                                kind: ExprKind::ConstantInt {
+                                    value: 433.into(),
+                                },
+                            },
+                        },
+                        offset: None,
+                    },
+                ),
+            ],
+        },
+        offset: None,
+    }
+}

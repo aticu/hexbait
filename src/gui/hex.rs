@@ -260,6 +260,10 @@ impl HexdumpView {
                                         "vhdx_metadata_table".into(),
                                         crate::parsing::tmp_vhdx_metadata_table(),
                                     );
+                                    context.add_named_node(
+                                        "vmdk_header".into(),
+                                        crate::parsing::tmp_vmdk_header(),
+                                    );
                                     let value = match context.parse(
                                         &crate::parsing::language::ast::Node {
                                             kind:
