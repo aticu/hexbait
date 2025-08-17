@@ -2,11 +2,7 @@
 
 use std::ops::RangeInclusive;
 
-use egui::{Context, Response, Ui};
-
-use crate::gui::{color, settings::Settings};
-
-use super::highlighting::highlight;
+use egui::{Context, Response};
 
 /// Contains the necessary context to manage selections in the hex view.
 pub(crate) struct SelectionContext {
@@ -74,27 +70,5 @@ impl SelectionContext {
                 *selection.end()..=*selection.start()
             }
         })
-    }
-
-    /// Renders the selection polygon on screen.
-    pub(crate) fn render_selection(
-        &mut self,
-        ui: &mut Ui,
-        file_size: u64,
-        screen_start_offset_in_rows: u64,
-        rows_onscreen: u64,
-        settings: &Settings,
-    ) {
-        if let Some(selection) = self.selection() {
-            highlight(
-                ui,
-                selection,
-                color::HIGHLIGHT_COLOR,
-                file_size,
-                screen_start_offset_in_rows,
-                rows_onscreen,
-                settings,
-            );
-        }
     }
 }

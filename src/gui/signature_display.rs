@@ -69,24 +69,29 @@ impl SignatureDisplay {
         if let Some((first, second)) = hover_positions {
             let intensity = signature.tuple(first ^ xor_value, second ^ xor_value);
 
-            show_tooltip_at_pointer(ui.ctx(), ui.layer_id(), "signature_display".into(), |ui| {
-                ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        render_hex(ui, settings, Sense::hover(), first);
-                        render_hex(ui, settings, Sense::hover(), second);
+            show_tooltip_at_pointer(
+                ui.ctx(),
+                ui.layer_id(),
+                "signature_display_tooltip".into(),
+                |ui| {
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            render_hex(ui, settings, Sense::hover(), first);
+                            render_hex(ui, settings, Sense::hover(), second);
 
-                        ui.spacing_mut().item_spacing = Vec2::ZERO;
-                        ui.add_space(settings.large_space());
+                            ui.spacing_mut().item_spacing = Vec2::ZERO;
+                            ui.add_space(settings.large_space());
 
-                        render_glyph(ui, settings, Sense::hover(), first);
-                        render_glyph(ui, settings, Sense::hover(), second);
+                            render_glyph(ui, settings, Sense::hover(), first);
+                            render_glyph(ui, settings, Sense::hover(), second);
+                        });
+                        ui.label(format!(
+                            "Relative Density: {:0.02}%",
+                            intensity as f64 / 2.55,
+                        ));
                     });
-                    ui.label(format!(
-                        "Relative Density: {:0.02}%",
-                        intensity as f64 / 2.55,
-                    ));
-                });
-            });
+                },
+            );
         }
     }
 }

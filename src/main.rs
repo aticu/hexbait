@@ -5,8 +5,8 @@ use std::io::Read;
 use hexbait::{
     data::{DataSource as _, Input},
     gui::{
-        hex::HexdumpView, settings::Settings, signature_display::SignatureDisplay,
-        zoombars::Zoombars,
+        hex::HexdumpView, marking::MarkedLocations, settings::Settings,
+        signature_display::SignatureDisplay, zoombars::Zoombars,
     },
     model::Endianness,
     statistics::StatisticsHandler,
@@ -44,6 +44,7 @@ fn main() -> eframe::Result {
                 parse_type: "none",
                 parse_offset: String::from("0"),
                 sync_parse_offset_to_selection_start: true,
+                marked_locations: MarkedLocations::new(),
             }))
         }),
     )
@@ -62,6 +63,7 @@ struct MyApp {
     parse_type: &'static str,
     parse_offset: String,
     sync_parse_offset_to_selection_start: bool,
+    marked_locations: MarkedLocations,
 }
 
 impl eframe::App for MyApp {
@@ -148,7 +150,8 @@ impl eframe::App for MyApp {
                 file_size,
                 &mut self.input,
                 &self.settings,
-                |ui, source, start| {
+                &mut self.marked_locations,
+                |ui, source, start, marked_locations| {
                     self.hexdump_context.render(
                         ui,
                         &self.settings,
@@ -156,6 +159,7 @@ impl eframe::App for MyApp {
                         &mut self.endianness,
                         start,
                         (self.parse_type, &mut parse_offset),
+                        marked_locations,
                     );
                 },
                 |ui, source, window| {

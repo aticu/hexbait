@@ -3,13 +3,18 @@
 use std::{collections::HashMap, ops::RangeInclusive};
 
 use egui::{
-    Align, Color32, Context, FontId, Layout, PointerButton, Rect, Sense, Ui, UiBuilder,
-    show_tooltip_at_pointer, vec2,
+    Align, Color32, Context, FontId, Layout, PointerButton, Pos2, Rect, RichText, Sense, Ui,
+    UiBuilder, show_tooltip_at_pointer, vec2,
 };
 
 use crate::{data::DataSource, window::Window};
 
-use super::{cached_image::CachedImage, color, settings::Settings};
+use super::{
+    cached_image::CachedImage,
+    color,
+    marking::{MarkedLocations, render_locations_on_bar},
+    settings::Settings,
+};
 
 const NULL_SELECTION: RangeInclusive<f32> = 0.0..=1.0;
 
@@ -64,7 +69,8 @@ impl Zoombars {
         file_size: u64,
         source: &mut Source,
         settings: &Settings,
-        render_hex: impl FnOnce(&mut Ui, &mut Source, u64),
+        marked_locations: &mut MarkedLocations,
+        render_hex: impl FnOnce(&mut Ui, &mut Source, u64, &mut MarkedLocations),
         render_overview: impl FnOnce(&mut Ui, &mut Source, Window),
     ) {
         let rect = ui.max_rect().intersect(ui.cursor());
@@ -76,7 +82,7 @@ impl Zoombars {
         let total_bytes = total_rows * 16;
 
         if total_bytes >= file_size {
-            render_hex(ui, source, 0);
+            render_hex(ui, source, 0, marked_locations);
             return;
         } else if self.bars.is_empty() {
             self.bars.push(Zoombar::new());
@@ -88,6 +94,9 @@ impl Zoombars {
         let mut show_hex = false;
 
         let mut entropy_cache = HashMap::new();
+
+        let mut new_hovered_location = None;
+        let currently_hovered = *marked_locations.hovered_location_id_mut();
 
         ui.allocate_new_ui(
             UiBuilder::new()
@@ -142,11 +151,32 @@ impl Zoombars {
                         },
                     );
 
-                    if let Some(row_window) = hovered_row_window {
+                    render_locations_on_bar(
+                        ui,
+                        rect,
+                        window,
+                        marked_locations,
+                        &mut new_hovered_location,
+                        currently_hovered,
+                    );
+
+                    if let Some(location) = marked_locations.hovered() {
+                        let offset = location.window().start();
                         show_tooltip_at_pointer(
                             ui.ctx(),
                             ui.layer_id(),
-                            "signature_display".into(),
+                            "position_highlight_hover".into(),
+                            |ui| {
+                                ui.label(
+                                    RichText::new(format!("{}", offset)).size(settings.font_size()),
+                                );
+                            },
+                        );
+                    } else if let Some(row_window) = hovered_row_window {
+                        show_tooltip_at_pointer(
+                            ui.ctx(),
+                            ui.layer_id(),
+                            "zoombar_tooltip".into(),
                             |ui| {
                                 let row_window = row_window.expand_to_align(1024);
                                 let entropy = entropy_cache
@@ -154,9 +184,14 @@ impl Zoombars {
                                     .or_insert_with(|| entropy(source, row_window));
 
                                 if let Some(entropy) = entropy {
-                                    ui.label(format!("Entropy: {entropy:.02}"));
+                                    ui.label(
+                                        RichText::new(format!("Entropy: {entropy:.02}"))
+                                            .size(settings.font_size()),
+                                    );
                                 } else {
-                                    ui.label("Entropy unknown");
+                                    ui.label(
+                                        RichText::new("Entropy unknown").size(settings.font_size()),
+                                    );
                                 }
                             },
                         );
@@ -213,12 +248,14 @@ impl Zoombars {
                         window.start() / 16
                     };
 
-                    render_hex(ui, source, start);
+                    render_hex(ui, source, start, marked_locations);
                 } else {
                     render_overview(ui, source, window);
                 }
             },
         );
+
+        *marked_locations.hovered_location_id_mut() = new_hovered_location;
     }
 }
 
@@ -405,22 +442,6 @@ impl Zoombar {
             },
         );
 
-        /*
-        let highlight_position = 200_000;
-
-        if window.contains(highlight_position) {
-            let relative_offset =
-                (highlight_position - window.start()) as f32 / window.size() as f32;
-
-            ui.painter().circle(
-                rect.center_top() + vec2(0.0, relative_offset * rect.height()),
-                rect.width() / 16f32,
-                Color32::RED,
-                egui::Stroke::NONE,
-            );
-        }
-        */
-
         ui.allocate_rect(rect, Sense::hover())
             .hover_pos()
             .map(|pos| {
@@ -437,5 +458,25 @@ impl Zoombar {
 impl Default for Zoombar {
     fn default() -> Self {
         Zoombar::new()
+    }
+}
+
+/// Returns the position of `offset` on the bar spanning `bar_window` displayed in `bar_rect`.
+pub fn offset_on_bar(bar_rect: Rect, bar_window: Window, offset: u64) -> Option<Pos2> {
+    if offset < bar_window.start() {
+        return None;
+    }
+
+    let relative_offset = (offset - bar_window.start()) as f32 / bar_window.size() as f32;
+    let height = bar_rect.height().ceil();
+
+    if 0.0 <= relative_offset && relative_offset <= 1.0 {
+        let offset = ((16.0 * height) * relative_offset) as u32;
+        let offset_x = offset % 16;
+        let offset_y = offset / 16;
+
+        Some(bar_rect.min + vec2(offset_x as f32 * bar_rect.width() / 16.0, offset_y as f32))
+    } else {
+        None
     }
 }

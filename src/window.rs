@@ -1,5 +1,7 @@
 //! Models "windows" as regions of the input.
 
+use std::ops::RangeInclusive;
+
 /// Represents a region of the input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Window {
@@ -62,9 +64,23 @@ impl Window {
         self.start() == self.end()
     }
 
-    /// Determines if the contains the given offset.
+    /// Determines if the window contains the given offset.
     pub fn contains(self, offset: u64) -> bool {
         self.start() <= offset && offset < self.end()
+    }
+
+    /// Determines if the window overlaps with the other window.
+    pub fn overlaps(self, other: Window) -> bool {
+        self.start() < other.end() && other.start() < self.end()
+    }
+
+    /// Returns the window as a [`RangeInclusive`] instead, if it is non-empty.
+    pub fn range_inclusive(self) -> Option<RangeInclusive<u64>> {
+        if self.start() < self.end() {
+            Some(self.start()..=(self.end() - 1))
+        } else {
+            None
+        }
     }
 
     /// Expands this window such that both the start and end are aligned to `align`.
@@ -137,6 +153,12 @@ impl Window {
         } else {
             None
         }
+    }
+}
+
+impl From<RangeInclusive<u64>> for Window {
+    fn from(value: RangeInclusive<u64>) -> Self {
+        Window::new(*value.start(), value.end() + 1)
     }
 }
 

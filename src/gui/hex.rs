@@ -18,7 +18,11 @@ use inspector::render_inspector;
 
 pub use primitives::{render_glyph, render_hex, render_offset};
 
-use super::{cached_image::CachedImage, settings::Settings};
+use super::{
+    cached_image::CachedImage,
+    marking::{MarkedLocation, MarkedLocations, MarkingKind, render_locations_on_bar},
+    settings::Settings,
+};
 
 /// A hexdump viewer widget.
 ///
@@ -54,6 +58,7 @@ impl HexdumpView {
         endianness: &mut Endianness,
         start: u64,
         (parse_type, parse_offset): (&str, &mut Option<u64>),
+        marked_locations: &mut MarkedLocations,
     ) {
         // start is in rows
         let start_in_bytes = start * 16;
@@ -110,16 +115,27 @@ impl HexdumpView {
                 |ui| {
                     let max_rect = ui.max_rect();
 
-                    self.render_sidebar(ui, window, rows_onscreen, max_scroll, start, settings);
+                    self.render_sidebar(
+                        ui,
+                        window,
+                        rows_onscreen,
+                        max_scroll,
+                        start,
+                        marked_locations,
+                        settings,
+                    );
+
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing = Vec2::ZERO;
-                        self.selection_context.render_selection(
-                            ui,
-                            file_size,
-                            start + self.scroll_offset,
-                            rows_onscreen,
-                            settings,
-                        );
+
+                        marked_locations
+                            .remove_where(|location| location.kind() == MarkingKind::Selection);
+                        if let Some(selection) = self.selection_context.selection() {
+                            marked_locations.add(MarkedLocation::new(
+                                selection.into(),
+                                MarkingKind::Selection,
+                            ));
+                        }
 
                         if let Some(hovered_parsed_bytes) = &self.hovered_parsed_bytes {
                             for range in hovered_parsed_bytes.byte_ranges() {
@@ -133,6 +149,24 @@ impl HexdumpView {
                                     settings,
                                 );
                             }
+                        }
+
+                        for location in marked_locations.iter_window(Window::from_start_len(
+                            start_in_bytes,
+                            window.len() as u64,
+                        )) {
+                            let Some(range) = location.window().range_inclusive() else {
+                                continue;
+                            };
+                            highlight(
+                                ui,
+                                range,
+                                location.color(),
+                                file_size,
+                                start + self.scroll_offset,
+                                rows_onscreen,
+                                settings,
+                            );
                         }
 
                         for (i, row) in window
@@ -420,6 +454,7 @@ impl HexdumpView {
         rows_onscreen: u64,
         max_scroll: u64,
         start: u64,
+        marked_locations: &mut MarkedLocations,
         settings: &Settings,
     ) {
         let bar_width_multiplier = settings.bar_width_multiplier();
@@ -456,6 +491,18 @@ impl HexdumpView {
                 }
             },
         );
+
+        let mut new_hovered_location = None;
+        let currently_hovered = *marked_locations.hovered_location_id_mut();
+        render_locations_on_bar(
+            ui,
+            rect,
+            Window::from_start_len(start * 16, window.len() as u64),
+            marked_locations,
+            &mut new_hovered_location,
+            currently_hovered,
+        );
+        *marked_locations.hovered_location_id_mut() = new_hovered_location;
     }
 }
 
