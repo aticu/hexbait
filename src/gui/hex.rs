@@ -462,6 +462,9 @@ impl HexdumpView {
         let mut rect = ui.max_rect().intersect(ui.cursor());
         rect.set_width(16.0 * bar_width_multiplier as f32);
 
+        let num_rows = (window.len() + 15) / 16;
+        rect.set_height(rect.height().min(num_rows as f32));
+
         let response = ui.allocate_rect(rect, Sense::click_and_drag());
 
         if let Some(pos) = response.interact_pointer_pos() {

@@ -184,8 +184,13 @@ pub fn render_locations_on_bar(
             }
             (Some(start), Some(end)) => {
                 if (end.y - start.y) < BIN_SIZE as f32 {
+                    let mut bin = ((start.y as u32) / BIN_SIZE) * BIN_SIZE;
+                    if bin < start.y as u32 {
+                        bin += BIN_SIZE;
+                    }
+
                     location_dots_by_y_bins
-                        .entry(((start.y as u32) / BIN_SIZE) * BIN_SIZE)
+                        .entry(bin)
                         .or_default()
                         .push(location);
                     continue;
