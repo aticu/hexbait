@@ -4,9 +4,7 @@ use egui::{Align, Color32, Layout, Rect, RichText, ScrollArea, Sense, Ui, UiBuil
 use highlighting::highlight;
 use selection::SelectionContext;
 
-use crate::{
-    data::DataSource, gui::color, model::Endianness, parsing::eval::Provenance, window::Window,
-};
+use crate::{data::DataSource, gui::color, model::Endianness, window::Window};
 
 mod highlighting;
 mod inspector;
@@ -34,8 +32,6 @@ pub struct HexdumpView {
     selection_context: SelectionContext,
     /// The cached image for the sidebar in the hex view.
     sidebar_cached_image: CachedImage<(u64, u64, bool)>,
-    /// The currently hovered parsed bytes.
-    hovered_parsed_bytes: Option<Provenance>,
 }
 
 impl HexdumpView {
@@ -45,7 +41,6 @@ impl HexdumpView {
             scroll_offset: 0,
             selection_context: SelectionContext::new(),
             sidebar_cached_image: CachedImage::new(),
-            hovered_parsed_bytes: None,
         }
     }
 
@@ -137,20 +132,6 @@ impl HexdumpView {
                             ));
                         }
 
-                        if let Some(hovered_parsed_bytes) = &self.hovered_parsed_bytes {
-                            for range in hovered_parsed_bytes.byte_ranges() {
-                                highlight(
-                                    ui,
-                                    range,
-                                    Color32::GOLD,
-                                    file_size,
-                                    start + self.scroll_offset,
-                                    rows_onscreen,
-                                    settings,
-                                );
-                            }
-                        }
-
                         for location in marked_locations.iter_window(Window::from_start_len(
                             start_in_bytes,
                             window.len() as u64,
@@ -229,7 +210,9 @@ impl HexdumpView {
                                 .id_salt("parser_scroll")
                                 .max_height(half_height)
                                 .show(ui, |ui| {
-                                    self.hovered_parsed_bytes = None;
+                                    marked_locations.remove_where(|location| {
+                                        location.kind() == MarkingKind::HoveredParsed
+                                    });
 
                                     let current_parse_offset = *parse_offset;
                                     if let Some(window) = self.selection() {
@@ -325,7 +308,12 @@ impl HexdumpView {
                                     if let Some(hovered) = hovered
                                         && let Some(value) = value.subvalue_at_path(&hovered)
                                     {
-                                        self.hovered_parsed_bytes = Some(value.provenance.clone());
+                                        for range in value.provenance.byte_ranges() {
+                                            marked_locations.add(MarkedLocation::new(
+                                                range.into(),
+                                                MarkingKind::HoveredParsed,
+                                            ));
+                                        }
                                     }
                                 });
                         },
@@ -496,7 +484,7 @@ impl HexdumpView {
         );
 
         let mut new_hovered_location = None;
-        let currently_hovered = *marked_locations.hovered_location_id_mut();
+        let currently_hovered = marked_locations.hovered_location_mut().clone();
         render_locations_on_bar(
             ui,
             rect,
@@ -505,7 +493,7 @@ impl HexdumpView {
             &mut new_hovered_location,
             currently_hovered,
         );
-        *marked_locations.hovered_location_id_mut() = new_hovered_location;
+        *marked_locations.hovered_location_mut() = new_hovered_location;
     }
 }
 

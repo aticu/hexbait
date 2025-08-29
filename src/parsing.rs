@@ -371,6 +371,28 @@ pub fn tmp_pe_file() -> language::ast::Node {
                                                 offset: None,
                                             },
                                         ),
+                                        (
+                                            "content".into(),
+                                            Node {
+                                                kind: NodeKind::Elsewhere {
+                                                    node: Box::new(Node {
+                                                        kind: NodeKind::FixedLength {
+                                                            length: Expr {
+                                                                kind: ExprKind::VariableUse {
+                                                                    var: "size_of_raw_data".into(),
+                                                                },
+                                                            },
+                                                        },
+                                                        offset: Some(Expr {
+                                                            kind: ExprKind::VariableUse {
+                                                                var: "pointer_to_raw_data".into(),
+                                                            },
+                                                        }),
+                                                    }),
+                                                },
+                                                offset: None,
+                                            }
+                                        ),
                                     ],
                                 },
                                 offset: None,

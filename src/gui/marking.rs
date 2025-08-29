@@ -1,6 +1,6 @@
 //! Implements marking of locations.
 
-use std::{collections::BTreeMap, num::NonZeroUsize, ops::Index};
+use std::collections::BTreeMap;
 
 use egui::{Color32, Rect, Stroke, Ui, pos2};
 
@@ -8,23 +8,12 @@ use crate::window::Window;
 
 use super::{color, zoombars::offset_on_bar};
 
-/// The ID of a marked location.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct MarkedLocationId {
-    /// The offset of the marked location.
-    offset: u64,
-    /// A unique id.
-    id: NonZeroUsize,
-}
-
 /// Stores the marked locations to highlight.
 pub struct MarkedLocations {
     /// The locations that should be highlighted.
     locations: BTreeMap<u64, Vec<MarkedLocation>>,
-    /// The next ID that will be used for a marked location.
-    next_id: NonZeroUsize,
     /// The currently hovered location.
-    hovered_location: Option<MarkedLocationId>,
+    hovered_location: Option<MarkedLocation>,
 }
 
 impl MarkedLocations {
@@ -32,28 +21,16 @@ impl MarkedLocations {
     pub fn new() -> MarkedLocations {
         MarkedLocations {
             locations: BTreeMap::new(),
-            next_id: NonZeroUsize::MIN,
             hovered_location: None,
         }
     }
 
     /// Adds a new marked location to be displayed.
-    pub fn add(&mut self, mut marked_location: MarkedLocation) -> MarkedLocationId {
-        let offset = marked_location.window.start();
-        let id = MarkedLocationId {
-            offset,
-            id: self.next_id,
-        };
-        self.next_id = id.id.checked_add(1).unwrap_or(NonZeroUsize::MIN);
-
-        marked_location.id = Some(id);
-
+    pub fn add(&mut self, marked_location: MarkedLocation) {
         self.locations
             .entry(marked_location.window.start())
             .or_default()
             .push(marked_location);
-
-        id
     }
 
     /// Remove marked locations that match the given filter.
@@ -73,52 +50,36 @@ impl MarkedLocations {
 
     /// The currently hovered location.
     pub fn hovered(&self) -> Option<&MarkedLocation> {
-        if let Some(id) = self.hovered_location {
-            Some(&self[id])
+        if let Some(location) = &self.hovered_location {
+            self.locations
+                .get(&location.window().start())
+                .unwrap()
+                .iter()
+                .find(|&loc| location == loc)
         } else {
             None
         }
     }
 
-    /// Returns a mutable reference to the currently hovered location id.
-    pub fn hovered_location_id_mut(&mut self) -> &mut Option<MarkedLocationId> {
+    /// Returns a mutable reference to the currently hovered location.
+    pub fn hovered_location_mut(&mut self) -> &mut Option<MarkedLocation> {
         &mut self.hovered_location
     }
 }
 
-impl Index<MarkedLocationId> for MarkedLocations {
-    type Output = MarkedLocation;
-
-    fn index(&self, index: MarkedLocationId) -> &Self::Output {
-        self.locations
-            .get(&index.offset)
-            .unwrap()
-            .iter()
-            .find(|location| location.id == Some(index))
-            .unwrap()
-    }
-}
-
 /// A marked location.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkedLocation {
     /// The window that this location refers to.
     window: Window,
     /// The kind of the marked location.
     kind: MarkingKind,
-    /// The ID of this location.
-    ///
-    /// This will be filled when the location is added to the marked locations.
-    id: Option<MarkedLocationId>,
 }
 
 impl MarkedLocation {
     /// Creates a new marked location on the given window.
     pub fn new(window: Window, kind: MarkingKind) -> MarkedLocation {
-        MarkedLocation {
-            window,
-            kind,
-            id: None,
-        }
+        MarkedLocation { window, kind }
     }
 
     /// The window covered by this marked location.
@@ -135,6 +96,7 @@ impl MarkedLocation {
     pub fn color(&self) -> Color32 {
         match self.kind() {
             MarkingKind::Selection => Color32::WHITE,
+            MarkingKind::HoveredParsed => Color32::DARK_RED,
         }
     }
 }
@@ -144,6 +106,8 @@ impl MarkedLocation {
 pub enum MarkingKind {
     /// The location is marked, because the user selected it.
     Selection,
+    /// The location is marked, because the user hovered the parsed value.
+    HoveredParsed,
 }
 
 /// Renders the given marked locations on the given bar window.
@@ -152,8 +116,8 @@ pub fn render_locations_on_bar(
     bar_rect: Rect,
     bar_window: Window,
     marked_locations: &mut MarkedLocations,
-    new_hovered: &mut Option<MarkedLocationId>,
-    currently_hovered: Option<MarkedLocationId>,
+    new_hovered: &mut Option<MarkedLocation>,
+    currently_hovered: Option<MarkedLocation>,
 ) {
     // first bin locations to similar y offsets, so that they don't overlap
     let mut location_dots_by_y_bins = BTreeMap::<u32, Vec<_>>::new();
@@ -229,9 +193,6 @@ pub fn render_locations_on_bar(
                 color::lerp(location.color(), Color32::TRANSPARENT, TRANSPARENCY),
             );
         }
-
-        // TODO: round x position to the nearest 16th of the bar
-        // TODO: draw range in three parts: first line, last line and block in between
     }
 
     for (y, mut locations) in location_dots_by_y_bins {
@@ -244,7 +205,7 @@ pub fn render_locations_on_bar(
                 y as f32,
             );
 
-            let is_hovered = location.id == currently_hovered;
+            let is_hovered = Some(*location) == currently_hovered.as_ref();
             let radius = if is_hovered {
                 bar_rect.width() / 8.0
             } else {
@@ -265,7 +226,7 @@ pub fn render_locations_on_bar(
                 .map(|pos| (pos - center).length() < radius)
                 .unwrap_or(false);
             if hovered {
-                *new_hovered = location.id;
+                *new_hovered = Some((*location).clone());
             }
         }
     }

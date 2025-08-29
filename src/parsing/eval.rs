@@ -397,6 +397,13 @@ impl ParseContext<'_> {
 
                 self.parse(&node, source)?
             }
+            NodeKind::Elsewhere { node } => {
+                let prev_offset = self.offset.clone();
+                let result = self.parse(node, source)?;
+                self.offset = prev_offset;
+
+                result
+            }
             NodeKind::Struct { nodes } => {
                 let mut child_ctx = self.child();
 

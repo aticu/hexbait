@@ -45,6 +45,11 @@ pub enum NodeKind {
         /// The name of the node to parse.
         name: Symbol,
     },
+    /// Parses the given node at a different location without updating the offset.
+    Elsewhere {
+        /// The node to parse.
+        node: Box<Node>,
+    },
     /// A composite node consisting of multiple named subnodes.
     Struct {
         /// The nodes that make up the struct.

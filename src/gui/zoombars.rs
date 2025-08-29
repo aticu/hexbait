@@ -96,7 +96,7 @@ impl Zoombars {
         let mut entropy_cache = HashMap::new();
 
         let mut new_hovered_location = None;
-        let currently_hovered = *marked_locations.hovered_location_id_mut();
+        let currently_hovered = marked_locations.hovered_location_mut().clone();
 
         ui.allocate_new_ui(
             UiBuilder::new()
@@ -157,7 +157,7 @@ impl Zoombars {
                         window,
                         marked_locations,
                         &mut new_hovered_location,
-                        currently_hovered,
+                        currently_hovered.clone(),
                     );
 
                     if let Some(location) = marked_locations.hovered() {
@@ -255,7 +255,7 @@ impl Zoombars {
             },
         );
 
-        *marked_locations.hovered_location_id_mut() = new_hovered_location;
+        *marked_locations.hovered_location_mut() = new_hovered_location;
     }
 }
 
