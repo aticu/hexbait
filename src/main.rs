@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::io::Read;
+use std::{io::Read, path::PathBuf};
 
 use hexbait::{
     data::{DataSource as _, Input},
@@ -9,22 +9,25 @@ use hexbait::{
         signature_display::SignatureDisplay, zoombars::Zoombars,
     },
     model::Endianness,
-    statistics::StatisticsHandler,
+    statistics::{Statistics, StatisticsHandler},
 };
 
 fn main() -> eframe::Result {
     let input = if let Some(arg) = std::env::args().nth(1) {
-        Input::File(std::fs::File::open(arg).unwrap())
+        Input::File {
+            path: PathBuf::from(&arg),
+            file: std::fs::File::open(arg).unwrap(),
+        }
     } else {
         let mut buf = Vec::new();
         std::io::stdin().read_to_end(&mut buf).unwrap();
-        Input::Stdin(buf)
+        Input::Stdin(buf.into())
     };
 
+    let statistics_cache_input = input.clone().unwrap();
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([320.0, 240.0])
-            .with_maximized(true),
+        viewport: egui::ViewportBuilder::default().with_maximized(true),
         ..Default::default()
     };
     eframe::run_native(
@@ -40,7 +43,7 @@ fn main() -> eframe::Result {
                 zoombars: Zoombars::new(),
                 signature_display: SignatureDisplay::new(),
                 xor_value: 0,
-                statistics_handler: StatisticsHandler::new(),
+                statistics_handler: StatisticsHandler::new(statistics_cache_input),
                 parse_type: "none",
                 parse_offset: String::from("0"),
                 sync_parse_offset_to_selection_start: true,
@@ -151,6 +154,7 @@ impl eframe::App for MyApp {
                 &mut self.input,
                 &self.settings,
                 &mut self.marked_locations,
+                &self.statistics_handler,
                 |ui, source, start, marked_locations| {
                     self.hexdump_context.render(
                         ui,
@@ -162,8 +166,13 @@ impl eframe::App for MyApp {
                         marked_locations,
                     );
                 },
-                |ui, source, window| {
-                    let statistics = self.statistics_handler.get(source, window).unwrap();
+                |ui, window| {
+                    let (statistics, quality) = self
+                        .statistics_handler
+                        .get_bigram(window)
+                        .into_result_with_quality()
+                        .unwrap()
+                        .unwrap_or_else(|| (Statistics::empty_for_window(window), 0.0));
                     let signature = statistics.to_signature();
                     let rect = ui.max_rect().intersect(ui.cursor());
 
@@ -174,6 +183,7 @@ impl eframe::App for MyApp {
                             window,
                             &signature,
                             self.xor_value,
+                            quality,
                             &self.settings,
                         );
 
@@ -184,6 +194,9 @@ impl eframe::App for MyApp {
                     });
                 },
             );
+
+            self.statistics_handler
+                .end_of_frame(self.zoombars.changed());
 
             if self.sync_parse_offset_to_selection_start {
                 if let Some(parse_offset) = parse_offset {

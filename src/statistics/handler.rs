@@ -1,15 +1,23 @@
 //! Implements a handler that manages statistics for an input.
 
-use std::sync::Arc;
+use std::sync::{Arc, mpsc};
 
+use background_thread::{BackgroundThread, Request, RequestKind};
 use quick_cache::sync::Cache;
 
-use crate::{data::DataSource, window::Window};
+use crate::{data::Input, window::Window};
 
 use super::Statistics;
 
+pub use statistics_result::StatisticsResult;
+
 #[macro_use]
 mod cache_size;
+mod background_thread;
+mod statistics_result;
+
+/// The minimum window size for entropy requests.
+const MIN_ENTROPY_WINDOW_SIZE: u64 = 1024;
 
 cache_sizes! {
     CacheSize {
@@ -29,121 +37,177 @@ cache_sizes! {
 
 /// Manages statistics for an input.
 pub struct StatisticsHandler {
-    /// Statistics for a 64KiB block in the input.
-    caches: [Cache<u64, Arc<Statistics>>; CacheSize::NUM_SIZES],
+    /// Statistics for different block-sizes in the input, aligned to the block size.
+    aligned_windows: Arc<[Cache<u64, Arc<Statistics>>; CacheSize::NUM_SIZES]>,
+    /// A cache for unaligned windows.
+    unaligned_windows: Arc<Cache<Window, Arc<Statistics>>>,
+    /// A cache for entropy values of the smallest possible window size.
+    entropy_results: Arc<Cache<u64, u8>>,
+    /// The requests for new windows to compute.
+    requests: mpsc::Sender<background_thread::Message>,
+    /// Whether to send requests for new data to the backend.
+    send_requests: bool,
 }
 
 impl StatisticsHandler {
     /// Creates a new statistics handler.
-    pub fn new() -> StatisticsHandler {
+    pub fn new(source: Input) -> StatisticsHandler {
+        let (sender, receiver) = mpsc::channel();
+        let aligned_windows = Arc::new(std::array::from_fn(|i| {
+            Cache::new(CacheSize::try_from_index(i).unwrap().num_entries())
+        }));
+        let unaligned_windows = Arc::new(Cache::new(2));
+        let entropy_results = Arc::new(Cache::new(65_536));
+
+        let background_thread = BackgroundThread {
+            aligned_windows: Arc::clone(&aligned_windows),
+            unaligned_windows: Arc::clone(&unaligned_windows),
+            entropy_results: Arc::clone(&entropy_results),
+            requests: receiver,
+            request_buffer: Vec::new(),
+            source,
+        };
+
+        std::thread::spawn(|| background_thread.run());
+
         StatisticsHandler {
-            caches: std::array::from_fn(|i| {
-                Cache::new(CacheSize::try_from_index(i).unwrap().num_entries())
-            }),
+            aligned_windows,
+            unaligned_windows,
+            entropy_results,
+            requests: sender,
+            send_requests: true,
         }
     }
 
-    /// Returns the cached statistics for the given window or computes them.
-    fn get_or_compute<Source: DataSource>(
-        &self,
-        source: &mut Source,
-        window: Window,
-    ) -> Result<(Arc<Statistics>, bool), Source::Error> {
+    /// Requests the given window.
+    fn request_window(&self, window: Window, request_kind: RequestKind) {
+        if self.send_requests {
+            self.requests
+                .send(background_thread::Message::Compute(Request {
+                    kind: request_kind,
+                    window,
+                }))
+                .unwrap();
+        }
+    }
+
+    /// Returns the cached statistics for the given window or requests it.
+    fn get_or_request_aligned(&self, window: Window) -> Option<Arc<Statistics>> {
         let size = CacheSize::try_from(window.size()).expect("not a valid cache size");
         assert_eq!(window.start() % size.size(), 0, "unaligned cache request");
 
-        self.caches[size.index()]
-            .get(&window.start())
-            .map(|stats| Ok((stats, true)))
-            .unwrap_or_else(|| {
-                Statistics::compute(source, window).map(|stats| (Arc::new(stats), false))
-            })
-    }
-
-    /// Returns the cached statistics for the given window.
-    ///
-    /// Recomputes if necessary.
-    fn get_or_cache<Source: DataSource>(
-        &self,
-        source: &mut Source,
-        window: Window,
-    ) -> Result<Arc<Statistics>, Source::Error> {
-        let (stats, cached) = self.get_or_compute(source, window)?;
-        if cached {
-            return Ok(stats);
+        let cached_stats = self.aligned_windows[size.index()].get(&window.start());
+        if cached_stats.is_some() {
+            return cached_stats;
         }
-        let size = CacheSize::try_from(window.size()).expect("not a valid cache size");
 
-        self.caches[size.index()].insert(window.start(), stats.clone());
-
-        Ok(stats)
+        self.request_window(window, RequestKind::Bigrams);
+        None
     }
 
-    /// Adds a section that is aligned to a cache size to the statistics.
-    fn add_aligned_section<Source: DataSource>(
-        &self,
-        stats: &mut Statistics,
-        source: &mut Source,
-        window: Window,
-        size: CacheSize,
-    ) -> Result<(), Source::Error> {
+    /// Adds an unaligned section to the given statistics.
+    fn add_unaligned_section(&self, stats: &mut Statistics, window: Window) -> u64 {
+        if let Some(window_stats) = self.unaligned_windows.get(&window) {
+            *stats += &window_stats;
+            return window.size();
+        }
+
+        stats.add_empty_window(window);
+        self.request_window(window, RequestKind::Bigrams);
+        0
+    }
+
+    /// Adds a section that is aligned to a cache size.
+    fn add_aligned_section(&self, stats: &mut Statistics, window: Window, size: CacheSize) -> u64 {
         let size_u64 = size.size();
+        let mut total_valid_bytes = 0;
 
-        let add_window =
-            |this: &Self, stats: &mut Statistics, source: &mut Source, window: Window| {
-                for i in 0..window.size() / size_u64 {
-                    let window_stats = this.get_or_cache(
-                        source,
-                        Window::from_start_len(window.start() + i * size_u64, size_u64),
-                    )?;
+        let add_window = |this: &Self, stats: &mut Statistics, window: Window| -> u64 {
+            let mut total_valid_bytes = 0;
 
+            for i in 0..window.size() / size_u64 {
+                let subwindow = Window::from_start_len(window.start() + i * size_u64, size_u64);
+                if let Some(window_stats) = this.get_or_request_aligned(subwindow) {
                     *stats += &window_stats;
+                    total_valid_bytes += subwindow.size();
+                } else {
+                    stats.add_empty_window(subwindow);
                 }
+            }
 
-                Ok(())
-            };
+            total_valid_bytes
+        };
 
         if let Some(next_size) = size.next()
             && let Some((before, aligned, after)) = window.align(next_size.size())
         {
-            add_window(self, stats, source, before)?;
-            self.add_aligned_section(stats, source, aligned, next_size)?;
-            add_window(self, stats, source, after)?;
+            total_valid_bytes += add_window(self, stats, before);
+            total_valid_bytes += self.add_aligned_section(stats, aligned, next_size);
+            total_valid_bytes += add_window(self, stats, after);
         } else {
-            add_window(self, stats, source, window)?;
+            total_valid_bytes += add_window(self, stats, window);
         }
 
-        Ok(())
+        total_valid_bytes
     }
 
-    /// Returns the statistics associated with the given window.
-    pub fn get<Source: DataSource>(
-        &self,
-        source: &mut Source,
-        window: Window,
-    ) -> Result<Statistics, Source::Error> {
+    /// Returns the bigram statistics associated with the given window.
+    pub fn get_bigram(&self, window: Window) -> StatisticsResult<Statistics> {
         let mut output = Statistics::empty_for_window(window);
+        let mut total_valid_bytes = 0;
 
         if let Some((before, aligned, after)) = window.align(CacheSize::SMALLEST.size()) {
             if !before.is_empty() {
-                output += &Statistics::compute(source, before)?;
+                total_valid_bytes += self.add_unaligned_section(&mut output, before);
             }
-            self.add_aligned_section(&mut output, source, aligned, CacheSize::SMALLEST)?;
+            total_valid_bytes +=
+                self.add_aligned_section(&mut output, aligned, CacheSize::SMALLEST);
             if !after.is_empty() {
-                output += &Statistics::compute(source, after)?;
+                total_valid_bytes += self.add_unaligned_section(&mut output, after);
             }
         } else {
-            output += &Statistics::compute(source, window)?;
+            total_valid_bytes += self.add_unaligned_section(&mut output, window);
         }
 
         assert_eq!(output.window, window);
 
-        Ok(output)
+        if total_valid_bytes != window.size() {
+            StatisticsResult::Estimate {
+                value: output,
+                quality: total_valid_bytes as f32 / window.size() as f32,
+            }
+        } else {
+            StatisticsResult::Exact(output)
+        }
     }
-}
 
-impl Default for StatisticsHandler {
-    fn default() -> Self {
-        StatisticsHandler::new()
+    /// Returns the entropy of the given window.
+    pub fn get_entropy(&self, window: Window) -> StatisticsResult<f32> {
+        let window = window.expand_to_align(MIN_ENTROPY_WINDOW_SIZE);
+
+        match self.entropy_results.get(&window.start()) {
+            Some(result) => StatisticsResult::Estimate {
+                value: result as f32 / 255.0,
+                quality: (MIN_ENTROPY_WINDOW_SIZE as f64 / window.size() as f64) as f32,
+            },
+            None => {
+                self.request_window(window, RequestKind::EntropyEstimate);
+                StatisticsResult::Unknown
+            }
+        }
+    }
+
+    /// Signals to the statistics handler that a frame has ended.
+    ///
+    /// `changed` is `true` if the requests for the handler changed this frame.
+    pub fn end_of_frame(&mut self, changed: bool) {
+        if changed {
+            self.requests
+                .send(background_thread::Message::ClearRequests)
+                .unwrap();
+            self.send_requests = true;
+        } else {
+            self.send_requests = false;
+        }
     }
 }

@@ -1,6 +1,6 @@
 //! Implements displaying of bigram signatures.
 
-use egui::{Rect, Sense, Ui, Vec2, show_tooltip_at_pointer, vec2};
+use egui::{Align2, Color32, FontId, Rect, Sense, Ui, Vec2, show_tooltip_at_pointer, vec2};
 
 use crate::{statistics::Signature, window::Window};
 
@@ -13,7 +13,7 @@ use super::{
 /// Displays a data signature as an image of bigram probabilities.
 pub struct SignatureDisplay {
     /// The image of the displayed signature.
-    cached_image: CachedImage<(Window, u8)>,
+    cached_image: CachedImage<(Window, u8, f32)>,
 }
 
 impl SignatureDisplay {
@@ -32,6 +32,7 @@ impl SignatureDisplay {
         window: Window,
         signature: &Signature,
         xor_value: u8,
+        quality: f32,
         settings: &Settings,
     ) {
         let side_len_x = (rect.width().trunc() / 256.0).trunc();
@@ -44,14 +45,30 @@ impl SignatureDisplay {
         );
 
         self.cached_image
-            .paint_at(ui, rect, (window, xor_value), |x, y| {
+            .paint_at(ui, rect, (window, xor_value, quality), |x, y| {
                 let first = x / side_len as usize;
                 let second = y / side_len as usize;
 
                 let intensity = signature.tuple(first as u8 ^ xor_value, second as u8 ^ xor_value);
-                settings.scale_color_u8(intensity)
+
+                let color = settings.scale_color_u8(intensity);
+                settings.unfinished_color_modifier(color, quality)
             });
         ui.advance_cursor_after_rect(rect);
+
+        if quality < 1.0 {
+            // 50ms is probably responsive enough
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(50));
+
+            ui.painter().text(
+                rect.center(),
+                Align2::CENTER_CENTER,
+                format!("Loading: {:6.2}%", quality * 100.0),
+                FontId::proportional(settings.font_size()),
+                Color32::WHITE,
+            );
+        }
 
         let hover_positions = ui.ctx().input(|input| {
             if let Some(pos) = input.pointer.latest_pos()

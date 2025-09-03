@@ -1,13 +1,16 @@
 //! Implements zoombars to zoom in on the content of a file.
 
-use std::{collections::HashMap, ops::RangeInclusive};
+use std::{
+    hash::{Hash as _, Hasher as _},
+    ops::RangeInclusive,
+};
 
 use egui::{
     Align, Color32, Context, FontId, Layout, PointerButton, Pos2, Rect, RichText, Sense, Ui,
     UiBuilder, show_tooltip_at_pointer, vec2,
 };
 
-use crate::{data::DataSource, window::Window};
+use crate::{data::DataSource, statistics::StatisticsHandler, window::Window};
 
 use super::{
     cached_image::CachedImage,
@@ -24,33 +27,8 @@ pub struct Zoombars {
     selecting: bool,
     /// The zoombars to render.
     bars: Vec<Zoombar>,
-}
-
-// TODO: pretty this part up
-fn entropy(source: &mut impl DataSource, window: Window) -> Option<f32> {
-    let mut buf = vec![0; window.size() as usize];
-
-    if let Ok(window) = source.window_at(window.start(), &mut buf) {
-        let mut frequencies = [0usize; 256];
-
-        for &byte in window {
-            frequencies[byte as usize] += 1;
-        }
-
-        Some(
-            -frequencies
-                .into_iter()
-                .filter(|&count| count != 0)
-                .map(|count| {
-                    let p = count as f32 / window.len() as f32;
-                    p * p.log2()
-                })
-                .sum::<f32>()
-                / 8.0,
-        )
-    } else {
-        None
-    }
+    /// The selection state in the previous frame.
+    prev_selection_state: u64,
 }
 
 impl Zoombars {
@@ -59,6 +37,8 @@ impl Zoombars {
         Zoombars {
             selecting: false,
             bars: Vec::new(),
+            // the initial selection state is irrelevant for the first frame
+            prev_selection_state: 0,
         }
     }
 
@@ -70,8 +50,9 @@ impl Zoombars {
         source: &mut Source,
         settings: &Settings,
         marked_locations: &mut MarkedLocations,
+        handler: &StatisticsHandler,
         render_hex: impl FnOnce(&mut Ui, &mut Source, u64, &mut MarkedLocations),
-        render_overview: impl FnOnce(&mut Ui, &mut Source, Window),
+        render_overview: impl FnOnce(&mut Ui, Window),
     ) {
         let rect = ui.max_rect().intersect(ui.cursor());
 
@@ -93,8 +74,6 @@ impl Zoombars {
         let mut window = Window::new(0, file_size);
         let mut show_hex = false;
 
-        let mut entropy_cache = HashMap::new();
-
         let mut new_hovered_location = None;
         let currently_hovered = marked_locations.hovered_location_mut().clone();
 
@@ -109,7 +88,7 @@ impl Zoombars {
 
                     let mut rect = ui.max_rect().intersect(ui.cursor());
                     rect.min += vec2(0.0, size_text_height);
-                    rect.set_width(16.0 * settings.bar_width_multiplier() as f32);
+                    rect.set_width(16.0 * settings.bar_width_multiplier() as f32 + 3.0);
                     let rect = rect;
 
                     ui.painter().text(
@@ -131,6 +110,7 @@ impl Zoombars {
                     let min_selection_size =
                         (total_bytes as f32 / window.size() as f32).min(maximum_min_selection_size);
 
+                    let mut require_repaint = false;
                     let hovered_row_window = bar.render(
                         ui,
                         rect,
@@ -138,18 +118,31 @@ impl Zoombars {
                         window,
                         min_selection_size,
                         |row_window| {
-                            let row_window = row_window.expand_to_align(1024);
-                            let entropy = entropy_cache
-                                .entry(row_window)
-                                .or_insert_with(|| entropy(source, row_window));
-
-                            if let Some(entropy) = entropy {
-                                settings.entropy_color(*entropy)
+                            if let Some((entropy, quality)) = handler
+                                .get_entropy(row_window)
+                                .into_result_with_quality()
+                                .unwrap()
+                            {
+                                // TODO: add actual entropy calculations after estimates
+                                // TODO: investigate why calculations sometimes get stuck
+                                if quality < 1.0 {
+                                    require_repaint = true;
+                                }
+                                let color = settings.entropy_color(entropy);
+                                let secondary_color = if quality < 1.0 {
+                                    Color32::RED
+                                } else {
+                                    Color32::GREEN
+                                };
+                                (color, secondary_color)
                             } else {
-                                todo!("pick a color to display when the info is not available")
+                                require_repaint = true;
+                                let color = settings.missing_color();
+                                (color, color)
                             }
                         },
                     );
+                    bar.cached_image.require_repaint(require_repaint);
 
                     render_locations_on_bar(
                         ui,
@@ -178,16 +171,22 @@ impl Zoombars {
                             ui.layer_id(),
                             "zoombar_tooltip".into(),
                             |ui| {
-                                let row_window = row_window.expand_to_align(1024);
-                                let entropy = entropy_cache
-                                    .entry(row_window)
-                                    .or_insert_with(|| entropy(source, row_window));
-
-                                if let Some(entropy) = entropy {
-                                    ui.label(
-                                        RichText::new(format!("Entropy: {entropy:.02}"))
-                                            .size(settings.font_size()),
-                                    );
+                                if let Some((entropy, quality)) = handler
+                                    .get_entropy(row_window)
+                                    .into_result_with_quality()
+                                    .unwrap()
+                                {
+                                    if quality < 1.0 {
+                                        ui.label(
+                                            RichText::new(format!("Entropy: {entropy:.02} (Estimation quality: {:.2}%)", quality * 100.0))
+                                                .size(settings.font_size()),
+                                        );
+                                    } else {
+                                        ui.label(
+                                            RichText::new(format!("Entropy: {entropy:.02}"))
+                                                .size(settings.font_size()),
+                                        );
+                                    }
                                 } else {
                                     ui.label(
                                         RichText::new("Entropy unknown").size(settings.font_size()),
@@ -250,12 +249,34 @@ impl Zoombars {
 
                     render_hex(ui, source, start, marked_locations);
                 } else {
-                    render_overview(ui, source, window);
+                    render_overview(ui, window);
                 }
             },
         );
 
         *marked_locations.hovered_location_mut() = new_hovered_location;
+    }
+
+    /// Creates a hash of the zoombar selection state.
+    pub fn selection_state(&self) -> u64 {
+        let mut hasher = std::hash::DefaultHasher::new();
+
+        self.bars.len().hash(&mut hasher);
+        for bar in &self.bars {
+            bar.selected.start().to_ne_bytes().hash(&mut hasher);
+            bar.selected.end().to_ne_bytes().hash(&mut hasher);
+        }
+
+        hasher.finish()
+    }
+
+    /// Determines if the zoombar selection state changed since the last call to this method.
+    pub fn changed(&mut self) -> bool {
+        let state = self.selection_state();
+        let prev_state = self.prev_selection_state;
+        self.prev_selection_state = state;
+
+        prev_state != state
     }
 }
 
@@ -406,7 +427,7 @@ impl Zoombar {
         selecting: &mut bool,
         window: Window,
         min_selection_size: f32,
-        mut row_color: impl FnMut(Window) -> Color32,
+        mut row_color: impl FnMut(Window) -> (Color32, Color32),
     ) -> Option<Window> {
         let total_rows = rect.height().trunc() as u64;
 
@@ -418,26 +439,34 @@ impl Zoombar {
 
         let bytes_per_row = (window.size() as f64 / total_rows as f64).round() as u64;
 
+        let side_start = (rect.width() - 2.0) as usize;
+
         self.cached_image.paint_at(
             ui,
             rect,
             (self.selection(min_selection_size), window),
-            |_, y| {
+            |x, y| {
                 let relative_offset = y as f64 / total_rows as f64;
                 let offset_within_range = (relative_offset * window.size() as f64) as u64;
 
                 let row_window =
                     Window::from_start_len(window.start() + offset_within_range, bytes_per_row);
 
-                let raw_color = row_color(row_window);
+                let (raw_color, side_color) = row_color(row_window);
 
                 const HIGHLIGHT_STRENGTH: f64 = 0.4;
 
-                if selection_start <= y && y <= selection_end {
-                    //color::lerp(raw_color, egui::Color32::WHITE, HIGHLIGHT_STRENGTH)
-                    raw_color
+                if x >= side_start {
+                    side_color
+                } else if x == side_start - 1 {
+                    Color32::BLACK
                 } else {
-                    color::lerp(raw_color, egui::Color32::BLACK, HIGHLIGHT_STRENGTH)
+                    if selection_start <= y && y <= selection_end {
+                        //color::lerp(raw_color, egui::Color32::WHITE, HIGHLIGHT_STRENGTH)
+                        raw_color
+                    } else {
+                        color::lerp(raw_color, egui::Color32::BLACK, HIGHLIGHT_STRENGTH)
+                    }
                 }
             },
         );

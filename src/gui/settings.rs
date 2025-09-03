@@ -102,15 +102,17 @@ impl Settings {
 
     /// A color representing an entropy.
     pub fn entropy_color(&self, entropy: f32) -> Color32 {
-        // While the used color scales are perceptually similar, entropy distributions are not.
-        // In practice the upper end of the entropy spectrum contains many more nuances than the
-        // bottom.
-        // Thus here we use a power greater than 1 to better show differences between different
-        // higher entropy values.
-        // There is specific reason this particular value was chosen (it seemed best in trial and
-        // error).
-        let scaled_entropy = entropy.powf(1.0);
-        self.scale_color_f32(scaled_entropy)
+        self.scale_color_f32(entropy)
+    }
+
+    /// The color used for computations which are yet unfinished.
+    pub fn unfinished_color_modifier(&self, color: Color32, quality: f32) -> Color32 {
+        super::color::lerp(Color32::DARK_GRAY, color, 0.5 + (quality as f64 / 2.0))
+    }
+
+    /// The color representing missing data.
+    pub fn missing_color(&self) -> Color32 {
+        Color32::BROWN
     }
 
     /// The width multiplier of the zoom and scrollbars.

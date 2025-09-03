@@ -49,21 +49,6 @@ where
         )
     }
 
-    /// Computes the entropy from the collected statistics.
-    pub(super) fn entropy(&self, window: Window, first_byte: Option<u8>) -> f32 {
-        let window_size = window.size() as f32;
-        -(0..256)
-            .map(|i| {
-                u64::from(self.follow[i].into_iter().sum::<Count>())
-                    + (first_byte == Some(i as u8)) as u64
-            })
-            .filter(|&count| count > 0)
-            .map(|count| count as f32 / window_size)
-            .map(|p| p * p.log2())
-            .sum::<f32>()
-            / 8.0
-    }
-
     /// Returns the count of values where `second` follows `first` in the window.
     pub(super) fn follow(&self, first: u8, second: u8) -> Count {
         self.follow[second as usize][first as usize]
@@ -121,24 +106,6 @@ impl SmallRawBigrams {
             source,
             window,
         )
-    }
-
-    /// Computes the entropy from the collected statistics.
-    pub(super) fn entropy(&self, window: Window, first_byte: Option<u8>) -> f32 {
-        let window_size = window.size() as f32;
-        -(0..=255)
-            .map(|i| {
-                self.follow
-                    .range((i, 0)..=(i, 255))
-                    .map(|(_, &count)| u64::from(count))
-                    .sum::<u64>()
-                    + (first_byte == Some(i)) as u64
-            })
-            .filter(|&count| count > 0)
-            .map(|count| count as f32 / window_size)
-            .map(|p| p * p.log2())
-            .sum::<f32>()
-            / 8.0
     }
 
     /// Returns the count of values where `second` follows `first` in the window.

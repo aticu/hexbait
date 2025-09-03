@@ -65,6 +65,21 @@ macro_rules! cache_sizes {
                 }
             }
 
+            /// The size of the cache entry.
+            const fn from_size(size: u64) -> Option<Self> {
+                $(
+                    #[allow(non_upper_case_globals)]
+                    const $name: u64 = $size * cache_sizes!(__size_mod: $size_mod);
+                )*
+                match size {
+                    $(
+                        #[allow(non_upper_case_globals)]
+                        $name => Some($enum_name::$name),
+                    )*
+                    _ => None,
+                }
+            }
+
             /// Turns this cache size into an index.
             const fn index(self) -> usize {
                 match self {
@@ -75,7 +90,7 @@ macro_rules! cache_sizes {
             }
 
             /// Turns this cache size into an index.
-            const fn try_from_index(index: usize) -> Option<CacheSize> {
+            const fn try_from_index(index: usize) -> Option<Self> {
                 match index {
                     $(
                         num if num == $count => Some($enum_name::$name),
@@ -124,35 +139,12 @@ impl CacheSize {
     pub(super) const fn next(self) -> Option<CacheSize> {
         CacheSize::try_from_index(self.index() + 1)
     }
-
-    /// Iterates through the different cache sizes from small to large.
-    pub(super) fn iter_through_sizes() -> impl Iterator<Item = CacheSize> {
-        const SIZES: [CacheSize; CacheSize::NUM_SIZES] = {
-            let mut out = [CacheSize::SMALLEST; CacheSize::NUM_SIZES];
-
-            let mut i = 1;
-            while i < out.len() {
-                out[i] = CacheSize::try_from_index(i).unwrap();
-                i += 1;
-            }
-
-            out
-        };
-
-        SIZES.into_iter()
-    }
 }
 
 impl TryFrom<u64> for CacheSize {
     type Error = ();
 
     fn try_from(value: u64) -> Result<Self, Self::Error> {
-        for size in CacheSize::iter_through_sizes() {
-            if size.size() == value {
-                return Ok(size);
-            }
-        }
-
-        Err(())
+        Self::from_size(value).ok_or(())
     }
 }

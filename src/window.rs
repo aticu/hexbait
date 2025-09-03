@@ -1,9 +1,9 @@
 //! Models "windows" as regions of the input.
 
-use std::ops::RangeInclusive;
+use std::{fmt, ops::RangeInclusive};
 
 /// Represents a region of the input.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Window {
     /// The index of the first byte in the region.
     start: u64,
@@ -159,6 +159,19 @@ impl Window {
 impl From<RangeInclusive<u64>> for Window {
     fn from(value: RangeInclusive<u64>) -> Self {
         Window::new(*value.start(), value.end() + 1)
+    }
+}
+
+impl fmt::Debug for Window {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Window(at: {}B ({}), size: {}B ({}))",
+            size_format::SizeFormatterBinary::new(self.start()),
+            self.start(),
+            size_format::SizeFormatterBinary::new(self.size()),
+            self.size(),
+        )
     }
 }
 

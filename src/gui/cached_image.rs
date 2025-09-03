@@ -14,6 +14,8 @@ pub struct CachedImage<T: PartialEq> {
     height: usize,
     /// The parameters that determine the staleness of the image.
     params: Option<T>,
+    /// Can be set for images where the parameters are only known during rendering.
+    require_repaint: bool,
 }
 
 impl<T: PartialEq> CachedImage<T> {
@@ -24,6 +26,7 @@ impl<T: PartialEq> CachedImage<T> {
             width: 0,
             height: 0,
             params: None,
+            require_repaint: false,
         }
     }
 
@@ -42,6 +45,7 @@ impl<T: PartialEq> CachedImage<T> {
         mut render: impl FnMut(usize, usize) -> Color32,
     ) -> Image {
         let can_keep = self.texture_handle.is_some()
+            && !self.require_repaint
             && width == self.width
             && height == self.height
             && Some(&params) == self.params.as_ref();
@@ -114,6 +118,11 @@ impl<T: PartialEq> CachedImage<T> {
 
         self.rendered(ui, width, height, params, render)
             .paint_at(ui, rect);
+    }
+
+    /// Updates whether the image requires a repaint.
+    pub fn require_repaint(&mut self, require_repaint: bool) {
+        self.require_repaint = require_repaint;
     }
 }
 

@@ -6,10 +6,13 @@ use raw_bigrams::{RawBigrams, SmallRawBigrams};
 
 use crate::{data::DataSource, window::Window};
 
+mod flat;
 mod handler;
 mod raw_bigrams;
 
-pub use handler::StatisticsHandler;
+pub use handler::{StatisticsHandler, StatisticsResult};
+
+pub use flat::FlatStatistics;
 
 /// Computed statistics about a window of data.
 #[derive(Eq, PartialEq)]
@@ -79,19 +82,17 @@ impl Statistics {
         })
     }
 
-    /// Computes the entropy from the collected statistics.
-    pub fn entropy(&self) -> f32 {
-        match &self.statistics {
-            StatisticsKind::Large(raw_statistics) => {
-                raw_statistics.entropy(self.window, self.first_byte)
-            }
-            StatisticsKind::Medium(raw_statistics) => {
-                raw_statistics.entropy(self.window, self.first_byte)
-            }
-            StatisticsKind::Small(raw_statistics) => {
-                raw_statistics.entropy(self.window, self.first_byte)
-            }
-        }
+    /// Adds an empty window to the statistics.
+    ///
+    /// This makes the statistics not fully representative of the input.
+    pub fn add_empty_window(&mut self, window: Window) {
+        let Some(window) = self.window.joined(window) else {
+            panic!(
+                "statistics must be adjacent to be added:\nstatistics: {self:?}\nnew window: {window:?}",
+            );
+        };
+
+        self.window = window;
     }
 
     /// Converts the statistics to a signature.
