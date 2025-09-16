@@ -85,6 +85,7 @@ impl Statistics {
     /// Adds an empty window to the statistics.
     ///
     /// This makes the statistics not fully representative of the input.
+    #[track_caller]
     pub fn add_empty_window(&mut self, window: Window) {
         let Some(window) = self.window.joined(window) else {
             panic!(
@@ -93,6 +94,11 @@ impl Statistics {
         };
 
         self.window = window;
+    }
+
+    /// Converts the given statistics to flat statistics.
+    pub fn to_flat(&self) -> FlatStatistics {
+        FlatStatistics::from_bigrams(self)
     }
 
     /// Converts the statistics to a signature.

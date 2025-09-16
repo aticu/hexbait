@@ -42,7 +42,9 @@ pub struct StatisticsHandler {
     /// A cache for unaligned windows.
     unaligned_windows: Arc<Cache<Window, Arc<Statistics>>>,
     /// A cache for entropy values of the smallest possible window size.
-    entropy_results: Arc<Cache<u64, u8>>,
+    entropy_smallest: Arc<Cache<u64, u8>>,
+    /// A cache for entropy values.
+    entropy_results: Arc<Cache<Window, u8>>,
     /// The requests for new windows to compute.
     requests: mpsc::Sender<background_thread::Message>,
     /// Whether to send requests for new data to the backend.
@@ -57,11 +59,13 @@ impl StatisticsHandler {
             Cache::new(CacheSize::try_from_index(i).unwrap().num_entries())
         }));
         let unaligned_windows = Arc::new(Cache::new(2));
+        let entropy_smallest = Arc::new(Cache::new(65_536));
         let entropy_results = Arc::new(Cache::new(65_536));
 
         let background_thread = BackgroundThread {
             aligned_windows: Arc::clone(&aligned_windows),
             unaligned_windows: Arc::clone(&unaligned_windows),
+            entropy_smallest: Arc::clone(&entropy_smallest),
             entropy_results: Arc::clone(&entropy_results),
             requests: receiver,
             request_buffer: Vec::new(),
@@ -73,6 +77,7 @@ impl StatisticsHandler {
         StatisticsHandler {
             aligned_windows,
             unaligned_windows,
+            entropy_smallest,
             entropy_results,
             requests: sender,
             send_requests: true,
@@ -131,14 +136,49 @@ impl StatisticsHandler {
                     *stats += &window_stats;
                     total_valid_bytes += subwindow.size();
                 } else {
-                    stats.add_empty_window(subwindow);
+                    // In case we have no windows of the correct size, we try smaller sizes.
+                    // Because of the way the backend fills the caches, it makes sense here to keep
+                    // going until the smaller siźe either fully fills the subwindow (in case of
+                    // race conditions with the check earlier) or there is none for the specific
+                    // sub-subwindow.
+                    let mut start = subwindow.start();
+                    let mut smaller_size = size.next_down();
+                    while let Some(smaller_size_candidate) = smaller_size {
+                        if this.aligned_windows[smaller_size_candidate.index()].contains_key(&start)
+                        {
+                            break;
+                        }
+                        smaller_size = smaller_size_candidate.next_down();
+                    }
+
+                    if let Some(smaller_size) = smaller_size {
+                        let smaller_size_u64 = smaller_size.size();
+                        for i in 0..subwindow.size() / smaller_size_u64 {
+                            let subsubwindow = Window::from_start_len(
+                                subwindow.start() + i * smaller_size_u64,
+                                smaller_size_u64,
+                            );
+                            if let Some(subsubwindow_stats) = this.aligned_windows
+                                [smaller_size.index()]
+                            .get(&subsubwindow.start())
+                            {
+                                *stats += &subsubwindow_stats;
+                                total_valid_bytes += subsubwindow.size();
+                                start = subsubwindow.end();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+
+                    stats.add_empty_window(Window::new(start, subwindow.end()));
                 }
             }
 
             total_valid_bytes
         };
 
-        if let Some(next_size) = size.next()
+        if let Some(next_size) = size.next_up()
             && let Some((before, aligned, after)) = window.align(next_size.size())
         {
             total_valid_bytes += add_window(self, stats, before);
@@ -185,14 +225,20 @@ impl StatisticsHandler {
     pub fn get_entropy(&self, window: Window) -> StatisticsResult<f32> {
         let window = window.expand_to_align(MIN_ENTROPY_WINDOW_SIZE);
 
-        match self.entropy_results.get(&window.start()) {
-            Some(result) => StatisticsResult::Estimate {
-                value: result as f32 / 255.0,
-                quality: (MIN_ENTROPY_WINDOW_SIZE as f64 / window.size() as f64) as f32,
-            },
+        match self.entropy_results.get(&window) {
+            Some(result) => StatisticsResult::Exact(result as f32 / 255.0),
             None => {
-                self.request_window(window, RequestKind::EntropyEstimate);
-                StatisticsResult::Unknown
+                self.request_window(window, RequestKind::Entropy);
+                match self.entropy_smallest.get(&window.start()) {
+                    Some(result) => StatisticsResult::Estimate {
+                        value: result as f32 / 255.0,
+                        quality: (MIN_ENTROPY_WINDOW_SIZE as f64 / window.size() as f64) as f32,
+                    },
+                    None => {
+                        self.request_window(window, RequestKind::EntropyEstimate);
+                        StatisticsResult::Unknown
+                    }
+                }
             }
         }
     }

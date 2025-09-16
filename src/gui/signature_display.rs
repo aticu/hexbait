@@ -51,8 +51,7 @@ impl SignatureDisplay {
 
                 let intensity = signature.tuple(first as u8 ^ xor_value, second as u8 ^ xor_value);
 
-                let color = settings.scale_color_u8(intensity);
-                settings.unfinished_color_modifier(color, quality)
+                settings.scale_color_u8(intensity)
             });
         ui.advance_cursor_after_rect(rect);
 

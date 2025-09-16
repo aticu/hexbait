@@ -29,10 +29,10 @@ pub(crate) enum Message {
 /// The different kinds of requests that can be made to the backend.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub(crate) enum RequestKind {
+    /// Request exact entropy for a given window.
+    Entropy = 0,
     /// Request bigram statistics for a given window.
-    Bigrams = 0,
-    /// Request flat statistics for a given window.
-    Flat = 1,
+    Bigrams = 1,
     /// Request an entropy estimate for a given window.
     EntropyEstimate = 2,
 }
@@ -53,9 +53,33 @@ impl Ord for Request {
             return ordering;
         }
 
-        let key = |request: &Request| (cmp::Reverse(request.window.start()), request.window.size());
+        match self.kind {
+            RequestKind::Bigrams => {
+                // this branch needs to ensure that subrequests created by a larger request are
+                // served first
+                let key = |request: &Request| {
+                    (
+                        cmp::Reverse(request.window.size()),
+                        cmp::Reverse(request.window.start()),
+                    )
+                };
 
-        key(self).cmp(&key(other))
+                key(self).cmp(&key(other))
+            }
+            RequestKind::Entropy => {
+                let key = |request: &Request| {
+                    (
+                        cmp::Reverse(request.window.size()),
+                        cmp::Reverse(request.window.start()),
+                    )
+                };
+
+                key(self).cmp(&key(other))
+            }
+            RequestKind::EntropyEstimate => {
+                self.window.start().cmp(&other.window.start()).reverse()
+            }
+        }
     }
 }
 
@@ -76,7 +100,9 @@ pub(crate) struct BackgroundThread {
     /// Shared with the GUI thread.
     pub(crate) unaligned_windows: Arc<Cache<Window, Arc<Statistics>>>,
     /// A cache for entropy values of the smallest possible window size.
-    pub(crate) entropy_results: Arc<Cache<u64, u8>>,
+    pub(crate) entropy_smallest: Arc<Cache<u64, u8>>,
+    /// A cache for entropy values.
+    pub(crate) entropy_results: Arc<Cache<Window, u8>>,
     /// The requests for new windows to compute.
     pub(crate) requests: mpsc::Receiver<Message>,
     /// Already received read requests for windows.
@@ -112,15 +138,14 @@ impl BackgroundThread {
     fn serve_request(&mut self, request: Request) {
         match request.kind {
             RequestKind::Bigrams => self.serve_bigram_request(request.window),
-            RequestKind::Flat => todo!(),
-            RequestKind::EntropyEstimate => self.serve_entropy_request(request.window),
+            RequestKind::Entropy => self.serve_entropy_request(request.window),
+            RequestKind::EntropyEstimate => self.serve_entropy_estimate_request(request.window),
         }
     }
 
     /// Serves the given bigram request.
     fn serve_bigram_request(&mut self, window: Window) {
         let mut compute = || {
-            //eprintln!("computing {window:?}");
             let stats = Statistics::compute(&mut self.source, window)
                 .expect("TODO: improve error handling here in the future");
             Arc::new(stats)
@@ -133,7 +158,52 @@ impl BackgroundThread {
                     return;
                 }
 
-                self.aligned_windows[cache_size.index()].insert(window.start(), compute());
+                // split up blocks larger than 64MiB into smaller requests first, so that the
+                // background thread never hangs too long
+                if cache_size.size() > 64 * 1024 * 1024 {
+                    let Some(smaller_size) = cache_size.next_down() else {
+                        panic!("trying to compute from smaller cache size when there is none")
+                    };
+                    let smaller_size_index = smaller_size.index();
+                    let smaller_size = smaller_size.size();
+                    let mut all_present = true;
+                    let mut statistics = Statistics::empty_for_window(window);
+
+                    for i in 0..window.size() / smaller_size {
+                        let subwindow =
+                            Window::from_start_len(window.start() + i * smaller_size, smaller_size);
+
+                        if let Some(substatistics) =
+                            self.aligned_windows[smaller_size_index].get(&subwindow.start())
+                        {
+                            if all_present {
+                                statistics += &substatistics;
+                            }
+                        } else {
+                            self.request_buffer.push(Request {
+                                kind: RequestKind::Bigrams,
+                                window: subwindow,
+                            });
+                            if all_present {
+                                // ensure that the original request is preserved, but only once
+                                all_present = false;
+                                self.request_buffer.push(Request {
+                                    kind: RequestKind::Bigrams,
+                                    window,
+                                });
+                            }
+                        }
+                    }
+
+                    if all_present {
+                        // we've successfully computed the whole statistics from its parts, time to
+                        // cache the result
+                        self.aligned_windows[cache_size.index()]
+                            .insert(window.start(), Arc::new(statistics));
+                    }
+                } else {
+                    self.aligned_windows[cache_size.index()].insert(window.start(), compute());
+                }
             }
             None => {
                 if self.unaligned_windows.contains_key(&window) {
@@ -147,9 +217,7 @@ impl BackgroundThread {
 
     /// Serves the given entropy request.
     fn serve_entropy_request(&mut self, window: Window) {
-        let window = Window::from_start_len(window.start(), MIN_ENTROPY_WINDOW_SIZE);
-
-        if self.entropy_results.contains_key(&window.start()) {
+        if self.entropy_results.contains_key(&window) {
             return;
         }
 
@@ -158,6 +226,22 @@ impl BackgroundThread {
         let entropy = stats.entropy();
 
         self.entropy_results
+            .insert(window, (entropy * 255.0).round() as u8);
+    }
+
+    /// Serves the given entropy estimate request.
+    fn serve_entropy_estimate_request(&mut self, window: Window) {
+        let window = Window::from_start_len(window.start(), MIN_ENTROPY_WINDOW_SIZE);
+
+        if self.entropy_smallest.contains_key(&window.start()) {
+            return;
+        }
+
+        let stats = FlatStatistics::compute(&mut self.source, window)
+            .expect("TODO: improve error handling here in the future");
+        let entropy = stats.entropy();
+
+        self.entropy_smallest
             .insert(window.start(), (entropy * 255.0).round() as u8);
     }
 

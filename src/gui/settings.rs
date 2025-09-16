@@ -105,11 +105,6 @@ impl Settings {
         self.scale_color_f32(entropy)
     }
 
-    /// The color used for computations which are yet unfinished.
-    pub fn unfinished_color_modifier(&self, color: Color32, quality: f32) -> Color32 {
-        super::color::lerp(Color32::DARK_GRAY, color, 0.5 + (quality as f64 / 2.0))
-    }
-
     /// The color representing missing data.
     pub fn missing_color(&self) -> Color32 {
         Color32::BROWN

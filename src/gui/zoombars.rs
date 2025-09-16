@@ -19,6 +19,7 @@ use super::{
     settings::Settings,
 };
 
+/// The selection of a zoombar that selected nothing.
 const NULL_SELECTION: RangeInclusive<f32> = 0.0..=1.0;
 
 /// Zoombars are a GUI component to narrow in on parts of a file.
@@ -27,6 +28,8 @@ pub struct Zoombars {
     selecting: bool,
     /// The zoombars to render.
     bars: Vec<Zoombar>,
+    /// The height of the zoombars in the previous frame.
+    prev_height: f32,
     /// The selection state in the previous frame.
     prev_selection_state: u64,
 }
@@ -37,6 +40,8 @@ impl Zoombars {
         Zoombars {
             selecting: false,
             bars: Vec::new(),
+            // the previous height is irrelevant for the first frame
+            prev_height: 0.0,
             // the initial selection state is irrelevant for the first frame
             prev_selection_state: 0,
         }
@@ -55,6 +60,8 @@ impl Zoombars {
         render_overview: impl FnOnce(&mut Ui, Window),
     ) {
         let rect = ui.max_rect().intersect(ui.cursor());
+
+        self.prev_height = rect.height();
 
         // be deliberately small to fit more text here
         let size_text_height = settings.font_size() * 0.7;
@@ -261,6 +268,7 @@ impl Zoombars {
     pub fn selection_state(&self) -> u64 {
         let mut hasher = std::hash::DefaultHasher::new();
 
+        self.prev_height.to_ne_bytes().hash(&mut hasher);
         self.bars.len().hash(&mut hasher);
         for bar in &self.bars {
             bar.selected.start().to_ne_bytes().hash(&mut hasher);

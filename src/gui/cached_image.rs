@@ -43,7 +43,7 @@ impl<T: PartialEq> CachedImage<T> {
         height: usize,
         params: T,
         mut render: impl FnMut(usize, usize) -> Color32,
-    ) -> Image {
+    ) -> Image<'static> {
         let can_keep = self.texture_handle.is_some()
             && !self.require_repaint
             && width == self.width

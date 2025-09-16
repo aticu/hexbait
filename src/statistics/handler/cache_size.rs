@@ -45,7 +45,7 @@ macro_rules! cache_sizes {
         )*
     ) => {
         /// The size of a cached window.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
         enum $enum_name {
             $(
                 #[doc = concat!("The cached window is ", stringify!($size), stringify!($size_mod), " large.")]
@@ -108,6 +108,16 @@ macro_rules! cache_sizes {
                 }
             }
         }
+
+        impl ::std::fmt::Debug for $enum_name {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                match self {
+                    $(
+                        $enum_name::$name => f.write_str(concat!(stringify!($size), stringify!($size_mod))),
+                    )*
+                }
+            }
+        }
     };
     // this is admittedly a bit of a hack to not have to give explicit names
     (__size_mod: KiB) => { 1024 };
@@ -124,7 +134,7 @@ impl CacheSize {
         let mut size = CacheSize::SMALLEST;
         let mut count = 1;
 
-        while let Some(next_size) = size.next() {
+        while let Some(next_size) = size.next_up() {
             size = next_size;
             count += 1;
         }
@@ -135,9 +145,18 @@ impl CacheSize {
     /// The smallest cache size.
     pub(super) const SMALLEST: CacheSize = CacheSize::try_from_index(0).unwrap();
 
-    /// The next cache size.
-    pub(super) const fn next(self) -> Option<CacheSize> {
+    /// The next bigger cache size.
+    pub(super) const fn next_up(self) -> Option<CacheSize> {
         CacheSize::try_from_index(self.index() + 1)
+    }
+
+    /// The next smaller cache size.
+    pub(super) const fn next_down(self) -> Option<CacheSize> {
+        if let Some(idx) = self.index().checked_sub(1) {
+            CacheSize::try_from_index(idx)
+        } else {
+            None
+        }
     }
 }
 

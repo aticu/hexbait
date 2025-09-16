@@ -6,7 +6,11 @@ use std::{
     ops::{AddAssign, SubAssign},
 };
 
-use crate::{data::DataSource, window::Window};
+use crate::{
+    data::DataSource,
+    statistics::{Statistics, StatisticsKind},
+    window::Window,
+};
 
 /// Computed flat statistics about a window of data.
 #[derive(Eq, PartialEq)]
@@ -72,6 +76,55 @@ impl FlatStatistics {
             })
             .sum::<f32>()
             / 8.0
+    }
+
+    /// Converts the given bigram statistics to flat statistics.
+    pub fn from_bigrams(bigrams: &Statistics) -> FlatStatistics {
+        let mut flat = FlatStatistics::empty_for_window(bigrams.window);
+
+        flat.window = bigrams.window;
+
+        for byte_value in 0..=255 {
+            let mut count = 0;
+
+            for prev_byte_value in 0..=255 {
+                count += match &bigrams.statistics {
+                    StatisticsKind::Large(raw_statistics) => {
+                        raw_statistics.follow(prev_byte_value, byte_value)
+                    }
+                    StatisticsKind::Medium(raw_statistics) => {
+                        u64::from(raw_statistics.follow(prev_byte_value, byte_value))
+                    }
+                    StatisticsKind::Small(raw_statistics) => {
+                        u64::from(raw_statistics.follow(prev_byte_value, byte_value))
+                    }
+                };
+            }
+
+            let byte_value = byte_value as usize;
+            match &mut flat.statistics {
+                FlatStatisticsKind::Large(stats) => stats.counts[byte_value] += count,
+                FlatStatisticsKind::Medium(stats) => {
+                    stats.counts[byte_value] +=
+                        u32::try_from(count).expect("window must be appropriately sized")
+                }
+                FlatStatisticsKind::Small(stats) => {
+                    stats.counts[byte_value] +=
+                        u16::try_from(count).expect("window must be appropriately sized")
+                }
+            }
+        }
+
+        if let Some(byte_value) = bigrams.first_byte {
+            let byte_value = byte_value as usize;
+            match &mut flat.statistics {
+                FlatStatisticsKind::Large(stats) => stats.counts[byte_value] += 1,
+                FlatStatisticsKind::Medium(stats) => stats.counts[byte_value] += 1,
+                FlatStatisticsKind::Small(stats) => stats.counts[byte_value] += 1,
+            }
+        }
+
+        flat
     }
 }
 

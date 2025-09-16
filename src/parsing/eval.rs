@@ -75,7 +75,7 @@ impl ParseContext<'_> {
     }
 
     /// Creates a child parsing context.
-    pub fn child(&self) -> ParseContext {
+    pub fn child(&self) -> ParseContext<'_> {
         ParseContext {
             endianness: self.endianness,
             offset: self.offset.clone(),
