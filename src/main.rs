@@ -5,10 +5,14 @@ use std::{io::Read, path::PathBuf};
 use hexbait::{
     data::{DataSource as _, Input},
     gui::{
-        hex::HexdumpView, marking::MarkedLocations, settings::Settings,
-        signature_display::SignatureDisplay, zoombars::Zoombars,
+        hex::HexdumpView,
+        marking::{MarkedLocation, MarkedLocations, MarkingKind},
+        settings::Settings,
+        signature_display::SignatureDisplay,
+        zoombars::Zoombars,
     },
     model::Endianness,
+    search::Searcher,
     statistics::{Statistics, StatisticsHandler},
 };
 
@@ -25,6 +29,7 @@ fn main() -> eframe::Result {
     };
 
     let statistics_cache_input = input.clone().unwrap();
+    let searcher = Searcher::new(&input);
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_maximized(true),
@@ -44,6 +49,8 @@ fn main() -> eframe::Result {
                 signature_display: SignatureDisplay::new(),
                 xor_value: 0,
                 statistics_handler: StatisticsHandler::new(statistics_cache_input),
+                searcher,
+                search_text: String::new(),
                 parse_type: "none",
                 parse_offset: String::from("0"),
                 sync_parse_offset_to_selection_start: true,
@@ -63,6 +70,8 @@ struct MyApp {
     signature_display: SignatureDisplay,
     xor_value: u8,
     statistics_handler: StatisticsHandler,
+    searcher: Searcher,
+    search_text: String,
     parse_type: &'static str,
     parse_offset: String,
     sync_parse_offset_to_selection_start: bool,
@@ -191,9 +200,30 @@ impl eframe::App for MyApp {
                         ui.spacing_mut().slider_width = self.settings.font_size() * 20.0;
                         ui.add(egui::Slider::new(&mut self.xor_value, 0..=255).text("xor value"));
                         ui.spacing_mut().slider_width = old;
+
+                        ui.label(format!(
+                            "search {:.02}% complete ({} results)",
+                            self.searcher.progress() * 100.0,
+                            self.searcher.results().len()
+                        ));
+                        ui.text_edit_singleline(&mut self.search_text);
+                        if ui.button("start search").clicked() {
+                            self.searcher
+                                .start_new_search(self.search_text.as_bytes(), false);
+                        }
                     });
                 },
             );
+
+            self.marked_locations
+                .remove_where(|loc| loc.kind() == MarkingKind::SearchResult);
+            for result in self.searcher.results().iter() {
+                self.marked_locations
+                    .add(MarkedLocation::new(*result, MarkingKind::SearchResult));
+            }
+            // TODO: jump to location
+            // TODO: figure out why entropy calculations are sometimes so slow
+            // TODO: fix dragging across end during initial zoombar selection
 
             self.statistics_handler
                 .end_of_frame(self.zoombars.changed());

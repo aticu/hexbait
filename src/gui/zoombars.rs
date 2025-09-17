@@ -10,7 +10,7 @@ use egui::{
     UiBuilder, show_tooltip_at_pointer, vec2,
 };
 
-use crate::{data::DataSource, statistics::StatisticsHandler, window::Window};
+use crate::{IDLE_TIME, data::DataSource, statistics::StatisticsHandler, window::Window};
 
 use super::{
     cached_image::CachedImage,
@@ -150,6 +150,10 @@ impl Zoombars {
                         },
                     );
                     bar.cached_image.require_repaint(require_repaint);
+
+                    if require_repaint {
+                        ui.ctx().request_repaint_after(IDLE_TIME);
+                    }
 
                     render_locations_on_bar(
                         ui,

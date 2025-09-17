@@ -320,6 +320,21 @@ impl HexdumpView {
                     );
                 },
             );
+
+            let copy_event =
+                ui.input(|input| input.events.iter().any(|event| *event == egui::Event::Copy));
+
+            if copy_event
+                && let Some(selection) = self.selection()
+                && let Ok(size) = usize::try_from(selection.size())
+            {
+                let mut buf = vec![0; size];
+                if let Ok(window) = source.window_at(selection.start(), &mut buf) {
+                    if let Ok(as_text) = std::str::from_utf8(window) {
+                        ui.ctx().copy_text(as_text.to_string());
+                    }
+                }
+            }
         } else {
             ui.label("hex display is experiencing issues");
             ui.spinner();

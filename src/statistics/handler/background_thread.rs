@@ -11,6 +11,7 @@ use std::{
 use quick_cache::sync::Cache;
 
 use crate::{
+    IDLE_TIME,
     data::Input,
     statistics::{FlatStatistics, Statistics},
     window::Window,
@@ -67,10 +68,11 @@ impl Ord for Request {
                 key(self).cmp(&key(other))
             }
             RequestKind::Entropy => {
+                // TODO: more rightmost frames should be computed first
                 let key = |request: &Request| {
                     (
-                        cmp::Reverse(request.window.size()),
                         cmp::Reverse(request.window.start()),
+                        cmp::Reverse(request.window.size()),
                     )
                 };
 
@@ -255,8 +257,7 @@ impl BackgroundThread {
             if let Some(request) = self.request_buffer.pop() {
                 self.serve_request(request);
             } else {
-                // 50ms is probably responsive enough but does not buy loop unnecessarily
-                std::thread::sleep(std::time::Duration::from_millis(50));
+                std::thread::sleep(IDLE_TIME);
             }
         }
     }

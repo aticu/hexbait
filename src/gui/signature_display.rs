@@ -2,7 +2,7 @@
 
 use egui::{Align2, Color32, FontId, Rect, Sense, Ui, Vec2, show_tooltip_at_pointer, vec2};
 
-use crate::{statistics::Signature, window::Window};
+use crate::{IDLE_TIME, statistics::Signature, window::Window};
 
 use super::{
     cached_image::CachedImage,
@@ -56,9 +56,7 @@ impl SignatureDisplay {
         ui.advance_cursor_after_rect(rect);
 
         if quality < 1.0 {
-            // 50ms is probably responsive enough
-            ui.ctx()
-                .request_repaint_after(std::time::Duration::from_millis(50));
+            ui.ctx().request_repaint_after(IDLE_TIME);
 
             ui.painter().text(
                 rect.center(),
