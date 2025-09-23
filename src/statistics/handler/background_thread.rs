@@ -116,22 +116,28 @@ pub(crate) struct BackgroundThread {
 impl BackgroundThread {
     /// Processes new requests to serve.
     fn process_new_requests(&mut self) -> bool {
+        let mut new_requests = false;
         loop {
             match self.requests.try_recv() {
-                Ok(message) => match message {
-                    Message::Compute(request) => {
-                        self.request_buffer.push(request);
+                Ok(message) => {
+                    new_requests = true;
+                    match message {
+                        Message::Compute(request) => {
+                            self.request_buffer.push(request);
+                        }
+                        Message::ClearRequests => {
+                            self.request_buffer.clear();
+                        }
                     }
-                    Message::ClearRequests => {
-                        self.request_buffer.clear();
-                    }
-                },
+                }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => return false,
             }
         }
 
-        self.request_buffer.sort();
+        if new_requests {
+            self.request_buffer.sort();
+        }
 
         true
     }
@@ -202,6 +208,8 @@ impl BackgroundThread {
                         // cache the result
                         self.aligned_windows[cache_size.index()]
                             .insert(window.start(), Arc::new(statistics));
+                    } else {
+                        self.request_buffer.sort();
                     }
                 } else {
                     self.aligned_windows[cache_size.index()].insert(window.start(), compute());

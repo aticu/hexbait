@@ -203,7 +203,6 @@ impl Zoombars {
                         );
                     }
 
-                    dbg!(window);
                     window = bar.selection_window(window, rect.height());
 
                     if !was_selecting && selecting {
