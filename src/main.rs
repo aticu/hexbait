@@ -147,12 +147,9 @@ impl eframe::App for MyApp {
             });
 
             let file_size = self.input.len().unwrap();
-            // TODO: use caching for entropy calculation
             // TODO: change font to render more characters
-            // TODO: move statistics computing to a background thread
-            // TODO: try to speed up cache computation by looking up values from the smaller caches
+            // TODO: change default font-size and refactor around that
             // TODO: implement to-disk caching for some sizes to increase re-load times
-            // TODO: implement search
             // TODO: fix up main file
 
             let mut parse_offset = self.parse_offset.parse().ok();

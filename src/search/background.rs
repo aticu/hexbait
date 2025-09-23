@@ -105,6 +105,9 @@ impl BackgroundSearcher {
                         .build(&[&request.content])
                         .unwrap(),
                 );
+                // TODO: implement hex escaping here
+                // TODO: put case flag into ui
+                // TODO: add utf16 handling
 
                 self.overlap_size = request.content.len().saturating_sub(1);
 

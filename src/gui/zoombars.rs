@@ -76,8 +76,6 @@ impl Zoombars {
             self.bars.push(Zoombar::new());
         }
 
-        let maximum_min_selection_size = (total_rows - 1) as f32 / total_rows as f32;
-
         let mut window = Window::new(0, file_size);
         let mut show_hex = false;
 
@@ -114,8 +112,7 @@ impl Zoombars {
                         break;
                     }
 
-                    let min_selection_size =
-                        (total_bytes as f32 / window.size() as f32).min(maximum_min_selection_size);
+                    let min_selection_size = min_selection_size(window, rect.height());
 
                     let mut require_repaint = false;
                     let hovered_row_window = bar.render(
@@ -130,7 +127,6 @@ impl Zoombars {
                                 .into_result_with_quality()
                                 .unwrap()
                             {
-                                // TODO: add actual entropy calculations after estimates
                                 // TODO: investigate why calculations sometimes get stuck
                                 if quality < 1.0 {
                                     require_repaint = true;
@@ -207,17 +203,8 @@ impl Zoombars {
                         );
                     }
 
-                    let min_selection_size =
-                        (total_bytes as f32 / window.size() as f32).min(maximum_min_selection_size);
-                    let selection = bar.selection(min_selection_size);
-
-                    let new_start_offset = (window.size() as f32 * selection.start()) as u64;
-
-                    let start = window.start() + new_start_offset;
-                    let selection_size = ((selection.end() - selection.start()) as f64
-                        * window.size() as f64) as u64;
-
-                    window = Window::new(start, std::cmp::min(start + selection_size, file_size));
+                    dbg!(window);
+                    window = bar.selection_window(window, rect.height());
 
                     if !was_selecting && selecting {
                         self.selecting = true;
@@ -266,6 +253,64 @@ impl Zoombars {
         );
 
         *marked_locations.hovered_location_mut() = new_hovered_location;
+    }
+
+    /// Rearranges the zoombars to focus on the given point.
+    ///
+    /// Bars before `start_bar` remain unchanged, if `point` lies within them, otherwise they are
+    /// shifted.
+    pub fn rearrange_bars_for_point(
+        &mut self,
+        bar_height: f32,
+        file_size: u64,
+        start_bar: usize,
+        point: u64,
+    ) {
+        let from_center_len = |center: f32, len: f32| -> RangeInclusive<f32> {
+            let tentative_start = center - (len / 2.0);
+            let start = if tentative_start < 0.0 {
+                0.0
+            } else if tentative_start + len > 1.0 {
+                1.0 - len
+            } else {
+                tentative_start
+            };
+
+            start..=start + len
+        };
+
+        let mut redo_at = self.bars.len();
+        let mut window = Window::new(0, file_size);
+        for (i, bar) in self.bars.iter_mut().enumerate() {
+            if i < start_bar {
+                let selected_window = bar.selection_window(window, bar_height);
+                if selected_window.contains(point) {
+                    window = selected_window;
+                    continue;
+                }
+
+                let min_selection_size = min_selection_size(window, bar_height);
+                let selection = bar.selection(min_selection_size);
+
+                let selection_len = selection.end() - selection.start();
+                let selection_center =
+                    (point - selected_window.start()) as f32 / selected_window.size() as f32;
+
+                bar.set_selection(from_center_len(selection_center, selection_len));
+
+                window = bar.selection_window(window, bar_height);
+                redo_at = i;
+
+                break;
+            } else {
+                redo_at = i;
+                break;
+            }
+        }
+        self.bars.drain(redo_at..);
+        dbg!(window);
+
+        todo!("finish implementing this");
     }
 
     /// Creates a hash of the zoombar selection state.
@@ -318,6 +363,11 @@ impl Zoombar {
         }
     }
 
+    /// Sets the selection to the given one.
+    fn set_selection(&mut self, selection: RangeInclusive<f32>) {
+        self.selected = selection;
+    }
+
     /// The selection of this zoombar.
     fn selection(&self, min_selection_size: f32) -> RangeInclusive<f32> {
         let size = (*self.selected.start() - *self.selected.end())
@@ -341,6 +391,23 @@ impl Zoombar {
         } else {
             NULL_SELECTION
         }
+    }
+
+    /// Computes the window that this zoombar selected.
+    fn selection_window(&self, prev_window: Window, bar_height: f32) -> Window {
+        let min_selection_size = min_selection_size(prev_window, bar_height);
+        let selection = self.selection(min_selection_size);
+
+        let new_start_offset = (prev_window.size() as f32 * selection.start()) as u64;
+
+        let start = prev_window.start() + new_start_offset;
+        let selection_size =
+            ((selection.end() - selection.start()) as f64 * prev_window.size() as f64) as u64;
+
+        Window::new(
+            start,
+            std::cmp::min(start + selection_size, prev_window.end()),
+        )
     }
 
     /// Handles manipulating the selection on the zoombar.
@@ -520,4 +587,14 @@ pub fn offset_on_bar(bar_rect: Rect, bar_window: Window, offset: u64) -> Option<
     } else {
         None
     }
+}
+
+/// The minimum size of a selection for the given current window and bar height.
+fn min_selection_size(window: Window, bar_height: f32) -> f32 {
+    let total_rows = (bar_height.trunc() as u64).max(1);
+    let total_bytes = total_rows * 16;
+
+    let maximum_min_selection_size = (total_rows - 1) as f32 / total_rows as f32;
+
+    (total_bytes as f32 / window.size() as f32).min(maximum_min_selection_size)
 }

@@ -12,9 +12,7 @@ pub mod language;
 // TODO: implement classification of parsed values (offset, integer?, string?)
 // TODO: improve display of the parsed values in the GUI
 // TODO: figure out a way to cleverly incorporate colors
-// TODO: implement different start offsets
 // TODO: implement jumping to offsets in the hexview
-// TODO: implement highlighting on the overview bars
 
 // TODO: remove when this can be parsed from a text file
 pub fn tmp_pe_file() -> language::ast::Node {
