@@ -1,0 +1,42 @@
+!endian le;
+
+mz_magic bytes = "MZ";
+!seek to 60;
+new_exe_header u32;
+
+!seek to new_exe_header;
+// The "new" exe header
+pe_magic bytes = <"PE" 00 00>;
+machine u16;
+num_of_sections u16;
+time_date_stamp u32;
+pointer_to_symbol_table u32;
+num_of_symbols u32;
+size_of_optional_header u16;
+characteristics u16;
+
+// The "optional" header
+optional_magic bytes = <0b 01>;
+major_linker_version u8;
+minor_linker_version u8;
+size_of_code u32;
+size_of_initialized_data u32;
+size_of_uninitialized_data u32;
+addr_of_entry_point u32;
+base_of_code u32;
+base_of_data u32;
+
+!seek to size_of_optional_header + 24 + new_exe_header;
+section_name bytes len 8;
+virtual_size u32;
+virtual_address u32;
+size_of_raw_data u32;
+pointer_to_raw_data u32;
+pointer_to_relocations u32;
+pointer_to_line_numbers u32;
+number_of_relocations u16;
+number_of_line_numbers u16;
+characteristics u32;
+!scope at pointer_to_raw_data {
+    content bytes len size_of_raw_data;
+}

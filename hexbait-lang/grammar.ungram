@@ -1,0 +1,101 @@
+// NOTE: the way the code generator is currently implemented is a little wonky, especially around contextual keywords and matching specific tokens.
+// The current implementation works well enough for its purpose, but if you make changes, be sure to carefully check if the generated code does what you expect it to do.
+
+File =
+  StructContent*
+
+StructContent =
+  Declaration
+| StructField
+| Struct
+
+Declaration =
+  EndiannessDeclaration
+| AlignDeclaration
+| SeekByDeclaration
+| SeekToDeclaration
+| ScopeAtDeclaration
+
+EndiannessDeclaration =
+  '!' 'endian' kind:'ident' ';'
+
+AlignDeclaration =
+  '!' 'align' amount:Expr ';'
+
+SeekByDeclaration =
+  '!' 'seek' 'by' amount:Expr ';'
+
+SeekToDeclaration =
+  '!' 'seek' 'to' amount:Expr ';'
+
+ScopeAtDeclaration =
+  '!' 'scope' 'at' start:Expr '{' StructContent* '}'
+
+StructField =
+  name:'ident' ParseType ( '=' expected:Expr )?
+
+ParseType =
+  NamedParseType
+| BytesParseType
+| RepeatParseType
+
+NamedParseType =
+  name:'ident'
+
+BytesParseType =
+  'bytes' RepeatDecl?
+
+RepeatParseType =
+  '[' ty:ParseType ']' repetition:RepeatDecl
+
+RepeatDecl =
+  RepeatLenDecl
+| RepeatWhileDecl
+
+RepeatLenDecl =
+  'len' count:Expr
+
+RepeatWhileDecl =
+  'while' condition:Expr
+
+Struct =
+  'struct' name:'ident' '{' StructContent* '}'
+
+Expr =
+  Atom
+| ByteConcat
+| ParenExpr
+| PrefixExpr
+| InfixExpr
+
+Atom =
+  'bin_lit'
+| 'oct_lit'
+| 'dec_lit'
+| 'hex_lit'
+| 'str_lit'
+| 'ident'
+
+ByteConcat =
+  '<' ( 'byte_lit' | 'dec_lit' | 'str_lit' )* '>'
+
+ParenExpr =
+  '(' Expr ')'
+
+PrefixExpr =
+  Op Expr
+
+InfixExpr =
+  lhs:Expr Op rhs:Expr
+
+Op =
+  '+'
+| '-'
+| '*'
+| '/'
+| '=='
+| '!='
+| '>'
+| '>='
+| '<'
+| '<='

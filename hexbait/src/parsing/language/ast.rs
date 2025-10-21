@@ -7,7 +7,7 @@ pub use expr::*;
 mod expr;
 
 /// A node to be parsed.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Node {
     /// The kind of node.
     pub kind: NodeKind,
@@ -15,8 +15,18 @@ pub struct Node {
     pub offset: Option<Expr>,
 }
 
+impl fmt::Debug for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(offset) = &self.offset {
+            write!(f, "{:?} @ {:?}", self.kind, offset)
+        } else {
+            write!(f, "{:?}", self.kind)
+        }
+    }
+}
+
 /// The kind of a node that can be parsed.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum NodeKind {
     /// Fixed bytes are expected.
     FixedBytes {
@@ -89,6 +99,73 @@ pub enum NodeKind {
     },
 }
 
+impl fmt::Debug for NodeKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FixedBytes { expected } => {
+                write!(
+                    f,
+                    "bytes len {} = {:?}",
+                    match &expected.kind {
+                        ExprKind::ConstantBytes { value } => value.len(),
+                        _ => unreachable!(),
+                    },
+                    expected
+                )
+            }
+            Self::FixedLength { length } => {
+                write!(f, "bytes len {:?}", length)
+            }
+            Self::Integer { bit_width, signed } => {
+                write!(f, "{}{}", if *signed { "i" } else { "u" }, bit_width)
+            }
+            Self::Float { bit_width } => f
+                .debug_struct("Float")
+                .field("bit_width", bit_width)
+                .finish(),
+            Self::NamedNode { name } => f.debug_struct("NamedNode").field("name", name).finish(),
+            Self::Elsewhere { node } => f.debug_struct("Elsewhere").field("node", node).finish(),
+            Self::Struct { nodes } => {
+                writeln!(f, "struct {{")?;
+                for (name, node) in nodes {
+                    writeln!(f, "    {name:?} {node:?};")?;
+                }
+                writeln!(f, "}}")
+            }
+            Self::RepeatCount { node, count } => f
+                .debug_struct("RepeatCount")
+                .field("node", node)
+                .field("count", count)
+                .finish(),
+            Self::RepeatWhile { node, condition } => f
+                .debug_struct("RepeatWhile")
+                .field("node", node)
+                .field("condition", condition)
+                .finish(),
+            Self::ParseIf {
+                condition,
+                true_node,
+                false_node,
+            } => f
+                .debug_struct("ParseIf")
+                .field("condition", condition)
+                .field("true_node", true_node)
+                .field("false_node", false_node)
+                .finish(),
+            Self::Switch {
+                scrutinee,
+                branches,
+                default,
+            } => f
+                .debug_struct("Switch")
+                .field("scrutinee", scrutinee)
+                .field("branches", branches)
+                .field("default", default)
+                .finish(),
+        }
+    }
+}
+
 /// References a name in the language.
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub struct Symbol {
@@ -106,6 +183,6 @@ impl From<&str> for Symbol {
 
 impl fmt::Debug for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.name.fmt(f)
+        write!(f, "{}", self.name)
     }
 }

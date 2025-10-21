@@ -1,0 +1,185 @@
+//! Implements the values parsed by the language.
+
+use std::fmt;
+
+use crate::{Int, ir::Symbol};
+
+use super::{
+    path::{Path, PathComponent},
+    provenance::Provenance,
+};
+
+/// Represents a parsed value.
+#[derive(Debug, Clone)]
+pub struct Value {
+    /// The kind of the value.
+    pub kind: ValueKind,
+    /// The provenance of the value.
+    pub provenance: Provenance,
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
+}
+
+/// The different kinds of values that can be parsed.
+#[derive(Clone, PartialEq)]
+pub enum ValueKind {
+    /// A boolean value.
+    Boolean(bool),
+    /// An integer value.
+    Integer(Int),
+    /// A float value.
+    Float(f64),
+    /// A number of bytes as a value.
+    Bytes(Vec<u8>),
+    /// Represents a `struct` with named fields.
+    ///
+    /// This is a `Vec` and not a map, to preserve field ordering for the purposes of displaying
+    /// them.
+    Struct(Vec<(Symbol, Value)>),
+    /// Represents an array of values.
+    Array(Vec<Value>),
+    /// A value that is invalid due to an error during parsing.
+    Err,
+}
+
+impl fmt::Debug for ValueKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Boolean(val) => write!(f, "{val:?}"),
+            Self::Integer(int) => write!(f, "{int} (0x{int:x})"),
+            Self::Float(float) => float.fmt(f),
+            Self::Bytes(bytes) => match bytes.len() {
+                0 => write!(f, "[]"),
+                1..=16 => {
+                    write!(f, "[{:02x}", bytes[0])?;
+                    for byte in &bytes[1..] {
+                        write!(f, " {byte:02x}")?;
+                    }
+                    write!(f, "]")
+                }
+                17.. => {
+                    write!(f, "[{:02x}", bytes[0])?;
+                    for byte in &bytes[1..8] {
+                        write!(f, " {byte:02x}")?;
+                    }
+                    write!(f, " ...")?;
+                    for byte in &bytes[bytes.len() - 8..] {
+                        write!(f, " {byte:02x}")?;
+                    }
+                    write!(f, "]")
+                }
+            },
+            Self::Struct(fields) => {
+                let mut debug_struct = f.debug_struct("struct");
+                for (name, value) in fields {
+                    debug_struct.field(name.as_str(), value);
+                }
+                debug_struct.finish()
+            }
+            Self::Array(array) => f.debug_list().entries(array).finish(),
+            Self::Err => f.write_str("error"),
+        }
+    }
+}
+
+impl ValueKind {
+    /// Expects the value to be an boolean, panicking if this is false.
+    ///
+    /// # Panics
+    /// This function will panic if the value is not a boolean.
+    #[track_caller]
+    pub fn expect_bool(&self) -> bool {
+        match self {
+            ValueKind::Boolean(value) => *value,
+            _ => unreachable!("impossible because of static analysis"),
+        }
+    }
+
+    /// Expects the value to be an integer, panicking if this is false.
+    ///
+    /// # Panics
+    /// This function will panic if the value is not an integer.
+    #[track_caller]
+    pub fn expect_int(&self) -> &Int {
+        match self {
+            ValueKind::Integer(value) => value,
+            _ => unreachable!("impossible because of static analysis"),
+        }
+    }
+
+    /// Expects the value to be a float, panicking if this is false.
+    ///
+    /// # Panics
+    /// This function will panic if the value is not a float.
+    #[track_caller]
+    pub fn expect_float(&self) -> f64 {
+        match self {
+            ValueKind::Float(value) => *value,
+            _ => unreachable!("impossible because of static analysis"),
+        }
+    }
+
+    /// Expects the value to be of type bytes, panicking if this is false.
+    ///
+    /// # Panics
+    /// This function will panic if the value is not of type bytes.
+    #[track_caller]
+    pub fn expect_bytes(&self) -> &[u8] {
+        match self {
+            ValueKind::Bytes(value) => value,
+            _ => unreachable!("impossible because of static analysis"),
+        }
+    }
+
+    /// Expects the value to be a struct, panicking if this is false.
+    ///
+    /// # Panics
+    /// This function will panic if the value is not a struct.
+    #[track_caller]
+    pub fn expect_struct(&self) -> &Vec<(Symbol, Value)> {
+        match self {
+            ValueKind::Struct(value) => value,
+            _ => unreachable!("impossible because of static analysis"),
+        }
+    }
+}
+
+impl Value {
+    /// Returns the value at the give path.
+    pub fn subvalue_at_path(&self, path: &Path) -> Option<&Value> {
+        let mut current_value = self;
+
+        for component in path.iter() {
+            match component {
+                PathComponent::FieldAccess(field) => {
+                    let ValueKind::Struct(items) = &current_value.kind else {
+                        return None;
+                    };
+
+                    'find_entry: {
+                        for (name, value) in items {
+                            if name == field {
+                                current_value = value;
+                                break 'find_entry;
+                            }
+                        }
+                        return None;
+                    }
+                }
+                PathComponent::Indexing(index) => {
+                    let ValueKind::Array(array) = &current_value.kind else {
+                        return None;
+                    };
+
+                    current_value = array.get(*index)?;
+                }
+            }
+        }
+
+        Some(current_value)
+    }
+}

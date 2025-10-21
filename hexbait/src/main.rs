@@ -28,6 +28,19 @@ fn main() -> eframe::Result {
         Input::Stdin(buf.into())
     };
 
+    let parse = hexbait_lang::parse(include_str!("../../format_descriptions/pe.hbl"));
+    dbg!(&parse.ast);
+    let ir = hexbait_lang::ir::lower_file(parse.ast);
+    let mut input = input;
+    let view = match &mut input {
+        Input::File { file, .. } => hexbait_lang::View::File(file),
+        Input::Stdin(bytes) => hexbait_lang::View::Bytes(&*bytes),
+    };
+    let out = hexbait_lang::eval_ir(&ir, view);
+    dbg!(&ir);
+    dbg!(out);
+    dbg!(hexbait::parsing::tmp_pe_file());
+
     let statistics_cache_input = input.clone().unwrap();
     let searcher = Searcher::new(&input);
 
@@ -151,6 +164,7 @@ impl eframe::App for MyApp {
             // TODO: change default font-size and refactor around that
             // TODO: implement to-disk caching for some sizes to increase re-load times
             // TODO: fix up main file
+            // TODO: use "inner" and "outer" color for displaying marked locations
 
             let mut parse_offset = self.parse_offset.parse().ok();
 

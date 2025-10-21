@@ -1,14 +1,22 @@
 //! Implements expressions in the AST.
 
+use std::fmt;
+
 use crate::parsing::language::Int;
 
 use super::{Node, Symbol};
 
 /// Represents an expression in the AST.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Expr {
     /// The kind of the expression.
     pub kind: ExprKind,
+}
+
+impl fmt::Debug for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.kind.fmt(f)
+    }
 }
 
 /// The type of unary operation to perform.
@@ -19,7 +27,7 @@ pub enum UnOp {
 }
 
 /// The type of binary operation to perform.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum BinOp {
     /// Perform an equality check.
     Eq,
@@ -49,8 +57,28 @@ pub enum BinOp {
     Or,
 }
 
+impl fmt::Debug for BinOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Eq => write!(f, "=="),
+            Self::Neq => write!(f, "!="),
+            Self::Gt => write!(f, ">"),
+            Self::Geq => write!(f, ">="),
+            Self::Lt => write!(f, "<"),
+            Self::Leq => write!(f, "<="),
+            Self::Add => write!(f, "+"),
+            Self::Sub => write!(f, "-"),
+            Self::Mul => write!(f, "*"),
+            Self::Div => write!(f, "/"),
+            Self::Mod => write!(f, "%"),
+            Self::And => write!(f, "&"),
+            Self::Or => write!(f, "|"),
+        }
+    }
+}
+
 /// The kind of an expression.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum ExprKind {
     /// The expression is a constant integer value.
     ConstantInt {
@@ -135,6 +163,83 @@ impl Expr {
                     || true_branch.contains_last()
                     || false_branch.contains_last()
             }
+        }
+    }
+}
+
+impl fmt::Debug for ExprKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ConstantInt { value } => write!(f, "{value}"),
+            Self::ConstantBytes { value } => {
+                let needs_escape =
+                    |byte: &u8| !byte.is_ascii_graphic() && !b"\n\r\t ".contains(&byte);
+                let any_needs_escape = value.iter().any(needs_escape);
+
+                if any_needs_escape {
+                    write!(f, "<")?;
+                }
+
+                let mut in_str = None;
+                for byte in value {
+                    if needs_escape(byte) {
+                        match in_str {
+                            None => (),
+                            Some(true) => write!(f, "\" ")?,
+                            Some(false) => write!(f, " ")?,
+                        }
+                        in_str = Some(false);
+
+                        write!(f, "{byte:02x}")?;
+                    } else {
+                        match in_str {
+                            None => write!(f, "\"")?,
+                            Some(true) => (),
+                            Some(false) => write!(f, " \"")?,
+                        }
+                        in_str = Some(true);
+
+                        match byte {
+                            b'\n' => write!(f, "\\n")?,
+                            b'\r' => write!(f, "\\r")?,
+                            b'\t' => write!(f, "\\t")?,
+                            b' ' => write!(f, " ")?,
+                            _ => write!(f, "{}", *byte as char)?,
+                        }
+                    }
+                }
+                if in_str.unwrap_or(false) {
+                    write!(f, "\"")?;
+                }
+
+                if any_needs_escape {
+                    write!(f, ">")?;
+                }
+
+                Ok(())
+            }
+            Self::Offset => write!(f, "Offset"),
+            Self::Parent => write!(f, "Parent"),
+            Self::Last => write!(f, "Last"),
+            Self::UnOp {
+                operand,
+                op: UnOp::Not,
+            } => write!(f, "-{operand:?}"),
+            Self::BinOp { left, right, op } => write!(f, "{left:?} {op:?} {right:?}"),
+            Self::VariableUse { var } => write!(f, "{var:?}"),
+            Self::FieldAccess {
+                field_holder,
+                field,
+            } => write!(f, "{field_holder:?}.{field:?}"),
+            Self::ParseAt { node } => write!(f, "parse({node:?})"),
+            Self::If {
+                condition,
+                true_branch,
+                false_branch,
+            } => write!(
+                f,
+                "if ({condition:?}) {{ {true_branch:?} }} else {{ {false_branch:?} }}"
+            ),
         }
     }
 }

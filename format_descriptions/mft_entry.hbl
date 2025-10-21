@@ -1,0 +1,12 @@
+!endian le;
+!align 4;
+
+// --- fixed header (safe to read before fixup) ---
+signature     u32 = 0x454C4946;
+usa_offset    u16;
+usa_count     u16;
+lsn           u64;
+seq_no        u16;
+hardlinks     u16;
+attrs_offset  u16;
+entry_flags   u16;
