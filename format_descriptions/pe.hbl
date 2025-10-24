@@ -27,16 +27,19 @@ base_of_code u32;
 base_of_data u32;
 
 !seek to size_of_optional_header + 24 + new_exe_header;
-section_name bytes len 8;
-virtual_size u32;
-virtual_address u32;
-size_of_raw_data u32;
-pointer_to_raw_data u32;
-pointer_to_relocations u32;
-pointer_to_line_numbers u32;
-number_of_relocations u16;
-number_of_line_numbers u16;
-characteristics u32;
-!scope at pointer_to_raw_data {
-    content bytes len size_of_raw_data;
-}
+
+sections [struct {
+    section_name bytes len 8;
+    virtual_size u32;
+    virtual_address u32;
+    size_of_raw_data u32;
+    pointer_to_raw_data u32;
+    pointer_to_relocations u32;
+    pointer_to_line_numbers u32;
+    number_of_relocations u16;
+    number_of_line_numbers u16;
+    characteristics u32;
+    !scope at pointer_to_raw_data {
+        content bytes len size_of_raw_data;
+    }
+}] len num_of_sections;

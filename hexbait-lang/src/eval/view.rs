@@ -10,15 +10,15 @@ use super::provenance::Provenance;
 
 /// A view describes a source that can be parsed from.
 #[derive(Debug)]
-pub enum View<'s> {
+pub enum View<'source> {
     /// Parses directly from the given file.
-    File(&'s mut fs::File),
+    File(&'source fs::File),
     /// Parses directly from the underlying bytes.
-    Bytes(&'s [u8]),
+    Bytes(&'source [u8]),
     /// Parses out of a subview of a larger view.
     Subview {
         /// The view to parse from.
-        view: &'s mut View<'s>,
+        view: &'source View<'source>,
         /// The range of the parent view that is valid.
         valid_range: Range<u64>,
     },
@@ -26,9 +26,9 @@ pub enum View<'s> {
 
 impl View<'_> {
     /// Returns the length of the view in bytes.
-    pub(crate) fn len(&mut self) -> io::Result<u64> {
+    pub(crate) fn len(&self) -> io::Result<u64> {
         match self {
-            View::File(file) => file.seek(SeekFrom::End(0)),
+            View::File(file) => (&**file).seek(SeekFrom::End(0)),
             View::Bytes(bytes) => <[u8]>::len(bytes)
                 .try_into()
                 .map_err(|_| io::Error::other("length does not fit into `u64`")),
@@ -36,7 +36,7 @@ impl View<'_> {
                 assert!(valid_range.end >= valid_range.start);
 
                 let len = view.len()?;
-                if len > valid_range.start {
+                if valid_range.start > len {
                     Ok(0)
                 } else {
                     Ok(std::cmp::min(len, valid_range.end) - valid_range.start)
@@ -46,11 +46,7 @@ impl View<'_> {
     }
 
     /// Reads data into the buffer at the given offset.
-    pub(crate) fn read_at<'buf>(
-        &mut self,
-        offset: u64,
-        buf: &'buf mut [u8],
-    ) -> io::Result<&'buf [u8]> {
+    pub(crate) fn read_at<'buf>(&self, offset: u64, buf: &'buf mut [u8]) -> io::Result<&'buf [u8]> {
         let len = self.len()?;
 
         if offset > len {
@@ -59,6 +55,8 @@ impl View<'_> {
 
         let out_buf = match self {
             View::File(file) => {
+                let mut file = &**file;
+
                 let len_left = len - offset;
                 let output_size = std::cmp::min(len_left, buf.len().try_into().unwrap_or(u64::MAX));
                 let truncated_buf = &mut buf[..output_size

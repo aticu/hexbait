@@ -146,6 +146,11 @@ pub enum ParseType {
         /// The repetition kind.
         repetition_kind: RepeatKind,
     },
+    /// Parses an anonymous `struct` declaration.
+    Struct {
+        /// The content of the `struct`.
+        content: Vec<StructContent>,
+    },
     /// A parse type that contained an error during parsing.
     Error,
 }

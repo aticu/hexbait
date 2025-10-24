@@ -43,9 +43,7 @@ fn r#struct(p: &mut Parser) {
     p.expect(TokenKind::Identifier);
     p.expect(TokenKind::LBrace);
 
-    while let Some(kind) = p.cur()
-        && kind != TokenKind::RBrace
-    {
+    while p.cur().is_some_and(|t| t != TokenKind::RBrace) {
         struct_content(p);
     }
 
@@ -148,6 +146,15 @@ fn parse_type_raw<'p, 'src>(p: &'p mut Parser<'src>, nested: bool) -> TriviaBump
                 p.expect(TokenKind::BytesKw);
                 repeat_decl(p).and_complete(m, NodeKind::BytesParseType)
             }
+        }
+        Some(TokenKind::StructKw) => {
+            p.expect(TokenKind::StructKw);
+            p.expect(TokenKind::LBrace);
+            while p.cur().is_some_and(|t| t != TokenKind::RBrace) {
+                struct_content(p);
+            }
+            p.complete_after(m, NodeKind::AnonymousStructParseType, TokenKind::RBrace)
+                .1
         }
         Some(TokenKind::Identifier) => {
             p.complete_after(m, NodeKind::NamedParseType, TokenKind::Identifier)

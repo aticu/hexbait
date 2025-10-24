@@ -95,6 +95,8 @@ pub enum NodeKind {
     BytesParseType,
     /// A parse type that is a repetition of a fixed element.
     RepeatParseType,
+    /// A parse type that parses an anonymous `struct`.
+    AnonymousStructParseType,
 
     // Repeating types
     /// A repetition of a fixed number of elements.

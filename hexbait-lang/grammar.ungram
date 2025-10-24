@@ -38,6 +38,7 @@ ParseType =
   NamedParseType
 | BytesParseType
 | RepeatParseType
+| AnonymousStructParseType
 
 NamedParseType =
   name:'ident'
@@ -47,6 +48,9 @@ BytesParseType =
 
 RepeatParseType =
   '[' ty:ParseType ']' repetition:RepeatDecl
+
+AnonymousStructParseType =
+  'struct' '{' StructContent* '}'
 
 RepeatDecl =
   RepeatLenDecl

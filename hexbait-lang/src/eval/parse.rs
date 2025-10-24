@@ -37,10 +37,11 @@ impl From<io::Error> for ParseErr {
 
 /// Evaluates the given IR on the given input.
 pub fn eval_ir(file: &File, view: View<'_>) -> Value {
-    let mut ctx = StructContext::new(view);
+    let mut ctx = StructContext::new();
+    let mut scope = Scope::new(&mut ctx, view);
 
     for content in &file.content {
-        ctx.eval_struct_content(content);
+        scope.eval_struct_content(content);
     }
 
     let mut provenance = Provenance::empty();
@@ -62,26 +63,53 @@ macro_rules! impossible {
 
 /// The parsing context for a `struct`.
 #[derive(Debug)]
-struct StructContext<'src> {
+struct StructContext {
     /// The endianness used for parsing.
     endianness: Endianness,
-    /// The current offset used for parsing.
-    offset: ByteOffset,
-    /// The view that is being parsed from.
-    view: View<'src>,
     /// The already parsed fields.
     parsed_fields: Vec<(Symbol, Value)>,
 }
 
-impl<'src> StructContext<'src> {
-    /// Creates a new `struct` parsing context at the start of the view.
-    fn new(view: View<'src>) -> StructContext<'src> {
+impl StructContext {
+    /// Creates a new `struct` parsing context.
+    fn new() -> StructContext {
         StructContext {
             // static analysis makes sure that this is set to the correct value before parsing
             endianness: Endianness::Little,
+            parsed_fields: Vec::new(),
+        }
+    }
+
+    /// Creates a child context from the current context.
+    fn child(&self) -> StructContext {
+        StructContext {
+            endianness: self.endianness,
+            parsed_fields: Vec::new(),
+        }
+    }
+}
+
+/// The parsing context for a `scope`.
+#[derive(Debug)]
+struct Scope<'src, 'struct_ctx> {
+    /// The `struct` context of this scope.
+    struct_ctx: &'struct_ctx mut StructContext,
+    /// The current offset used for parsing.
+    offset: ByteOffset,
+    /// The view that this scope parses from.
+    view: View<'src>,
+}
+
+impl<'src, 'struct_ctx> Scope<'src, 'struct_ctx> {
+    /// Creates a new `scope` for the given `struct` context in the given view.
+    fn new(
+        struct_ctx: &'struct_ctx mut StructContext,
+        view: View<'src>,
+    ) -> Scope<'src, 'struct_ctx> {
+        Scope {
+            struct_ctx,
             offset: ByteOffset(0),
             view,
-            parsed_fields: Vec::new(),
         }
     }
 
@@ -132,7 +160,7 @@ impl<'src> StructContext<'src> {
                 provenance: Provenance::empty(),
             },
             ExprKind::VarUse(var) => {
-                for (name, val) in &self.parsed_fields {
+                for (name, val) in &self.struct_ctx.parsed_fields {
                     if *name == var.inner {
                         return val.clone();
                     }
@@ -204,7 +232,7 @@ impl<'src> StructContext<'src> {
     /// Evaluates the given declaration.
     fn eval_declaration(&mut self, declaration: &Declaration) -> Result<(), ParseErr> {
         match declaration {
-            Declaration::Endianness(endianness) => self.endianness = *endianness,
+            Declaration::Endianness(endianness) => self.struct_ctx.endianness = *endianness,
             Declaration::Align(expr) => {
                 let value = self.eval_expr(&expr);
                 let align = value.kind.expect_int();
@@ -244,7 +272,34 @@ impl<'src> StructContext<'src> {
                     );
                 }
             }
-            Declaration::ScopeAt { start, content } => todo!(),
+            Declaration::ScopeAt { start, content } => {
+                let start_expr = self.eval_expr(start);
+                let len = self.current_view().len()?;
+
+                let start = if let Ok(start) = u64::try_from(start_expr.kind.expect_int())
+                    && start < len
+                {
+                    start
+                } else {
+                    self.error(
+                        "scope start exceeded the end of the current scope",
+                        &start_expr.provenance,
+                        start.span,
+                    );
+                    return Ok(());
+                    // TODO: check what to return here
+                };
+
+                let view = View::Subview {
+                    view: &self.view,
+                    valid_range: start..len,
+                };
+                let mut scope = Scope::new(self.struct_ctx, view);
+
+                for single_content in content {
+                    scope.eval_struct_content(single_content);
+                }
+            }
         }
 
         Ok(())
@@ -301,7 +356,7 @@ impl<'src> StructContext<'src> {
 
                 let mut parse_buf = [0; 8];
 
-                let (copy_start, msb) = match self.endianness {
+                let (copy_start, msb) = match self.struct_ctx.endianness {
                     Endianness::Little => (0, parsed_bytes[size_in_bytes - 1]),
                     Endianness::Big => (8 - size_in_bytes, parsed_bytes[0]),
                 };
@@ -312,7 +367,7 @@ impl<'src> StructContext<'src> {
                 }
 
                 parse_buf[copy_start..copy_start + size_in_bytes].copy_from_slice(&parsed_bytes);
-                let num = match self.endianness {
+                let num = match self.struct_ctx.endianness {
                     Endianness::Little => i64::from_le_bytes(parse_buf),
                     Endianness::Big => i64::from_be_bytes(parse_buf),
                 };
@@ -365,6 +420,7 @@ impl<'src> StructContext<'src> {
                 crate::ir::RepeatKind::While { condition } => todo!(),
                 crate::ir::RepeatKind::Error => impossible!(),
             },
+            ParseType::Struct { content } => todo!(),
             ParseType::Error => impossible!(),
         };
 
@@ -393,7 +449,9 @@ impl<'src> StructContext<'src> {
         }
 
         // TODO: use resolved names here later
-        self.parsed_fields.push((field.name.inner.clone(), value));
+        self.struct_ctx
+            .parsed_fields
+            .push((field.name.inner.clone(), value));
     }
 
     /// Evaluates the given `struct` content.

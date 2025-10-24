@@ -29,15 +29,14 @@ fn main() -> eframe::Result {
     };
 
     let parse = hexbait_lang::parse(include_str!("../../format_descriptions/pe.hbl"));
-    dbg!(&parse.ast);
+    //dbg!(&parse.ast);
     let ir = hexbait_lang::ir::lower_file(parse.ast);
-    let mut input = input;
-    let view = match &mut input {
+    let view = match &input {
         Input::File { file, .. } => hexbait_lang::View::File(file),
         Input::Stdin(bytes) => hexbait_lang::View::Bytes(&*bytes),
     };
     let out = hexbait_lang::eval_ir(&ir, view);
-    dbg!(&ir);
+    //dbg!(&ir);
     dbg!(out);
     dbg!(hexbait::parsing::tmp_pe_file());
 

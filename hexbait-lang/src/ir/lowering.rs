@@ -146,6 +146,13 @@ impl LoweringCtx {
                     ),
                 }
             }
+            ast::ParseType::AnonymousStructParseType(struct_parse_type) => {
+                let content = struct_parse_type.struct_content().map(|content| self.lower_struct_content(content)).collect();
+
+                ParseType::Struct {
+                    content,
+                }
+            }
         }
     }
 
@@ -426,6 +433,7 @@ trait ParserImpossible {
 impl<T> ParserImpossible for Option<T> {
     type Target = T;
 
+    #[track_caller]
     fn parser_expect(self) -> Self::Target {
         self.expect("this should be rejected by the parser")
     }
