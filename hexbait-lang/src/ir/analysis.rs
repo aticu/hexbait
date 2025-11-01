@@ -8,7 +8,7 @@ pub struct ResolvedNames {}
 
 /// Checks if the file is well formed.
 // TODO: add an error type here
-pub fn check(file: &File) -> Result<ResolvedNames, ()> {
+pub fn check_ir(_file: &File) -> Result<ResolvedNames, ()> {
     // TODO: check types
     // TODO: resolve names
     // TODO: ensure that endianness is properly specified before parsing fields
@@ -17,5 +17,10 @@ pub fn check(file: &File) -> Result<ResolvedNames, ()> {
     // TODO: ensure that alignment fits into u64
     // TODO: ensure that integers are non-zero length
     // TODO: ensure that non-byte-aligned integers are only allowed in bitfields
+    // TODO: ensure that all field accesses are valid (both field access and in current struct)
+    // TODO: ensure comparison operations are well types (== and != for all, but others only for ints)
+    // TODO: ensure assertion and warning messages are utf8
+    // TODO: ensure that $last is only used if $len > 0
+    // TODO: ensure that $parent, $last and $len are only used in correct contexts
     Ok(ResolvedNames {})
 }

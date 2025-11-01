@@ -87,6 +87,8 @@ pub enum NodeKind {
     Struct,
     /// A field of a struct.
     StructField,
+    /// Defines a new computed value.
+    LetStatement,
 
     // Parse types
     /// A parse type that is a single identifier.
@@ -97,6 +99,10 @@ pub enum NodeKind {
     RepeatParseType,
     /// A parse type that parses an anonymous `struct`.
     AnonymousStructParseType,
+    /// A parse type that parses different types depending on the value of an expression.
+    SwitchParseType,
+    /// A single arm of a switch parse type.
+    SwitchParseTypeArm,
 
     // Repeating types
     /// A repetition of a fixed number of elements.
@@ -115,10 +121,16 @@ pub enum NodeKind {
     SeekByDeclaration,
     /// A declaration that parsing should continue in another scope that starts at a given offset.
     ScopeAtDeclaration,
+    /// A declaration asserting that an expression is true like `!assert size > 4`.
+    AssertDeclaration,
+    /// A declaration warns if the expression is true like `!warn if size > 4: "expected small size"`.
+    WarnIfDeclaration,
 
     // Expressions
     /// An atomic expression.
     Atom,
+    /// A meta variable such as `$offset` or `$parent`.
+    Metavar,
     /// A byte concatenation expression.
     ByteConcat,
     /// An operator used in expressions.
@@ -129,6 +141,10 @@ pub enum NodeKind {
     InfixExpr,
     /// An expression with a prefix operator.
     PrefixExpr,
+    /// A field access expression: `val.field`.
+    FieldAccess,
+    /// A `peek(type, at = offset)` expression.
+    PeekExpr,
 
     /// Contains unrecognized syntax.
     Error,

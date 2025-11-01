@@ -5,6 +5,8 @@ use std::{
     io::{self, Read as _, Seek as _, SeekFrom},
 };
 
+use hexbait_lang::View;
+
 use super::DataSource;
 
 impl DataSource for File {
@@ -35,5 +37,9 @@ impl DataSource for File {
         self.read_exact(truncated_buf)?;
 
         Ok(truncated_buf)
+    }
+
+    fn as_view<'this>(&'this self) -> Result<View<'this>, Self::Error> {
+        View::try_from(self)
     }
 }

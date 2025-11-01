@@ -1,0 +1,8 @@
+!endian le;
+
+partition_type_guid bytes len 16;
+unique_partition_guid bytes len 16;
+starting_lba u64;
+ending_lba u64;
+attributes u64;
+partition_name bytes len 72;

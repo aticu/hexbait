@@ -93,6 +93,9 @@ pub enum TokenKind {
     /// The dot symbol: `.`.
     #[token(".")]
     Dot,
+    /// The dollar symbol: `$`.
+    #[token("$")]
+    Dollar,
     /// The hash symbol: `#`.
     #[token("#")]
     Hash,
@@ -133,6 +136,18 @@ pub enum TokenKind {
     /// The `let` keyword.
     #[token("let")]
     LetKw,
+    /// The `parse` keyword.
+    #[token("peek")]
+    PeekKw,
+    /// The `switch` keyword.
+    #[token("switch")]
+    SwitchKw,
+    /// The `true` keyword.
+    #[token("true")]
+    TrueKw,
+    /// The `false` keyword.
+    #[token("false")]
+    FalseKw,
 
     /// Represents any kind of error in the input stream.
     Error,
@@ -170,6 +185,7 @@ impl TokenKind {
             TokenKind::Semicolon => "`;`",
             TokenKind::Comma => "`,`",
             TokenKind::Dot => "`.`",
+            TokenKind::Dollar => "`$`",
             TokenKind::Hash => "`#`",
             TokenKind::LAngle => "`<`",
             TokenKind::RAngle => "`>`",
@@ -182,6 +198,10 @@ impl TokenKind {
             TokenKind::BytesKw => "`bytes`",
             TokenKind::StructKw => "`struct`",
             TokenKind::LetKw => "`let`",
+            TokenKind::PeekKw => "`peek`",
+            TokenKind::SwitchKw => "`switch`",
+            TokenKind::TrueKw => "`true`",
+            TokenKind::FalseKw => "`false`",
             TokenKind::Error => "an unrecognized token",
             TokenKind::_Last => unreachable!("the last variant should never be constructed"),
         }
@@ -216,6 +236,7 @@ impl TokenKind {
             | TokenKind::Semicolon
             | TokenKind::Comma
             | TokenKind::Dot
+            | TokenKind::Dollar
             | TokenKind::Hash
             | TokenKind::LAngle
             | TokenKind::RAngle
@@ -228,6 +249,10 @@ impl TokenKind {
             | TokenKind::BytesKw
             | TokenKind::StructKw
             | TokenKind::LetKw
+            | TokenKind::PeekKw
+            | TokenKind::SwitchKw
+            | TokenKind::TrueKw
+            | TokenKind::FalseKw
             | TokenKind::Error
             | TokenKind::_Last => false,
         }

@@ -1,0 +1,11 @@
+signature bytes = "metadata";
+unknown u16;
+number_of_entries u16;
+unknown2 bytes len 20;
+
+entries [{
+    metadata_item_identifier bytes len 16;
+    metadata_item_offset u32;
+    metadata_item_size u32;
+    unknown u64;
+}] len number_of_entries;

@@ -6,12 +6,14 @@ use smol_str::SmolStr;
 
 use crate::{SyntaxToken, span::Span};
 
+pub use analysis::check_ir;
 pub use expr::*;
 pub use lowering::lower_file;
 
 mod analysis;
 mod expr;
 mod lowering;
+pub mod path;
 mod str;
 
 /// A name in the language.
@@ -75,6 +77,8 @@ pub enum StructContent {
     Field(StructField),
     /// A declaration in the `struct`.
     Declaration(Declaration),
+    /// A `let` statement.
+    LetStatement(LetStatement),
     /// A `struct` content that contained an error during parsing.
     Error,
 }
@@ -88,6 +92,15 @@ pub struct StructField {
     pub ty: ParseType,
     /// The expected value for this field, if one exists.
     pub expected: Option<Expr>,
+}
+
+/// A `let` statement.
+#[derive(Debug)]
+pub struct LetStatement {
+    /// The name of the computed value.
+    pub name: Spanned<Symbol>,
+    /// The expression that computes the value.
+    pub expr: Expr,
 }
 
 /// An endianness as found in an endianness declaration.
@@ -114,8 +127,24 @@ pub enum Declaration {
     ScopeAt {
         /// The start offset of the scope relative to the current parent.
         start: Expr,
+        /// The end offset of the scope relative to the current parent.
+        end: Option<Expr>,
         /// The content of the scope.
         content: Vec<StructContent>,
+    },
+    /// Asserts that the given expression is true.
+    Assert {
+        /// The condition that needs to hold.
+        condition: Expr,
+        /// The message to display if the condition is false.
+        message: Option<Expr>,
+    },
+    /// Warns if the given expression is true.
+    WarnIf {
+        /// The condition that will trigger a warning.
+        condition: Expr,
+        /// The message to display if the condition is true.
+        message: Option<Expr>,
     },
 }
 
@@ -150,6 +179,15 @@ pub enum ParseType {
     Struct {
         /// The content of the `struct`.
         content: Vec<StructContent>,
+    },
+    /// Parses one of multiple other parse types depending on the value of `scrutinee`.
+    Switch {
+        /// The value determining which branch to take.
+        scrutinee: Expr,
+        /// The branches of the `switch` parse type.
+        branches: Vec<(Lit, ParseType)>,
+        /// The default branch if no other branch matches.
+        default: Box<ParseType>,
     },
     /// A parse type that contained an error during parsing.
     Error,

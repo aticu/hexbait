@@ -1,0 +1,20 @@
+boot_entry_point bytes len 3;
+file_system_signature bytes = "-FVE-FS-";
+bytes_per_sector u16;
+sectors_per_cluster_block u8;
+
+!seek to 40;
+number_of_sectors u64;
+mft_cluster_block_number u64;
+mft_mirr_cluster_block_number u64;
+mft_entry_size u8;
+
+!seek to 160;
+volume_serial_number bytes len 16;
+
+!seek to 176;
+information_offsets [u64] len 3;
+eow_information_offsets [u64] len 2;
+
+!seek to 510;
+sector_signature bytes = <55 aa>;

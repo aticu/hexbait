@@ -1,0 +1,17 @@
+signature bytes = "KDMV";
+version u32;
+flags u32;
+maximum_data_number_of_sectors u64;
+grain_number_of_sectors u64;
+descriptor_sector_number u64;
+descriptor_number_of_sectors u64;
+number_of_grains_table_entries u32;
+secondary_grain_directory_sector_number u64;
+grain_directory_sector_number u64;
+metadata_number_of_sectors u64;
+is_dirty u8;
+eol1 bytes = "\n";
+non_eol bytes len 1;
+eol2 bytes = "\r\n";
+compression_method u16;
+padding bytes len 433;

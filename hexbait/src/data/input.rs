@@ -2,6 +2,8 @@
 
 use std::{fs::File, io, path::PathBuf, sync::Arc};
 
+use hexbait_lang::View;
+
 use super::DataSource;
 
 /// The input file to examine.
@@ -55,6 +57,21 @@ impl DataSource for Input {
                 let mut as_ref = &**stdin;
                 <&[u8] as DataSource>::window_at(&mut as_ref, offset, buf).map_err(io::Error::other)
             }
+        }
+    }
+
+    fn as_view<'this>(&'this self) -> Result<View<'this>, Self::Error> {
+        View::try_from(self)
+    }
+}
+
+impl<'input> TryFrom<&'input Input> for View<'input> {
+    type Error = io::Error;
+
+    fn try_from(value: &'input Input) -> Result<View<'input>, Self::Error> {
+        match value {
+            Input::File { file, .. } => View::try_from(file),
+            Input::Stdin(bytes) => Ok(View::from(&**bytes)),
         }
     }
 }

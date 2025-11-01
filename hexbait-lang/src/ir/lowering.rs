@@ -9,8 +9,8 @@ use crate::{
 };
 
 use super::{
-    Declaration, Endianness, File, ParseType, RepeatKind, Spanned, StructContent, StructField,
-    Symbol,
+    Declaration, Endianness, File, LetStatement, ParseType, RepeatKind, Spanned, StructContent,
+    StructField, Symbol,
     expr::{BinOp, Expr, ExprKind, Lit, UnOp},
     str::str_lit_content_to_bytes,
 };
@@ -58,21 +58,28 @@ impl LoweringCtx {
     }
 
     /// Shows the given error message for the given span.
-    fn error(&mut self, message: impl Into<String>, span: Span) {}
+    fn error(&mut self, message: impl Into<String>, span: Span) {
+        eprintln!(
+            "TODO: improve error handling: {} at {span:?}",
+            message.into()
+        );
+    }
 
     /// Lowers the given `struct` content AST to IR.
     fn lower_struct_content(&mut self, struct_content: ast::StructContent) -> StructContent {
         match struct_content {
             ast::StructContent::Declaration(declaration) => self
                 .lower_declaration(declaration)
-                .map(StructContent::Declaration)
-                .unwrap_or(StructContent::Error),
+                .map(StructContent::Declaration),
             ast::StructContent::StructField(struct_field) => self
                 .lower_struct_field(struct_field)
-                .map(StructContent::Field)
-                .unwrap_or(StructContent::Error),
+                .map(StructContent::Field),
             ast::StructContent::Struct(_) => todo!(),
+            ast::StructContent::LetStatement(let_statement) => self
+                .lower_let_statement(let_statement)
+                .map(StructContent::LetStatement),
         }
+        .unwrap_or(StructContent::Error)
     }
 
     /// Lowers the given AST `struct` field to IR.
@@ -153,6 +160,36 @@ impl LoweringCtx {
                     content,
                 }
             }
+            ast::ParseType::SwitchParseType(switch_parse_type) => {
+                let scrutinee = self.lower_expr(
+                    required_field!(switch_parse_type => scrutinee ? self: "expected `switch` scrutinee" => ParseType::Error)
+                );
+
+                let mut branches = Vec::new();
+
+                for arm in switch_parse_type.switch_parse_type_arm() {
+                    let value = self.lower_expr(
+                        required_field!(arm => val ? self: "expected arm value" => ParseType::Error)
+                    );
+                    let parse_ty = self.lower_parse_type(
+                        required_field!(arm => parse_type ? self: "expected arm parse type" => ParseType::Error),
+                        &None,
+                    );
+
+                    if let ExprKind::Lit(lit) = value.kind {
+                        branches.push((lit, parse_ty));
+                    } else {
+                        self.error("expected literal", value.span);
+                    }
+                }
+
+                let default = Box::new(self.lower_parse_type(
+                    required_field!(switch_parse_type => default ? self: "expected `switch` default branch" => ParseType::Error),
+                    &None
+                ));
+
+                ParseType::Switch { scrutinee, branches, default }
+            }
         }
     }
 
@@ -188,6 +225,19 @@ impl LoweringCtx {
     fn lower_expr_kind(&mut self, expr: ast::Expr) -> ExprKind {
         match expr {
             ast::Expr::Atom(atom) => self.lower_atom(atom),
+            ast::Expr::Metavar(metavar) => {
+                let name = required_field!(metavar => name ? self: "expected variable name" => ExprKind::Error);
+                match name.text() {
+                    "offset" => ExprKind::Offset,
+                    "parent" => ExprKind::Parent,
+                    "last" => ExprKind::Last,
+                    "len" => ExprKind::Len,
+                    var => {
+                        self.error(format!("unknown metavariable: {var}"), metavar.span());
+                        ExprKind::Error
+                    }
+                }
+            }
             ast::Expr::ByteConcat(byte_concat) => {
                 let mut out = Vec::new();
 
@@ -207,7 +257,9 @@ impl LoweringCtx {
                                 return ExprKind::Error;
                             }
                         }
-                        TokenKind::ByteLiteral | TokenKind::DecimalIntegerLiteral => {
+                        TokenKind::ByteLiteral
+                        | TokenKind::DecimalIntegerLiteral
+                        | TokenKind::Identifier => {
                             let text = part.text();
                             if text.len() != 2 {
                                 self.error(
@@ -244,6 +296,8 @@ impl LoweringCtx {
                 .unwrap_or(ExprKind::Error),
             ast::Expr::PrefixExpr(prefix_expr) => self.lower_prefix_expr(prefix_expr),
             ast::Expr::InfixExpr(infix_expr) => self.lower_infix_expr(infix_expr),
+            ast::Expr::FieldAccess(field_access) => self.lower_field_access(field_access),
+            ast::Expr::PeekExpr(peek_expr) => self.lower_peek_expr(peek_expr),
         }
     }
 
@@ -285,6 +339,8 @@ impl LoweringCtx {
 
                 ExprKind::Lit(Lit::Bytes(bytes))
             }
+            TokenKind::TrueKw => ExprKind::Lit(Lit::Bool(true)),
+            TokenKind::FalseKw => ExprKind::Lit(Lit::Bool(false)),
             TokenKind::Identifier => ExprKind::VarUse(Spanned::<Symbol>::from(token)),
             _ => parser_unreachable!(),
         }
@@ -325,6 +381,11 @@ impl LoweringCtx {
             ">=" => BinOp::Geq,
             "<" => BinOp::Lt,
             "<=" => BinOp::Leq,
+            "&&" => BinOp::LogicalAnd,
+            "||" => BinOp::LogicalOr,
+            "&" => BinOp::BitAnd,
+            "|" => BinOp::BitOr,
+            "^" => BinOp::BitXor,
             _ => parser_unreachable!(),
         };
 
@@ -332,6 +393,34 @@ impl LoweringCtx {
             op,
             lhs: Box::new(self.lower_expr(lhs)),
             rhs: Box::new(self.lower_expr(rhs)),
+        }
+    }
+
+    /// Lowers the given AST field access expression to IR.
+    fn lower_field_access(&mut self, field_access: ast::FieldAccess) -> ExprKind {
+        let expr = field_access.expr().parser_expect();
+        let field = Spanned::<Symbol>::from(
+            required_field!(field_access => field ? self: "expected field name" => ExprKind::Error),
+        );
+
+        ExprKind::FieldAccess {
+            expr: Box::new(self.lower_expr(expr)),
+            field,
+        }
+    }
+
+    /// Lowers the given AST `peek` expression to IR.
+    fn lower_peek_expr(&mut self, peek_expr: ast::PeekExpr) -> ExprKind {
+        let offset = peek_expr
+            .offset()
+            .map(|expr| Box::new(self.lower_expr(expr)));
+
+        ExprKind::Peek {
+            ty: Box::new(self.lower_parse_type(
+                required_field!(peek_expr => parse_type ? self: "expected parse type" => ExprKind::Error),
+                &None,
+            )),
+            offset
         }
     }
 
@@ -349,6 +438,8 @@ impl LoweringCtx {
             ast::Declaration::ScopeAtDeclaration(scope_at) => {
                 self.lower_scope_at_declaration(scope_at)
             }
+            ast::Declaration::AssertDeclaration(assert) => self.lower_assert_declaration(assert),
+            ast::Declaration::WarnIfDeclaration(warn_if) => self.lower_warn_if_declaration(warn_if),
         }
     }
 
@@ -410,13 +501,51 @@ impl LoweringCtx {
         let start = self.lower_expr(
             required_field!(scope_at => start ? self: "expected scope start offset" => None),
         );
+        let end = scope_at.end().map(|expr| self.lower_expr(expr));
         let mut content = Vec::new();
 
         for single_content in scope_at.struct_content() {
             content.push(self.lower_struct_content(single_content));
         }
 
-        Some(Declaration::ScopeAt { start, content })
+        Some(Declaration::ScopeAt {
+            start,
+            end,
+            content,
+        })
+    }
+
+    /// Lowers the given AST `assert` declaration to IR.
+    fn lower_assert_declaration(&mut self, assert: ast::AssertDeclaration) -> Option<Declaration> {
+        Some(Declaration::Assert {
+            condition: self
+                .lower_expr(required_field!(assert => expr ? self: "expected assertion" => None)),
+            message: assert.message().map(|expr| self.lower_expr(expr)),
+        })
+    }
+
+    /// Lowers the given AST `warn if` declaration to IR.
+    fn lower_warn_if_declaration(
+        &mut self,
+        warn_if: ast::WarnIfDeclaration,
+    ) -> Option<Declaration> {
+        Some(Declaration::WarnIf {
+            condition: self
+                .lower_expr(required_field!(warn_if => expr ? self: "expected expression" => None)),
+            message: warn_if.message().map(|expr| self.lower_expr(expr)),
+        })
+    }
+
+    /// Lowers the given AST `let` statement to IR.
+    fn lower_let_statement(&mut self, let_statement: ast::LetStatement) -> Option<LetStatement> {
+        Some(LetStatement {
+            name: Spanned::<Symbol>::from(
+                required_field!(let_statement => name ? self: "expected name" => None),
+            ),
+            expr: self.lower_expr(
+                required_field!(let_statement => expr ? self: "expected expression" => None),
+            ),
+        })
     }
 }
 

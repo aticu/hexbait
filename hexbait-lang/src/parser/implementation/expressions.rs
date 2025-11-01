@@ -3,11 +3,13 @@
 use crate::{
     NodeKind,
     lexer::TokenKind,
-    parser::infrastructure::{CompletedMarker, Parser, TriviaBumper},
+    parser::infrastructure::{Completed, CompletedMarker, Parser},
 };
 
+use super::nested_parse_type;
+
 /// Parses an atomic expression.
-fn atom<'p, 'src>(p: &'p mut Parser<'src>) -> (CompletedMarker, TriviaBumper<'p, 'src>) {
+fn atom<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
     let m = p.start();
 
     let (node_kind, next) = match p.cur() {
@@ -17,17 +19,62 @@ fn atom<'p, 'src>(p: &'p mut Parser<'src>) -> (CompletedMarker, TriviaBumper<'p,
             | TokenKind::OctalIntegerLiteral
             | TokenKind::DecimalIntegerLiteral
             | TokenKind::HexadecimalIntegerLiteral
+            | TokenKind::TrueKw
+            | TokenKind::FalseKw
             | TokenKind::StringLiteral),
         ) => (NodeKind::Atom, kind),
+        Some(TokenKind::Dollar) => {
+            p.expect(TokenKind::Dollar);
+            (NodeKind::Metavar, TokenKind::Identifier)
+        }
+        Some(TokenKind::PeekKw) => {
+            p.expect(TokenKind::PeekKw);
+            p.expect(TokenKind::LParen);
+
+            nested_parse_type(p);
+
+            if p.at_contextual_kw("at") {
+                p.bump();
+                expr(p);
+            }
+
+            (NodeKind::PeekExpr, TokenKind::RParen)
+        }
+        Some(TokenKind::LAngle) => {
+            p.expect(TokenKind::LAngle);
+            loop {
+                match p.cur() {
+                    Some(TokenKind::RAngle) => break,
+                    Some(
+                        lit @ (TokenKind::StringLiteral
+                        | TokenKind::ByteLiteral // for things like 1a
+                        | TokenKind::DecimalIntegerLiteral // for things like 10
+                        | TokenKind::Identifier), // for things like a1
+                    ) => p.expect(lit),
+                    _ => {
+                        p.dbg();
+                        todo!("error")
+                    }
+                }
+            }
+            (NodeKind::ByteConcat, TokenKind::RAngle)
+        }
         Some(TokenKind::LParen) => {
             p.expect(TokenKind::LParen);
             expr(p);
             (NodeKind::ParenExpr, TokenKind::RParen)
         }
         _ => {
-            p.expect_error(vec!["ident", "literal", "`(`"]);
+            p.expect_error(vec![
+                "identifier",
+                "literal",
+                "`parse`",
+                "`$`",
+                "`<`",
+                "`(`",
+            ]);
             let completed = p.complete(m, NodeKind::Atom);
-            return (completed, p.trivia_bumper());
+            return p.completed_from_marker(completed);
         }
     };
 
@@ -35,39 +82,17 @@ fn atom<'p, 'src>(p: &'p mut Parser<'src>) -> (CompletedMarker, TriviaBumper<'p,
 }
 
 /// Parses an expression.
-pub(crate) fn expr<'p, 'src>(p: &'p mut Parser<'src>) -> TriviaBumper<'p, 'src> {
-    expr_bp(p, 0);
+pub(crate) fn expr<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
+    let completed_marker = expr_bp(p, 0);
 
     // ensure that trivia is properly bumped before continuing
-    p.trivia_bumper()
+    p.completed_from_marker(completed_marker)
 }
 
 /// Parses an expression using a Pratt parser with the given minimum binding power.
 fn expr_bp<'p, 'src>(p: &'p mut Parser<'src>, min_bp: u8) -> CompletedMarker {
-    let mut lhs = if matches!(p.peek().next(), Some((_, TokenKind::LAngle))) {
-        let m = p.start();
-
-        p.expect(TokenKind::LAngle);
-
-        loop {
-            match p.cur() {
-                Some(TokenKind::RAngle) => break,
-                Some(
-                    lit @ (TokenKind::StringLiteral
-                    | TokenKind::ByteLiteral
-                    | TokenKind::DecimalIntegerLiteral),
-                ) => p.expect(lit),
-                _ => todo!("error"),
-            }
-        }
-
-        let (lhs, trivia_bumper) = p.complete_after(m, NodeKind::ByteConcat, TokenKind::RAngle);
-
-        // we will handle trivia bumping manually
-        std::mem::forget(trivia_bumper);
-
-        lhs
-    } else if let Some(op) = PrefixOp::peek(p) {
+    // parse prefix and first atom
+    let mut lhs = if let Some(op) = PrefixOp::peek(p) {
         let m = p.start();
 
         let (_l_bp, r_bp) = op.binding_power();
@@ -77,14 +102,27 @@ fn expr_bp<'p, 'src>(p: &'p mut Parser<'src>, min_bp: u8) -> CompletedMarker {
 
         p.complete(m, NodeKind::PrefixExpr)
     } else {
-        let (lhs, trivia_bumper) = atom(p);
-
-        // we will handle trivia bumping manually
-        std::mem::forget(trivia_bumper);
-
-        lhs
+        atom(p).handle_trivia_manually()
     };
 
+    // postfix loop
+    loop {
+        let next_token = p.peek().map(|(_, kind)| kind).next();
+        match next_token {
+            Some(TokenKind::Dot) => {
+                let m = lhs.precede(p);
+
+                p.expect(TokenKind::Dot);
+
+                lhs = p
+                    .complete_after(m, NodeKind::FieldAccess, TokenKind::Identifier)
+                    .handle_trivia_manually();
+            }
+            _ => break,
+        };
+    }
+
+    // infix loop
     loop {
         let Some(op) = InfixOp::peek(p) else {
             // no infix operator upcoming -> no more expression to parse
@@ -150,7 +188,7 @@ impl PrefixOp {
     /// Returns the binding powers of this operator.
     fn binding_power(&self) -> ((), u8) {
         match self {
-            PrefixOp::Neg | PrefixOp::Plus | PrefixOp::Not => ((), 7),
+            PrefixOp::Neg | PrefixOp::Plus | PrefixOp::Not => ((), 17),
         }
     }
 }
@@ -178,6 +216,16 @@ enum InfixOp {
     Lt,
     /// `<=`
     Leq,
+    /// `&&`
+    LogicalAnd,
+    /// `||`
+    LogicalOr,
+    /// `&`
+    BitAnd,
+    /// `|`
+    BitOr,
+    /// `^`
+    BitXor,
 }
 
 impl InfixOp {
@@ -201,6 +249,16 @@ impl InfixOp {
             (Some((i1, TokenKind::LAngle)), Some((i2, TokenKind::Equals))) if i1 + 1 == i2 => {
                 Some(InfixOp::Leq)
             }
+            (Some((i1, TokenKind::Ampersand)), Some((i2, TokenKind::Ampersand)))
+                if i1 + 1 == i2 =>
+            {
+                Some(InfixOp::LogicalAnd)
+            }
+            (Some((i1, TokenKind::VerticalLine)), Some((i2, TokenKind::VerticalLine)))
+                if i1 + 1 == i2 =>
+            {
+                Some(InfixOp::LogicalOr)
+            }
 
             // single character operators
             (Some((_, TokenKind::Plus)), _) => Some(InfixOp::Add),
@@ -209,6 +267,9 @@ impl InfixOp {
             (Some((_, TokenKind::Slash)), _) => Some(InfixOp::Div),
             (Some((_, TokenKind::RAngle)), _) => Some(InfixOp::Gt),
             (Some((_, TokenKind::LAngle)), _) => Some(InfixOp::Lt),
+            (Some((_, TokenKind::Ampersand)), _) => Some(InfixOp::BitAnd),
+            (Some((_, TokenKind::VerticalLine)), _) => Some(InfixOp::BitOr),
+            (Some((_, TokenKind::Caret)), _) => Some(InfixOp::BitXor),
 
             _ => None,
         }
@@ -240,6 +301,17 @@ impl InfixOp {
                 p.expect(TokenKind::LAngle);
                 TokenKind::Equals
             }
+            InfixOp::LogicalAnd => {
+                p.expect(TokenKind::Ampersand);
+                TokenKind::Ampersand
+            }
+            InfixOp::LogicalOr => {
+                p.expect(TokenKind::VerticalLine);
+                TokenKind::VerticalLine
+            }
+            InfixOp::BitAnd => TokenKind::Ampersand,
+            InfixOp::BitOr => TokenKind::VerticalLine,
+            InfixOp::BitXor => TokenKind::Caret,
         };
 
         p.complete_after(m, NodeKind::Op, final_token);
@@ -248,14 +320,19 @@ impl InfixOp {
     /// Returns the binding powers of this operator.
     fn binding_power(&self) -> (u8, u8) {
         match self {
-            InfixOp::Add | InfixOp::Sub => (3, 4),
-            InfixOp::Mul | InfixOp::Div => (5, 6),
+            InfixOp::Add | InfixOp::Sub => (13, 14),
+            InfixOp::Mul | InfixOp::Div => (15, 16),
             InfixOp::Eq
             | InfixOp::Neq
             | InfixOp::Gt
             | InfixOp::Geq
             | InfixOp::Lt
-            | InfixOp::Leq => (1, 2),
+            | InfixOp::Leq => (5, 6),
+            InfixOp::LogicalOr => (1, 2),
+            InfixOp::LogicalAnd => (3, 4),
+            InfixOp::BitOr => (7, 8),
+            InfixOp::BitXor => (9, 10),
+            InfixOp::BitAnd => (11, 12),
         }
     }
 }

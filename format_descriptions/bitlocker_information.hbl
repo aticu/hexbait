@@ -1,0 +1,32 @@
+signature bytes = "-FVE-FS-";
+size u16;
+version u16;
+current_state u16;
+next_state u16;
+encrypted_volume_size u64;
+convert_size u32;
+num_of_backup_sectors u32;
+information_offsets [u64] len 3;
+boot_sector_backup u64;
+
+dataset {
+    size u32;
+    unknown1 u32;
+    header_size u32;
+    copy_size u32;
+    guid bytes len 16;
+    next_counter u32;
+    algorithm u16;
+    trash u16;
+    timestamp u64;
+};
+
+datums [{
+    size u16;
+    entry_type u16;
+    value_type u16;
+    error_status u16;
+    content switch value_type {
+        _ => bytes len size - 8,
+    };
+}] while $offset < dataset.size + 64;

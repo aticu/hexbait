@@ -1,5 +1,7 @@
 //! Implements slices as a data source.
 
+use hexbait_lang::View;
+
 use super::DataSource;
 
 impl DataSource for &[u8] {
@@ -32,5 +34,9 @@ impl DataSource for &[u8] {
         buf[..output_size].copy_from_slice(&self[offset_usize..offset_usize + output_size]);
 
         Ok(&buf[..output_size])
+    }
+
+    fn as_view<'this>(&'this self) -> Result<View<'this>, Self::Error> {
+        Ok(View::from(*self))
     }
 }

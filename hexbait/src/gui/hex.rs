@@ -1,6 +1,7 @@
 //! Renders hexdumps in the GUI.
 
 use egui::{Align, Color32, Layout, Rect, RichText, ScrollArea, Sense, Ui, UiBuilder, Vec2, vec2};
+use hexbait_lang::{View, ir::File};
 use highlighting::highlight;
 use selection::SelectionContext;
 
@@ -52,7 +53,7 @@ impl HexdumpView {
         source: &mut impl DataSource,
         endianness: &mut Endianness,
         start: u64,
-        (parse_type, parse_offset): (&str, &mut Option<u64>),
+        (parse_type, parse_offset): (Option<&File>, &mut Option<u64>),
         marked_locations: &mut MarkedLocations,
     ) {
         // start is in rows
@@ -221,85 +222,20 @@ impl HexdumpView {
                                     let Some(parse_offset) = current_parse_offset else {
                                         return;
                                     };
-                                    if parse_type == "none" {
-                                        return;
-                                    }
 
-                                    let mut context =
-                                        crate::parsing::eval::ParseContext::with_offset(
-                                            parse_offset.into(),
-                                        );
-                                    context.add_named_node(
-                                        "pe_file".into(),
-                                        crate::parsing::tmp_pe_file(),
-                                    );
-                                    context.add_named_node(
-                                        "ntfs_header".into(),
-                                        crate::parsing::tmp_ntfs_header(),
-                                    );
-                                    context.add_named_node(
-                                        "mft_entry".into(),
-                                        crate::parsing::tmp_mft_entry(),
-                                    );
-                                    context.add_named_node(
-                                        "mft_attr_stdinfo".into(),
-                                        crate::parsing::tmp_mft_standard_information(),
-                                    );
-                                    context.add_named_node(
-                                        "mft_attr_filename".into(),
-                                        crate::parsing::tmp_mft_file_name(),
-                                    );
-                                    context.add_named_node(
-                                        "mft_index_node_header".into(),
-                                        crate::parsing::tmp_mft_index_node_header(),
-                                    );
-                                    context.add_named_node(
-                                        "mft_index_root".into(),
-                                        crate::parsing::tmp_mft_index_root(),
-                                    );
-                                    context.add_named_node(
-                                        "mft_index_entry".into(),
-                                        crate::parsing::tmp_mft_index_entry(),
-                                    );
-                                    context.add_named_node(
-                                        "bitlocker_header".into(),
-                                        crate::parsing::tmp_bitlocker_header(),
-                                    );
-                                    context.add_named_node(
-                                        "bitlocker_information".into(),
-                                        crate::parsing::tmp_bitlocker_information(),
-                                    );
-                                    context.add_named_node(
-                                        "vhdx_region_table".into(),
-                                        crate::parsing::tmp_vhdx_region_table(),
-                                    );
-                                    context.add_named_node(
-                                        "vhdx_metadata_table".into(),
-                                        crate::parsing::tmp_vhdx_metadata_table(),
-                                    );
-                                    context.add_named_node(
-                                        "vmdk_header".into(),
-                                        crate::parsing::tmp_vmdk_header(),
-                                    );
-                                    let value = match context.parse(
-                                        &crate::parsing::language::ast::Node {
-                                            kind:
-                                                crate::parsing::language::ast::NodeKind::NamedNode {
-                                                    name: parse_type.into(),
-                                                },
-                                            offset: None,
-                                        },
-                                        source,
-                                    ) {
-                                        Ok(value) => value,
-                                        Err(err) => {
-                                            eprintln!("failed parsing: {err}");
-                                            return;
-                                        }
+                                    let Some(parse_type) = parse_type else { return };
+                                    let Ok(view) = source.as_view() else {
+                                        eprintln!("TODO: implement better error handling");
+                                        return;
                                     };
+                                    let view = View::Subview {
+                                        view: &view,
+                                        valid_range: parse_offset..view.len(),
+                                    };
+                                    let value = hexbait_lang::eval_ir(&parse_type, view, 0);
                                     let hovered = parse_result::show_value(
                                         ui,
-                                        crate::parsing::eval::Path::new(),
+                                        hexbait_lang::ir::path::Path::new(),
                                         None,
                                         &value,
                                         settings,

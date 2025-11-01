@@ -1,0 +1,11 @@
+signature bytes = "regi";
+checksum u32;
+number_of_entries u32;
+reserved u32;
+
+entries [{
+    region_type_identifier bytes len 16;
+    region_data_offset u64;
+    region_data_size u32;
+    is_required_flag u32;
+}] len number_of_entries;

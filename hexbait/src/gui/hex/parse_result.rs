@@ -1,12 +1,14 @@
 //! Implements display logic for parsing results.
 
-use crate::{
-    gui::settings::Settings,
-    parsing::{
-        eval::{Path, PathComponent, Value, ValueKind},
-        language::ast::Symbol,
+use hexbait_lang::{
+    Value, ValueKind,
+    ir::{
+        Symbol,
+        path::{Path, PathComponent},
     },
 };
+
+use crate::gui::settings::Settings;
 
 /// Displays the given [`Value`] in the GUI.
 ///
@@ -113,6 +115,7 @@ pub fn show_value(
                 this_hovered |= hovered;
             });
         }
+        ValueKind::Err => todo!(),
     }
 
     if child_hovered.is_some() {

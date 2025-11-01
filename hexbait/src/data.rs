@@ -6,6 +6,7 @@ mod slice;
 
 use std::fmt;
 
+use hexbait_lang::View;
 pub use input::Input;
 
 /// A data source for hexamine to work with.
@@ -27,4 +28,7 @@ pub trait DataSource {
         offset: u64,
         buf: &'buf mut [u8],
     ) -> Result<&'buf [u8], Self::Error>;
+
+    /// Returns the data source as a parsing view.
+    fn as_view<'this>(&'this self) -> Result<View<'this>, Self::Error>;
 }

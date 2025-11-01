@@ -1,6 +1,6 @@
 //! Implements paths to subvalues.
 
-use crate::parsing::language::ast::Symbol;
+use super::Symbol;
 
 /// A path to a value.
 #[derive(Debug, Clone)]

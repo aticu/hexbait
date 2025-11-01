@@ -1,8 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::{io::Read, path::PathBuf};
+use std::{collections::BTreeMap, io::Read, path::PathBuf};
 
+use clap::Parser;
 use hexbait::{
+    built_in_format_descriptions::built_in_format_descriptions,
     data::{DataSource as _, Input},
     gui::{
         hex::HexdumpView,
@@ -16,32 +18,30 @@ use hexbait::{
     statistics::{Statistics, StatisticsHandler},
 };
 
+/// hexbait - Hierarchical EXploration Binary Analysis & Inspection Tool
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Config {
+    /// The file to analyze
+    file: Option<PathBuf>,
+    /// A parser definition file to supply additional parsers
+    #[arg(short, long)]
+    parser_definition: Option<PathBuf>,
+}
+
 fn main() -> eframe::Result {
-    let input = if let Some(arg) = std::env::args().nth(1) {
+    let config = Config::parse();
+
+    let input = if let Some(file) = &config.file {
         Input::File {
-            path: PathBuf::from(&arg),
-            file: std::fs::File::open(arg).unwrap(),
+            path: PathBuf::from(&file),
+            file: std::fs::File::open(file).unwrap(),
         }
     } else {
         let mut buf = Vec::new();
         std::io::stdin().read_to_end(&mut buf).unwrap();
         Input::Stdin(buf.into())
     };
-
-    let parse = hexbait_lang::parse(include_str!("../../format_descriptions/pe.hbl"));
-    //dbg!(&parse.ast);
-    let ir = hexbait_lang::ir::lower_file(parse.ast);
-    let view = match &input {
-        Input::File { file, .. } => hexbait_lang::View::File(file),
-        Input::Stdin(bytes) => hexbait_lang::View::Bytes(&*bytes),
-    };
-    let out = hexbait_lang::eval_ir(&ir, view);
-    //dbg!(&ir);
-    dbg!(out);
-    dbg!(hexbait::parsing::tmp_pe_file());
-
-    let statistics_cache_input = input.clone().unwrap();
-    let searcher = Searcher::new(&input);
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_maximized(true),
@@ -54,19 +54,21 @@ fn main() -> eframe::Result {
             Ok(Box::new(MyApp {
                 frame_time: std::time::Duration::ZERO,
                 settings: Settings::new(),
+                searcher: Searcher::new(&input),
+                statistics_handler: StatisticsHandler::new(input.clone().unwrap()),
                 input,
                 hexdump_context: HexdumpView::new(),
                 endianness: Endianness::native(),
                 zoombars: Zoombars::new(),
                 signature_display: SignatureDisplay::new(),
                 xor_value: 0,
-                statistics_handler: StatisticsHandler::new(statistics_cache_input),
-                searcher,
                 search_text: String::new(),
                 parse_type: "none",
                 parse_offset: String::from("0"),
                 sync_parse_offset_to_selection_start: true,
                 marked_locations: MarkedLocations::new(),
+                built_in_format_descriptions: built_in_format_descriptions(),
+                custom_parser: config.parser_definition,
             }))
         }),
     )
@@ -75,19 +77,21 @@ fn main() -> eframe::Result {
 struct MyApp {
     frame_time: std::time::Duration,
     settings: Settings,
+    searcher: Searcher,
+    statistics_handler: StatisticsHandler,
     input: Input,
     hexdump_context: HexdumpView,
     endianness: Endianness,
     zoombars: Zoombars,
     signature_display: SignatureDisplay,
     xor_value: u8,
-    statistics_handler: StatisticsHandler,
-    searcher: Searcher,
     search_text: String,
     parse_type: &'static str,
     parse_offset: String,
     sync_parse_offset_to_selection_start: bool,
     marked_locations: MarkedLocations,
+    built_in_format_descriptions: BTreeMap<&'static str, hexbait_lang::ir::File>,
+    custom_parser: Option<PathBuf>,
 }
 
 impl eframe::App for MyApp {
@@ -114,35 +118,16 @@ impl eframe::App for MyApp {
                     .selected_text(self.parse_type)
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut self.parse_type, "none", "none");
-                        ui.selectable_value(&mut self.parse_type, "pe_file", "pe_file");
-                        ui.selectable_value(&mut self.parse_type, "ntfs_header", "ntfs_header");
-                        ui.selectable_value(&mut self.parse_type, "mft_entry", "mft_entry");
-                        ui.selectable_value(
-                            &mut self.parse_type,
-                            "mft_index_entry",
-                            "mft_index_entry",
-                        );
-                        ui.selectable_value(
-                            &mut self.parse_type,
-                            "bitlocker_header",
-                            "bitlocker_header",
-                        );
-                        ui.selectable_value(
-                            &mut self.parse_type,
-                            "bitlocker_information",
-                            "bitlocker_information",
-                        );
-                        ui.selectable_value(
-                            &mut self.parse_type,
-                            "vhdx_region_table",
-                            "vhdx_region_table",
-                        );
-                        ui.selectable_value(
-                            &mut self.parse_type,
-                            "vhdx_metadata_table",
-                            "vhdx_metadata_table",
-                        );
-                        ui.selectable_value(&mut self.parse_type, "vmdk_header", "vmdk_header");
+                        if self.custom_parser.is_some() {
+                            ui.selectable_value(
+                                &mut self.parse_type,
+                                "custom parser",
+                                "custom parser",
+                            );
+                        }
+                        for description in self.built_in_format_descriptions.keys() {
+                            ui.selectable_value(&mut self.parse_type, description, *description);
+                        }
                     });
 
                 ui.label("Parse offset:");
@@ -164,6 +149,7 @@ impl eframe::App for MyApp {
             // TODO: implement to-disk caching for some sizes to increase re-load times
             // TODO: fix up main file
             // TODO: use "inner" and "outer" color for displaying marked locations
+            // TODO: remove data source and use concrete types instead
 
             let mut parse_offset = self.parse_offset.parse().ok();
 
@@ -175,13 +161,38 @@ impl eframe::App for MyApp {
                 &mut self.marked_locations,
                 &self.statistics_handler,
                 |ui, source, start, marked_locations| {
+                    let ir;
+
+                    let parse_type = if self.parse_type == "custom parser" {
+                        'parse_type: {
+                            let Ok(content) = std::fs::read_to_string(
+                                self.custom_parser
+                                    .as_ref()
+                                    .expect("if a custom parser is selected it should also exist"),
+                            ) else {
+                                break 'parse_type None;
+                            };
+
+                            let parse = hexbait_lang::parse(&content);
+                            if !parse.errors.is_empty() {
+                                break 'parse_type None;
+                            }
+
+                            ir = hexbait_lang::ir::lower_file(parse.ast);
+
+                            Some(&ir)
+                        }
+                    } else {
+                        self.built_in_format_descriptions.get(self.parse_type)
+                    };
+
                     self.hexdump_context.render(
                         ui,
                         &self.settings,
                         source,
                         &mut self.endianness,
                         start,
-                        (self.parse_type, &mut parse_offset),
+                        (parse_type, &mut parse_offset),
                         marked_locations,
                     );
                 },

@@ -1,34 +1,40 @@
 !endian le;
 
-mz_magic bytes = "MZ";
-!seek to 60;
-new_exe_header u32;
+mz_header {
+    magic bytes = "MZ";
+    !seek to 60;
+    new_exe_header u32;
+};
 
-!seek to new_exe_header;
-// The "new" exe header
-pe_magic bytes = <"PE" 00 00>;
-machine u16;
-num_of_sections u16;
-time_date_stamp u32;
-pointer_to_symbol_table u32;
-num_of_symbols u32;
-size_of_optional_header u16;
-characteristics u16;
+!seek to mz_header.new_exe_header;
 
-// The "optional" header
-optional_magic bytes = <0b 01>;
-major_linker_version u8;
-minor_linker_version u8;
-size_of_code u32;
-size_of_initialized_data u32;
-size_of_uninitialized_data u32;
-addr_of_entry_point u32;
-base_of_code u32;
-base_of_data u32;
+pe_header {
+    magic bytes = <"PE" 00 00>;
+    machine u16;
+    num_of_sections u16;
+    time_date_stamp u32;
+    pointer_to_symbol_table u32;
+    num_of_symbols u32;
+    size_of_optional_header u16;
+    characteristics u16;
+};
 
-!seek to size_of_optional_header + 24 + new_exe_header;
+optional_header {
+    magic bytes = <0b 01>;
+    major_linker_version u8;
+    minor_linker_version u8;
+    size_of_code u32;
+    size_of_initialized_data u32;
+    size_of_uninitialized_data u32;
+    addr_of_entry_point u32;
+    base_of_code u32;
+    base_of_data u32;
+};
 
-sections [struct {
+let size_of_pe_header = 24;
+!seek to mz_header.new_exe_header + pe_header.size_of_optional_header + size_of_pe_header;
+
+sections [{
     section_name bytes len 8;
     virtual_size u32;
     virtual_address u32;
@@ -42,4 +48,4 @@ sections [struct {
     !scope at pointer_to_raw_data {
         content bytes len size_of_raw_data;
     }
-}] len num_of_sections;
+}] len pe_header.num_of_sections;

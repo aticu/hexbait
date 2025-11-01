@@ -2,15 +2,18 @@
 
 use std::fmt;
 
-use crate::{Int, ir::Symbol};
-
-use super::{
-    path::{Path, PathComponent},
-    provenance::Provenance,
+use crate::{
+    Int,
+    ir::{
+        Lit, Symbol,
+        path::{Path, PathComponent},
+    },
 };
 
+use super::provenance::Provenance;
+
 /// Represents a parsed value.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Value {
     /// The kind of the value.
     pub kind: ValueKind,
@@ -21,6 +24,17 @@ pub struct Value {
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind
+    }
+}
+
+impl fmt::Debug for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:#?} from {:?}",
+            self.kind,
+            Vec::from_iter(self.provenance.byte_ranges())
+        )
     }
 }
 
@@ -181,5 +195,33 @@ impl Value {
         }
 
         Some(current_value)
+    }
+}
+
+impl PartialEq<Lit> for ValueKind {
+    fn eq(&self, other: &Lit) -> bool {
+        match other {
+            Lit::Int(other) => {
+                if let ValueKind::Integer(this) = self {
+                    this == other
+                } else {
+                    false
+                }
+            }
+            Lit::Bytes(other) => {
+                if let ValueKind::Bytes(this) = self {
+                    this == other
+                } else {
+                    false
+                }
+            }
+            Lit::Bool(other) => {
+                if let ValueKind::Boolean(this) = self {
+                    this == other
+                } else {
+                    false
+                }
+            }
+        }
     }
 }

@@ -1,12 +1,110 @@
 !endian le;
-!align 4;
 
-// --- fixed header (safe to read before fixup) ---
-signature     u32 = 0x454C4946;
-usa_offset    u16;
-usa_count     u16;
-lsn           u64;
-seq_no        u16;
-hardlinks     u16;
-attrs_offset  u16;
-entry_flags   u16;
+header {
+    magic bytes = "FILE";
+    fixup_value_offset u16;
+    num_fixup_values u16;
+    log_sequence_number u64;
+    sequence_number u16;
+    reference_count u16;
+    first_attribute u16;
+    entry_flags u16;
+    used_entry_size u32;
+    total_entry_size u32;
+    file_reference u64;
+    first_attribute_identifier u16;
+
+    !seek to 44;
+    entry_index u32;
+};
+
+!assert header.first_attribute_identifier < header.used_entry_size;
+!assert header.used_entry_size <= header.total_entry_size;
+!assert header.num_fixup_values == (header.total_entry_size / 512) + 1;
+
+let fixup_value = peek(bytes len 2 at header.fixup_value_offset);
+let fixup_values = peek([bytes len 2] len header.num_fixup_values - 1 at header.fixup_value_offset + 2);
+
+!seek to header.first_attribute;
+attributes [{
+    !scope at $offset until $offset + peek(u32 at $offset + 4) {
+        type u32;
+        size u32;
+        nonresident u8;
+        name_size u8;
+        name_offset u16;
+        let name = peek(bytes len name_size * 2 at name_offset);
+        attribute_data_flags u16;
+        attribute_identifier u16;
+
+        content switch nonresident {
+            0 => {
+                data_size u32;
+                data_offset u16;
+                indexed_flag u8;
+                padding bytes = <00>;
+
+                !scope at data_offset until data_offset + data_size {
+                    content switch $parent.type {
+                        0x10 => {
+                            creation_time u64;
+                            modification_time u64;
+                            changed_time u64;
+                            access_time u64;
+                            file_attribute_flags u32;
+                            maximum_number_of_versions u32;
+                            version_number u32;
+                            class_identifier u32;
+                            owner_identifier u32;
+                            security_descriptor_identifier u32;
+                            quota_charged u64;
+                            update_sequence_number u64;
+                        },
+                        0x30 => {
+                            parent_file_reference u64;
+                            creation_time u64;
+                            modification_time u64;
+                            changed_time u64;
+                            access_time u64;
+                            allocated_file_size u64;
+                            file_size u64;
+                            file_attribute_flags u32;
+                            extended_data u32;
+                            name_string_size u8;
+                            namespace u8;
+                            name bytes len name_string_size * 2;
+                        },
+                        0x90 => {
+                            attribute_type u32;
+                            collation_type u32;
+                            index_entry_size u32;
+                            index_entry_number_of_cluster_blocks u32;
+                            index_node_header {
+                                index_values_offset u32;
+                                index_node_size u32;
+                                allocated_index_node_size u32;
+                                index_node_flags u32;
+                            };
+                            // TODO: parse values here
+                        },
+                        _ => bytes len data_size,
+                    };
+                }
+            },
+            _ => {
+                first_virtual_cluster_number u64;
+                last_virtual_cluster_number u64;
+                data_runs_offset u16;
+                compression_unit_size u16;
+                padding bytes = <00 00 00 00>;
+                allocated_data_size u64;
+                data_size u64;
+                valid_data_size u64;
+                total_allocated_size u64;
+                content bytes len $parent.size - 72;
+            },
+        };
+    }
+    !seek by size;
+    !align 8;
+}] while peek(bytes len 4) != <ff ff ff ff>;

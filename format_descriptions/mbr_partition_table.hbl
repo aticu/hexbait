@@ -1,0 +1,14 @@
+!endian le;
+
+disk_signature u32;
+
+!seek by 2;
+
+partition_records [{
+    boot_indicator u8;
+    starting_chs u24;
+    os_type u8;
+    ending_chs u24;
+    starting_lba u32;
+    size_in_lba u32;
+}] len 4;

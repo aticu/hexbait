@@ -8,6 +8,7 @@ StructContent =
   Declaration
 | StructField
 | Struct
+| LetStatement
 
 Declaration =
   EndiannessDeclaration
@@ -15,6 +16,8 @@ Declaration =
 | SeekByDeclaration
 | SeekToDeclaration
 | ScopeAtDeclaration
+| AssertDeclaration
+| WarnIfDeclaration
 
 EndiannessDeclaration =
   '!' 'endian' kind:'ident' ';'
@@ -29,7 +32,13 @@ SeekToDeclaration =
   '!' 'seek' 'to' amount:Expr ';'
 
 ScopeAtDeclaration =
-  '!' 'scope' 'at' start:Expr '{' StructContent* '}'
+  '!' 'scope' 'at' start:Expr ('until' end:Expr)? '{' StructContent* '}'
+
+AssertDeclaration =
+  '!' 'assert' Expr (':' message:Expr)? ';'
+
+WarnIfDeclaration =
+  '!' 'warn' 'if' Expr (':' message:Expr)? ';'
 
 StructField =
   name:'ident' ParseType ( '=' expected:Expr )?
@@ -39,6 +48,7 @@ ParseType =
 | BytesParseType
 | RepeatParseType
 | AnonymousStructParseType
+| SwitchParseType
 
 NamedParseType =
   name:'ident'
@@ -50,7 +60,13 @@ RepeatParseType =
   '[' ty:ParseType ']' repetition:RepeatDecl
 
 AnonymousStructParseType =
-  'struct' '{' StructContent* '}'
+  '{' StructContent* '}'
+
+SwitchParseType =
+  'switch' scrutinee:Expr '{' SwitchParseTypeArm* '_' '=' '>' default:ParseType ','? '}'
+
+SwitchParseTypeArm =
+  val:Expr '=' '>' ParseType ','
 
 RepeatDecl =
   RepeatLenDecl
@@ -65,12 +81,18 @@ RepeatWhileDecl =
 Struct =
   'struct' name:'ident' '{' StructContent* '}'
 
+LetStatement =
+  'let' name:'ident' '=' Expr ';'
+
 Expr =
   Atom
+| Metavar
 | ByteConcat
 | ParenExpr
 | PrefixExpr
 | InfixExpr
+| FieldAccess
+| PeekExpr
 
 Atom =
   'bin_lit'
@@ -78,7 +100,12 @@ Atom =
 | 'dec_lit'
 | 'hex_lit'
 | 'str_lit'
+| 'true'
+| 'false'
 | 'ident'
+
+Metavar =
+  '$' name:'ident'
 
 ByteConcat =
   '<' ( 'byte_lit' | 'dec_lit' | 'str_lit' )* '>'
@@ -92,6 +119,12 @@ PrefixExpr =
 InfixExpr =
   lhs:Expr Op rhs:Expr
 
+FieldAccess =
+  Expr '.' field:'ident'
+
+PeekExpr =
+  'peek' '(' ParseType ('at' offset:Expr)? ')'
+
 Op =
   '+'
 | '-'
@@ -103,3 +136,8 @@ Op =
 | '>='
 | '<'
 | '<='
+| '&&'
+| '||'
+| '&'
+| '|'
+| '^'
