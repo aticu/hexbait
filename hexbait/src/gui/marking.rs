@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use egui::{Color32, Rect, Stroke, Ui, pos2};
 
-use crate::window::Window;
+use crate::{gui::hex::highlighting::trace_path, window::Window};
 
 use super::{color, zoombars::offset_on_bar};
 
@@ -92,11 +92,20 @@ impl MarkedLocation {
         self.kind
     }
 
-    /// The color of this marked location.
-    pub fn color(&self) -> Color32 {
+    /// The inner color of this marked location.
+    pub fn inner_color(&self) -> Color32 {
         match self.kind() {
             MarkingKind::Selection => Color32::WHITE,
             MarkingKind::HoveredParsed => Color32::DARK_RED,
+            MarkingKind::SearchResult => Color32::from_rgb(252, 15, 192),
+        }
+    }
+
+    /// The border color of this marked location.
+    pub fn border_color(&self) -> Color32 {
+        match self.kind() {
+            MarkingKind::Selection => Color32::WHITE,
+            MarkingKind::HoveredParsed => Color32::GOLD,
             MarkingKind::SearchResult => Color32::from_rgb(252, 15, 192),
         }
     }
@@ -186,16 +195,32 @@ pub fn render_locations_on_bar(
         );
         let bottom_rect = Rect::from_min_max(
             pos2(bar_rect.min.x, draw_range.end.y - 1.0),
-            pos2(end_x + (bar_rect.width() / 16.0), draw_range.end.y),
+            pos2(end_x, draw_range.end.y),
         );
 
         for rect in [top_rect, middle_rect, bottom_rect] {
             ui.painter().rect_filled(
                 rect,
                 0.0,
-                color::lerp(location.color(), Color32::TRANSPARENT, TRANSPARENCY),
+                color::lerp(location.inner_color(), Color32::TRANSPARENT, TRANSPARENCY),
             );
         }
+
+        let mut points = Vec::new();
+        points.push(top_rect.left_top());
+        points.push(top_rect.right_top());
+        points.push(middle_rect.right_bottom());
+        if bottom_rect.width() > 0.0 {
+            points.push(bottom_rect.right_top());
+            points.push(bottom_rect.right_bottom());
+            points.push(bottom_rect.left_bottom());
+        } else {
+            points.push(middle_rect.left_bottom());
+        }
+        points.push(middle_rect.left_top());
+        points.push(top_rect.left_bottom());
+
+        trace_path(ui.painter(), &points, 1.0, 0.0, location.border_color());
     }
 
     for (y, mut locations) in location_dots_by_y_bins {
@@ -215,13 +240,11 @@ pub fn render_locations_on_bar(
                 bar_rect.width() / 16.0
             };
 
-            let color = location.color();
-
             ui.painter().circle(
                 center,
                 radius,
-                color::lerp(color, Color32::TRANSPARENT, TRANSPARENCY),
-                Stroke::new(radius / 4.0, color),
+                color::lerp(location.inner_color(), Color32::TRANSPARENT, TRANSPARENCY),
+                Stroke::new(radius / 4.0, location.border_color()),
             );
 
             let hovered = ui

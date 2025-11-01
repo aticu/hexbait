@@ -3,7 +3,7 @@
 use std::ops::RangeInclusive;
 
 use egui::{
-    Color32, Pos2, Rect, Shape, Stroke, StrokeKind, Ui,
+    Color32, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, Ui,
     epaint::{ColorMode, PathStroke, QuadraticBezierShape},
     pos2,
 };
@@ -14,16 +14,16 @@ use crate::gui::{color, settings::Settings};
 pub(crate) fn highlight(
     ui: &mut Ui,
     mut range: RangeInclusive<u64>,
-    color: Color32,
+    inner_color: Color32,
+    border_color: Color32,
     file_size: u64,
     screen_start_offset_in_rows: u64,
     rows_onscreen: u64,
     settings: &Settings,
 ) {
-    let foreground = color;
-    let background = color::lerp(
-        foreground,
-        Color32::from_rgba_unmultiplied(foreground.r(), foreground.g(), foreground.b(), 0),
+    let inner_color = color::lerp(
+        inner_color,
+        Color32::from_rgba_unmultiplied(inner_color.r(), inner_color.g(), inner_color.b(), 0),
         0.85,
     );
 
@@ -163,37 +163,13 @@ pub(crate) fn highlight(
 
     let painter = ui.painter();
     for rect in rects {
-        painter.rect_filled(rect, 0.0, background);
+        painter.rect_filled(rect, 0.0, inner_color);
     }
 
     let corner_radius = settings.corner_radius();
     let stroke_width = settings.stroke_width();
     let trace_path = |points: Vec<Pos2>| {
-        for (idx, &point) in points.iter().enumerate() {
-            let next_point = points[(idx + 1) % points.len()];
-            let second_next_point = points[(idx + 2) % points.len()];
-
-            let towards_next = (next_point - point).normalized() * corner_radius;
-            let near_point = point + towards_next;
-            let before_next_point = next_point - towards_next;
-            let after_next_point =
-                next_point + (second_next_point - next_point).normalized() * corner_radius;
-
-            painter.add(Shape::LineSegment {
-                points: [near_point, before_next_point],
-                stroke: Stroke::new(stroke_width, foreground),
-            });
-            painter.add(QuadraticBezierShape {
-                points: [before_next_point, next_point, after_next_point],
-                closed: false,
-                fill: Color32::TRANSPARENT,
-                stroke: PathStroke {
-                    width: stroke_width,
-                    color: ColorMode::Solid(foreground),
-                    kind: StrokeKind::Middle,
-                },
-            });
-        }
+        trace_path(painter, &points, stroke_width, corner_radius, border_color);
     };
 
     trace_path(points_hex);
@@ -201,5 +177,40 @@ pub(crate) fn highlight(
     if !points2_hex.is_empty() {
         trace_path(points2_hex);
         trace_path(points2_glyph);
+    }
+}
+
+/// Traces the given points as a path.
+pub fn trace_path(
+    painter: &Painter,
+    points: &[Pos2],
+    stroke_width: f32,
+    corner_radius: f32,
+    color: Color32,
+) {
+    for (idx, &point) in points.iter().enumerate() {
+        let next_point = points[(idx + 1) % points.len()];
+        let second_next_point = points[(idx + 2) % points.len()];
+
+        let towards_next = (next_point - point).normalized() * corner_radius;
+        let near_point = point + towards_next;
+        let before_next_point = next_point - towards_next;
+        let after_next_point =
+            next_point + (second_next_point - next_point).normalized() * corner_radius;
+
+        painter.add(Shape::LineSegment {
+            points: [near_point, before_next_point],
+            stroke: Stroke::new(stroke_width, color),
+        });
+        painter.add(QuadraticBezierShape {
+            points: [before_next_point, next_point, after_next_point],
+            closed: false,
+            fill: Color32::TRANSPARENT,
+            stroke: PathStroke {
+                width: stroke_width,
+                color: ColorMode::Solid(color),
+                kind: StrokeKind::Middle,
+            },
+        });
     }
 }

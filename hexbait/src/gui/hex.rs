@@ -7,7 +7,7 @@ use selection::SelectionContext;
 
 use crate::{data::DataSource, gui::color, model::Endianness, window::Window};
 
-mod highlighting;
+pub mod highlighting;
 mod inspector;
 mod parse_result;
 mod primitives;
@@ -143,7 +143,8 @@ impl HexdumpView {
                             highlight(
                                 ui,
                                 range,
-                                location.color(),
+                                location.inner_color(),
+                                location.border_color(),
                                 file_size,
                                 start + self.scroll_offset,
                                 rows_onscreen,
@@ -407,7 +408,8 @@ impl HexdumpView {
         let response = ui.allocate_rect(rect, Sense::click_and_drag());
 
         if let Some(pos) = response.interact_pointer_pos() {
-            self.scroll_offset = (pos.y.round() as u64).saturating_sub(rows_onscreen / 2);
+            self.scroll_offset =
+                ((pos.y - rect.min.y).round() as u64).saturating_sub(rows_onscreen / 2);
 
             if self.scroll_offset > max_scroll {
                 self.scroll_offset = max_scroll;

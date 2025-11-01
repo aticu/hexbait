@@ -146,9 +146,10 @@ impl eframe::App for MyApp {
             let file_size = self.input.len().unwrap();
             // TODO: change font to render more characters
             // TODO: change default font-size and refactor around that
-            // TODO: implement to-disk caching for some sizes to increase re-load times
+            // TODO: implement to-disk caching for some sizes to decrease re-load times
             // TODO: fix up main file
-            // TODO: use "inner" and "outer" color for displaying marked locations
+            // TODO: use outer color for displays in zoombars
+            // TODO: join polygons of adjoining marked locations
             // TODO: remove data source and use concrete types instead
 
             let mut parse_offset = self.parse_offset.parse().ok();
