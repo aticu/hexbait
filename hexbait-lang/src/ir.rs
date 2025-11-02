@@ -9,6 +9,7 @@ use crate::{SyntaxToken, span::Span};
 pub use analysis::check_ir;
 pub use expr::*;
 pub use lowering::lower_file;
+pub use str::str_lit_content_to_bytes;
 
 mod analysis;
 mod expr;

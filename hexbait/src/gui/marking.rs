@@ -97,7 +97,7 @@ impl MarkedLocation {
         match self.kind() {
             MarkingKind::Selection => Color32::WHITE,
             MarkingKind::HoveredParsed => Color32::DARK_RED,
-            MarkingKind::SearchResult => Color32::from_rgb(252, 15, 192),
+            MarkingKind::SearchResult => Color32::BLUE,
         }
     }
 
@@ -138,7 +138,7 @@ pub fn render_locations_on_bar(
     const BIN_SIZE: u32 = 5;
 
     /// The transparency used for the locations on the bar.
-    const TRANSPARENCY: f64 = 0.7;
+    const TRANSPARENCY: f64 = 0.8;
 
     let bar_start = offset_on_bar(bar_rect, bar_window, bar_window.start()).unwrap();
     let bar_end = offset_on_bar(bar_rect, bar_window, bar_window.end() - 1).unwrap();

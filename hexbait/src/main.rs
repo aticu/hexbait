@@ -63,6 +63,8 @@ fn main() -> eframe::Result {
                 signature_display: SignatureDisplay::new(),
                 xor_value: 0,
                 search_text: String::new(),
+                search_ascii_case_insensitive: false,
+                search_utf16: false,
                 parse_type: "none",
                 parse_offset: String::from("0"),
                 sync_parse_offset_to_selection_start: true,
@@ -86,6 +88,8 @@ struct MyApp {
     signature_display: SignatureDisplay,
     xor_value: u8,
     search_text: String,
+    search_ascii_case_insensitive: bool,
+    search_utf16: bool,
     parse_type: &'static str,
     parse_offset: String,
     sync_parse_offset_to_selection_start: bool,
@@ -228,11 +232,50 @@ impl eframe::App for MyApp {
                             self.searcher.progress() * 100.0,
                             self.searcher.results().len()
                         ));
-                        ui.text_edit_singleline(&mut self.search_text);
-                        if ui.button("start search").clicked() {
-                            self.searcher
-                                .start_new_search(self.search_text.as_bytes(), false);
-                        }
+
+                        ui.horizontal(|ui| {
+                            ui.text_edit_singleline(&mut self.search_text);
+                            let mut search_bytes = Vec::new();
+                            // TODO: implement more convenient escaping here
+                            let valid = match hexbait_lang::ir::str_lit_content_to_bytes(
+                                &self.search_text,
+                                &mut search_bytes,
+                            ) {
+                                Ok(()) => true,
+                                Err((msg, _)) => {
+                                    ui.label(
+                                        egui::RichText::new("⚠").color(ui.visuals().warn_fg_color),
+                                    )
+                                    .on_hover_ui(|ui| {
+                                        ui.label(format!("invalid string literal: {msg}"));
+                                    });
+                                    false
+                                }
+                            };
+                            let valid_utf8 = std::str::from_utf8(&search_bytes).is_ok();
+
+                            ui.checkbox(
+                                &mut self.search_ascii_case_insensitive,
+                                "ASCII case insensitive",
+                            );
+                            ui.add_enabled(
+                                valid_utf8,
+                                egui::Checkbox::new(&mut self.search_utf16, "include UTF-16"),
+                            );
+                            if ui
+                                .add_enabled(
+                                    valid && !search_bytes.is_empty(),
+                                    egui::Button::new("start search"),
+                                )
+                                .clicked()
+                            {
+                                self.searcher.start_new_search(
+                                    &search_bytes,
+                                    self.search_ascii_case_insensitive,
+                                    self.search_utf16 && valid_utf8,
+                                );
+                            }
+                        });
                     });
                 },
             );

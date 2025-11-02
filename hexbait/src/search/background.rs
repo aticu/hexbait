@@ -29,7 +29,7 @@ pub(crate) struct BackgroundSearcherStartResult {
 /// The search request that the background thread receives.
 pub(crate) struct SearchRequest {
     /// The content to search for.
-    pub(crate) content: Vec<u8>,
+    pub(crate) content: Vec<Vec<u8>>,
     /// Whether to search case insensitively.
     pub(crate) ascii_case_insensitive: bool,
 }
@@ -102,12 +102,9 @@ impl BackgroundSearcher {
                 self.searcher = Some(
                     AhoCorasick::builder()
                         .ascii_case_insensitive(request.ascii_case_insensitive)
-                        .build(&[&request.content])
+                        .build(&request.content)
                         .unwrap(),
                 );
-                // TODO: implement hex escaping here
-                // TODO: put case flag into ui
-                // TODO: add utf16 handling
 
                 self.overlap_size = request.content.len().saturating_sub(1);
 

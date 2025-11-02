@@ -1,15 +1,17 @@
 //! Implements common string based operations.
 
+use std::borrow::Cow;
+
 /// Converts the given string literal content to bytes.
 ///
 /// This function does not expect any surrounding `"` bytes.
 pub fn str_lit_content_to_bytes(
     content: &str,
     out: &mut Vec<u8>,
-) -> Result<(), (&'static str, usize)> {
+) -> Result<(), (Cow<'static, str>, usize)> {
     /// The different states that can be encountered during the parsing of string
     /// literals.
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum State {
         /// No special conditions apply to the current state.
         Normal,
@@ -56,10 +58,10 @@ pub fn str_lit_content_to_bytes(
                 Normal
             }
             ('x', Escaped) => Hex1,
-            (_, Escaped) => todo!("unimplemented escape sequence: {c}"),
+            (_, Escaped) => return Err((Cow::Owned(format!("unknown escape sequence: {c}")), i)),
             (_, Hex1 | Hex2) => {
                 let Some(val) = c.to_digit(16) else {
-                    return Err(("expected two hex characters after `\\x`", i));
+                    return Err((Cow::Borrowed("expected two hex characters after `\\x`"), i));
                 };
                 let val = u8::try_from(val).expect("a single hex digit cannot exceed a u8");
 
@@ -78,5 +80,12 @@ pub fn str_lit_content_to_bytes(
         };
     }
 
-    Ok(())
+    if state == Normal {
+        Ok(())
+    } else {
+        Err((
+            Cow::Borrowed("unfinished escape sequence at the end of the string"),
+            content.len(),
+        ))
+    }
 }

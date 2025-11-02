@@ -36,10 +36,28 @@ impl Searcher {
     }
 
     /// Starts a new search.
-    pub fn start_new_search(&self, content: &[u8], ascii_case_insensitive: bool) {
+    pub fn start_new_search(
+        &self,
+        content: &[u8],
+        ascii_case_insensitive: bool,
+        include_utf16: bool,
+    ) {
+        let mut search_sequences = vec![content.to_vec()];
+        if include_utf16 && let Ok(as_str) = std::str::from_utf8(content) {
+            let mut le = Vec::new();
+            let mut be = Vec::new();
+            for code_unit in as_str.encode_utf16() {
+                le.extend_from_slice(&code_unit.to_le_bytes());
+                be.extend_from_slice(&code_unit.to_be_bytes());
+            }
+
+            search_sequences.push(le);
+            search_sequences.push(be);
+        }
+
         self.requests
             .send(SearchRequest {
-                content: content.to_vec(),
+                content: search_sequences,
                 ascii_case_insensitive,
             })
             .unwrap();
