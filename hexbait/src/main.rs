@@ -152,9 +152,10 @@ impl eframe::App for MyApp {
             // TODO: change default font-size and refactor around that
             // TODO: implement to-disk caching for some sizes to decrease re-load times
             // TODO: fix up main file
-            // TODO: use outer color for displays in zoombars
             // TODO: join polygons of adjoining marked locations
             // TODO: remove data source and use concrete types instead
+            // TODO: improve hover text
+            // TODO: consolidate todos
 
             let mut parse_offset = self.parse_offset.parse().ok();
 

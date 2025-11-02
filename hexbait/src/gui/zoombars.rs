@@ -82,6 +82,8 @@ impl Zoombars {
         let mut new_hovered_location = None;
         let currently_hovered = marked_locations.hovered_location_mut().clone();
 
+        let mut tmp_rearrange_flag = false;
+
         ui.allocate_new_ui(
             UiBuilder::new()
                 .max_rect(rect)
@@ -121,6 +123,7 @@ impl Zoombars {
                         &mut selecting,
                         window,
                         min_selection_size,
+                        marked_locations.hovered().is_none(),
                         |row_window| {
                             if let Some((entropy, quality)) = handler
                                 .get_entropy(row_window)
@@ -160,7 +163,7 @@ impl Zoombars {
                         currently_hovered.clone(),
                     );
 
-                    if let Some(location) = marked_locations.hovered() {
+                    if let Some(location) = marked_locations.hovered() && ui.input(|input| input.pointer.latest_pos().map(|pos| rect.contains(pos)).unwrap_or(false)) {
                         let offset = location.window().start();
                         show_tooltip_at_pointer(
                             ui.ctx(),
@@ -172,6 +175,12 @@ impl Zoombars {
                                 );
                             },
                         );
+                        if ui.input(|input| input.pointer.primary_clicked()) {
+                            self.rearrange_bars_for_point(rect.height(), file_size, i, offset, total_bytes);
+                            tmp_rearrange_flag = true;
+                            show_hex = true;
+                            break;
+                        }
                     } else if let Some(row_window) = hovered_row_window {
                         show_tooltip_at_pointer(
                             ui.ctx(),
@@ -264,6 +273,7 @@ impl Zoombars {
         file_size: u64,
         start_bar: usize,
         point: u64,
+        total_bytes: u64,
     ) {
         let from_center_len = |center: f32, len: f32| -> RangeInclusive<f32> {
             let tentative_start = center - (len / 2.0);
@@ -278,38 +288,45 @@ impl Zoombars {
             start..=start + len
         };
 
-        let mut redo_at = self.bars.len();
         let mut window = Window::new(0, file_size);
-        for (i, bar) in self.bars.iter_mut().enumerate() {
-            if i < start_bar {
-                let selected_window = bar.selection_window(window, bar_height);
-                if selected_window.contains(point) {
-                    window = selected_window;
-                    continue;
-                }
-
-                let min_selection_size = min_selection_size(window, bar_height);
-                let selection = bar.selection(min_selection_size);
-
-                let selection_len = selection.end() - selection.start();
-                let selection_center =
-                    (point - selected_window.start()) as f32 / selected_window.size() as f32;
-
-                bar.set_selection(from_center_len(selection_center, selection_len));
-
-                window = bar.selection_window(window, bar_height);
-                redo_at = i;
-
-                break;
-            } else {
-                redo_at = i;
-                break;
+        for bar in self.bars.iter_mut().take(start_bar + 1) {
+            let selected_window = bar.selection_window(window, bar_height);
+            if selected_window.contains(point) {
+                window = selected_window;
+                continue;
             }
-        }
-        self.bars.drain(redo_at..);
-        dbg!(window);
 
-        todo!("finish implementing this");
+            let min_selection_size = min_selection_size(window, bar_height);
+            let selection = bar.selection(min_selection_size);
+
+            let selection_len = selection.end() - selection.start();
+            let selection_center = (point - window.start()) as f32 / window.size() as f32;
+
+            bar.set_selection(from_center_len(selection_center, selection_len));
+
+            window = bar.selection_window(window, bar_height);
+        }
+        self.bars.drain(start_bar + 1..);
+
+        // if the current bar is full, re-do it instead
+        if self.bars[start_bar].selected == NULL_SELECTION {
+            self.bars.remove(start_bar);
+        }
+
+        while window.size() > total_bytes {
+            let min_selection_size = min_selection_size(window, bar_height);
+            let selection_len = 0.05f32.max(min_selection_size);
+            let selection_center = (point - window.start()) as f32 / window.size() as f32;
+
+            let mut bar = Zoombar::new();
+            bar.set_selection(from_center_len(selection_center, selection_len));
+            window = bar.selection_window(window, bar_height);
+
+            self.bars.push(bar);
+        }
+
+        // the algorithm expects a full bar at the end, so provide it
+        self.bars.push(Zoombar::new());
     }
 
     /// Creates a hash of the zoombar selection state.
@@ -415,6 +432,7 @@ impl Zoombar {
         rect: Rect,
         selecting: &mut bool,
         min_selection_size: f32,
+        allow_selection: bool,
         ctx: &Context,
     ) {
         ctx.input(|input| {
@@ -438,6 +456,7 @@ impl Zoombar {
                 && let Some(pos) = input.pointer.latest_pos()
                 && rect.contains(pos)
                 && !self.dragging
+                && allow_selection
             {
                 *selecting = true;
                 let current = (pos.y - rect.min.y) / rect.height();
@@ -505,11 +524,18 @@ impl Zoombar {
         selecting: &mut bool,
         window: Window,
         min_selection_size: f32,
+        allow_selection: bool,
         mut row_color: impl FnMut(Window) -> (Color32, Color32),
     ) -> Option<Window> {
         let total_rows = rect.height().trunc() as u64;
 
-        self.handle_selection(rect, selecting, min_selection_size, ui.ctx());
+        self.handle_selection(
+            rect,
+            selecting,
+            min_selection_size,
+            allow_selection,
+            ui.ctx(),
+        );
 
         let selection = self.selection(min_selection_size);
         let selection_start = (rect.height() * *selection.start()).trunc() as usize;

@@ -138,7 +138,7 @@ pub fn render_locations_on_bar(
     const BIN_SIZE: u32 = 5;
 
     /// The transparency used for the locations on the bar.
-    const TRANSPARENCY: f64 = 0.8;
+    const TRANSPARENCY: f64 = 0.5;
 
     let bar_start = offset_on_bar(bar_rect, bar_window, bar_window.start()).unwrap();
     let bar_end = offset_on_bar(bar_rect, bar_window, bar_window.end() - 1).unwrap();
