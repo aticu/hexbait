@@ -23,9 +23,16 @@ pub fn render_offset(ui: &mut Ui, settings: &Settings, sense: Sense, offset: u64
 }
 
 /// Show the given byte in hex.
-pub fn render_hex(ui: &mut Ui, settings: &Settings, sense: Sense, byte: u8) -> Response {
+pub fn render_hex(
+    ui: &mut Ui,
+    settings: &Settings,
+    sense: Sense,
+    byte: u8,
+    font_size: f32,
+) -> Response {
+    let char_width = font_size * 0.6;
     let mut rect = ui.cursor();
-    rect.max.x = rect.min.x + settings.char_width() * 2.0;
+    rect.max.x = rect.min.x + char_width * 2.0;
     rect.max.y = rect.min.y + settings.char_height();
     let painter = ui.painter().with_clip_rect(rect);
 
@@ -35,7 +42,7 @@ pub fn render_hex(ui: &mut Ui, settings: &Settings, sense: Sense, byte: u8) -> R
         rect.center(),
         Align2::CENTER_CENTER,
         format!("{byte:02x}"),
-        FontId::monospace(settings.hex_font_size()),
+        FontId::monospace(font_size),
         color,
     );
 

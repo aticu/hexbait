@@ -334,7 +334,8 @@ impl HexdumpView {
 
                 let byte_offset = offset + i as u64;
 
-                let response = render_hex(ui, settings, Sense::hover(), byte);
+                let response =
+                    render_hex(ui, settings, Sense::hover(), byte, settings.hex_font_size());
                 self.selection_context
                     .handle_selection(ui.ctx(), &response, byte_offset);
 
@@ -379,7 +380,7 @@ impl HexdumpView {
                     .handle_selection(ui.ctx(), &response, byte_offset);
 
                 response.on_hover_ui(|ui| {
-                    render_hex(ui, settings, Sense::hover(), byte);
+                    render_hex(ui, settings, Sense::hover(), byte, settings.hex_font_size());
                     render_offset_info(ui, byte_offset, self.selection());
                 });
             }

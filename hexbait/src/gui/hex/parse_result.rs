@@ -1,5 +1,6 @@
 //! Implements display logic for parsing results.
 
+use egui::Sense;
 use hexbait_lang::{
     Value, ValueKind,
     ir::{
@@ -8,7 +9,7 @@ use hexbait_lang::{
     },
 };
 
-use crate::gui::settings::Settings;
+use crate::gui::{hex::render_hex, settings::Settings};
 
 /// Displays the given [`Value`] in the GUI.
 ///
@@ -30,10 +31,7 @@ pub fn show_value(
     let mut child_hovered = None;
 
     match &value.kind {
-        ValueKind::Boolean(_)
-        | ValueKind::Integer(_)
-        | ValueKind::Float(_)
-        | ValueKind::Bytes(_) => {
+        ValueKind::Boolean(_) | ValueKind::Integer(_) | ValueKind::Float(_) => {
             let hovered = ui
                 .label(
                     egui::RichText::new(format!("{name_prefix}{:?},", value.kind))
@@ -42,6 +40,53 @@ pub fn show_value(
                 .hovered();
 
             this_hovered |= hovered;
+        }
+        ValueKind::Bytes(bytes) => {
+            ui.horizontal(|ui| {
+                let old_spacing = ui.spacing_mut().item_spacing;
+                ui.spacing_mut().item_spacing.x = 0.0;
+
+                let space = settings.small_space() * 0.6;
+
+                this_hovered |= ui
+                    .label(
+                        egui::RichText::new(format!("{name_prefix}<")).size(settings.font_size()),
+                    )
+                    .hovered();
+                if bytes.len() > 16 {
+                    for byte in &bytes[..8] {
+                        this_hovered |=
+                            render_hex(ui, settings, Sense::hover(), *byte, settings.font_size())
+                                .hovered();
+                        ui.add_space(space);
+                    }
+
+                    this_hovered |= ui
+                        .label(egui::RichText::new("...").size(settings.font_size()))
+                        .hovered();
+
+                    for byte in &bytes[bytes.len() - 8..] {
+                        ui.add_space(space);
+                        this_hovered |=
+                            render_hex(ui, settings, Sense::hover(), *byte, settings.font_size())
+                                .hovered();
+                    }
+                } else {
+                    for (i, byte) in bytes.iter().enumerate() {
+                        this_hovered |=
+                            render_hex(ui, settings, Sense::hover(), *byte, settings.font_size())
+                                .hovered();
+                        if i != bytes.len() - 1 {
+                            ui.add_space(space);
+                        }
+                    }
+                }
+                this_hovered |= ui
+                    .label(egui::RichText::new(">,").size(settings.font_size()))
+                    .hovered();
+
+                ui.spacing_mut().item_spacing = old_spacing;
+            });
         }
         ValueKind::Struct(children) => {
             ui.vertical(|ui| {

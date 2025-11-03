@@ -1,3 +1,7 @@
+//! Implements the hexbait application.
+//!
+//! This is a hexadecimal viewer and analysis tool.
+
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use std::{collections::BTreeMap, io::Read, path::PathBuf};
@@ -17,6 +21,21 @@ use hexbait::{
     search::Searcher,
     statistics::{Statistics, StatisticsHandler},
 };
+
+// TODO: change font to render more characters
+// TODO: change default font-size and refactor around that
+// TODO: implement to-disk caching for some statistic sizes to decrease re-load times
+// TODO: re-use non-flat statistics for flat statistics
+// TODO: fix up main file
+// TODO: join polygons of adjoining marked locations
+// TODO: remove data source and use concrete types instead
+// TODO: improve hover text for marked locations
+// TODO: refactor zoombars.rs
+// TODO: refactor hex.rs
+// TODO: implement more convenient escaping of byte arrays for search
+// TODO: rearrange UI in a more useful way
+// TODO: figure out why entropy calculations are sometimes so slow
+// TODO: fix dragging across end during initial zoombar selection
 
 /// hexbait - Hierarchical EXploration Binary Analysis & Inspection Tool
 #[derive(Parser, Debug)]
@@ -148,14 +167,6 @@ impl eframe::App for MyApp {
             });
 
             let file_size = self.input.len().unwrap();
-            // TODO: change font to render more characters
-            // TODO: change default font-size and refactor around that
-            // TODO: implement to-disk caching for some sizes to decrease re-load times
-            // TODO: fix up main file
-            // TODO: join polygons of adjoining marked locations
-            // TODO: remove data source and use concrete types instead
-            // TODO: improve hover text
-            // TODO: consolidate todos
 
             let mut parse_offset = self.parse_offset.parse().ok();
 
@@ -237,7 +248,6 @@ impl eframe::App for MyApp {
                         ui.horizontal(|ui| {
                             ui.text_edit_singleline(&mut self.search_text);
                             let mut search_bytes = Vec::new();
-                            // TODO: implement more convenient escaping here
                             let valid = match hexbait_lang::ir::str_lit_content_to_bytes(
                                 &self.search_text,
                                 &mut search_bytes,
@@ -287,9 +297,6 @@ impl eframe::App for MyApp {
                 self.marked_locations
                     .add(MarkedLocation::new(*result, MarkingKind::SearchResult));
             }
-            // TODO: jump to location
-            // TODO: figure out why entropy calculations are sometimes so slow
-            // TODO: fix dragging across end during initial zoombar selection
 
             self.statistics_handler
                 .end_of_frame(self.zoombars.changed());
