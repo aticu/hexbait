@@ -2,6 +2,7 @@
 //!
 //! This is a hexadecimal viewer and analysis tool.
 
+#![forbid(unsafe_code)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use std::{collections::BTreeMap, io::Read, path::PathBuf};
@@ -36,6 +37,10 @@ use hexbait::{
 // TODO: rearrange UI in a more useful way
 // TODO: figure out why entropy calculations are sometimes so slow
 // TODO: fix dragging across end during initial zoombar selection
+// TODO: add jump to offset button
+// TODO: add relative search (from here backwards/forwards)
+// TODO: add screenshots to README
+// TODO: add some user documentation
 
 /// hexbait - Hierarchical EXploration Binary Analysis & Inspection Tool
 #[derive(Parser, Debug)]

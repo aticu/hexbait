@@ -4,6 +4,7 @@ use crate::{
     Int,
     ast::{self, AstNode as _},
     int_from_str,
+    ir::ParseTypeKind,
     lexer::TokenKind,
     span::Span,
 };
@@ -106,20 +107,32 @@ impl LoweringCtx {
         parse_type: ast::ParseType,
         expected: &Option<Expr>,
     ) -> ParseType {
+        let span = parse_type.span();
+        let kind = self.lower_parse_type_kind(parse_type, expected);
+
+        ParseType { kind, span }
+    }
+
+    /// Lowers the given AST parse type into an IR parse type kind.
+    fn lower_parse_type_kind(
+        &mut self,
+        parse_type: ast::ParseType,
+        expected: &Option<Expr>,
+    ) -> ParseTypeKind {
         match parse_type {
             ast::ParseType::NamedParseType(named_parse_type) => {
-                let name_token = required_field!(named_parse_type => name ? self: "expected parse type" => ParseType::Error);
+                let name_token = required_field!(named_parse_type => name ? self: "expected parse type" => ParseTypeKind::Error);
 
                 let name = name_token.text();
                 if (name.starts_with("i") || name.starts_with("u"))
                     && let Ok(num_bits) = name[1..].parse::<u32>()
                 {
-                    ParseType::Integer {
+                    ParseTypeKind::Integer {
                         bit_width: num_bits,
                         signed: name.starts_with("i"),
                     }
                 } else {
-                    ParseType::Named {
+                    ParseTypeKind::Named {
                         name: Spanned::<Symbol>::from(name_token),
                     }
                 }
@@ -140,39 +153,39 @@ impl LoweringCtx {
                     }
                 };
 
-                ParseType::Bytes { repetition_kind }
+                ParseTypeKind::Bytes { repetition_kind }
             }
             ast::ParseType::RepeatParseType(repeat_parse_type) => {
-                ParseType::Repeating {
+                ParseTypeKind::Repeating {
                     parse_type: Box::new(self.lower_parse_type(
-                        required_field!(repeat_parse_type => ty ? self: "expected parse type" => ParseType::Error),
+                        required_field!(repeat_parse_type => ty ? self: "expected parse type" => ParseTypeKind::Error),
                         &None,
                     )),
                     repetition_kind: self.lower_repetition(
-                        required_field!(repeat_parse_type => repetition ? self: "expected repetition type" => ParseType::Error)
+                        required_field!(repeat_parse_type => repetition ? self: "expected repetition type" => ParseTypeKind::Error)
                     ),
                 }
             }
             ast::ParseType::AnonymousStructParseType(struct_parse_type) => {
                 let content = struct_parse_type.struct_content().map(|content| self.lower_struct_content(content)).collect();
 
-                ParseType::Struct {
+                ParseTypeKind::Struct {
                     content,
                 }
             }
             ast::ParseType::SwitchParseType(switch_parse_type) => {
                 let scrutinee = self.lower_expr(
-                    required_field!(switch_parse_type => scrutinee ? self: "expected `switch` scrutinee" => ParseType::Error)
+                    required_field!(switch_parse_type => scrutinee ? self: "expected `switch` scrutinee" => ParseTypeKind::Error)
                 );
 
                 let mut branches = Vec::new();
 
                 for arm in switch_parse_type.switch_parse_type_arm() {
                     let value = self.lower_expr(
-                        required_field!(arm => val ? self: "expected arm value" => ParseType::Error)
+                        required_field!(arm => val ? self: "expected arm value" => ParseTypeKind::Error)
                     );
                     let parse_ty = self.lower_parse_type(
-                        required_field!(arm => parse_type ? self: "expected arm parse type" => ParseType::Error),
+                        required_field!(arm => parse_type ? self: "expected arm parse type" => ParseTypeKind::Error),
                         &None,
                     );
 
@@ -184,11 +197,11 @@ impl LoweringCtx {
                 }
 
                 let default = Box::new(self.lower_parse_type(
-                    required_field!(switch_parse_type => default ? self: "expected `switch` default branch" => ParseType::Error),
+                    required_field!(switch_parse_type => default ? self: "expected `switch` default branch" => ParseTypeKind::Error),
                     &None
                 ));
 
-                ParseType::Switch { scrutinee, branches, default }
+                ParseTypeKind::Switch { scrutinee, branches, default }
             }
         }
     }
@@ -440,6 +453,9 @@ impl LoweringCtx {
             }
             ast::Declaration::AssertDeclaration(assert) => self.lower_assert_declaration(assert),
             ast::Declaration::WarnIfDeclaration(warn_if) => self.lower_warn_if_declaration(warn_if),
+            ast::Declaration::RecoveryDeclaration(recovery) => {
+                self.lower_recovery_declaration(recovery)
+            }
         }
     }
 
@@ -533,6 +549,18 @@ impl LoweringCtx {
             condition: self
                 .lower_expr(required_field!(warn_if => expr ? self: "expected expression" => None)),
             message: warn_if.message().map(|expr| self.lower_expr(expr)),
+        })
+    }
+
+    /// Lowers the given AST `recover` declaration to IR.
+    fn lower_recovery_declaration(
+        &mut self,
+        recovery: ast::RecoveryDeclaration,
+    ) -> Option<Declaration> {
+        Some(Declaration::Recover {
+            at: self.lower_expr(
+                required_field!(recovery => expr ? self: "expected expression" => None),
+            ),
         })
     }
 

@@ -56,8 +56,6 @@ pub enum ValueKind {
     Struct(Vec<(Symbol, Value)>),
     /// Represents an array of values.
     Array(Vec<Value>),
-    /// A value that is invalid due to an error during parsing.
-    Err,
 }
 
 impl fmt::Debug for ValueKind {
@@ -95,7 +93,6 @@ impl fmt::Debug for ValueKind {
                 debug_struct.finish()
             }
             Self::Array(array) => f.debug_list().entries(array).finish(),
-            Self::Err => f.write_str("error"),
         }
     }
 }

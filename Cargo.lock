@@ -1600,6 +1600,7 @@ dependencies = [
  "logos",
  "num-bigint",
  "num-traits",
+ "num_enum",
  "range-set-blaze",
  "rowan",
  "smol_str 0.3.4",

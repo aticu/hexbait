@@ -141,6 +141,17 @@ fn decl<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
 
             NodeKind::WarnIfDeclaration
         }
+        Some("recover") => {
+            if p.at_contextual_kw("at") {
+                p.bump();
+            } else {
+                todo!("recover currently requires at");
+            }
+
+            expr(p);
+
+            NodeKind::RecoveryDeclaration
+        }
         _ => todo!(),
     };
 

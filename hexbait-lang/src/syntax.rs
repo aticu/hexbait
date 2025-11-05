@@ -74,7 +74,7 @@ const _: () = {
 };
 
 /// The kind of an inner node in the syntax tree.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
+#[derive(num_enum::TryFromPrimitive, Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
 #[repr(u16)]
 pub enum NodeKind {
     /// A file.
@@ -125,6 +125,8 @@ pub enum NodeKind {
     AssertDeclaration,
     /// A declaration warns if the expression is true like `!warn if size > 4: "expected small size"`.
     WarnIfDeclaration,
+    /// A declaration to specify recovery behavior in case of errors like `!recover at 8`.
+    RecoveryDeclaration,
 
     // Expressions
     /// An atomic expression.
@@ -165,21 +167,15 @@ impl rowan::Language for Language {
 
         if num < TokenKind::_Last as u16 {
             SyntaxKind::Token {
-                kind: unsafe {
-                    // SAFETY: `TokenKind` is repr(u16) and the variant is before `_Last`, so it's a
-                    // valid variant
-                    std::mem::transmute::<u16, TokenKind>(num)
-                },
+                kind: TokenKind::try_from(num)
+                    .expect("num < TokenKind::_Last, so we have a valid TokenKind"),
             }
         } else {
             let num = num - TokenKind::_Last as u16;
             assert!(num < NodeKind::_Last as u16);
             SyntaxKind::Node {
-                kind: unsafe {
-                    // SAFETY: `NodeKind` is repr(u16) and the variant is before `_Last`, so it's a
-                    // valid variant
-                    std::mem::transmute::<u16, NodeKind>(num)
-                },
+                kind: NodeKind::try_from(num)
+                    .expect("num < NodeKind::_Last, so we have a valid NodeKind"),
             }
         }
     }

@@ -1,5 +1,7 @@
 //! Implements the hexbait format description language.
 
+#![forbid(unsafe_code)]
+
 pub mod ast;
 mod eval;
 pub mod ir;
@@ -31,4 +33,4 @@ fn int_from_str(base: u32, s: &str) -> Option<Int> {
 // TODO: implement classification of parsed values (offset, integer?, string?)
 // TODO: improve display of the parsed values in the GUI
 // TODO: figure out a way to cleverly incorporate colors
-// TODO: implement jumping to offsets in the hexview
+// TODO: implement a new concept of "scopes" in the file to reset endianness (and others) at the end of `!scope` and `struct`s

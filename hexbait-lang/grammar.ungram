@@ -18,6 +18,7 @@ Declaration =
 | ScopeAtDeclaration
 | AssertDeclaration
 | WarnIfDeclaration
+| RecoveryDeclaration
 
 EndiannessDeclaration =
   '!' 'endian' kind:'ident' ';'
@@ -39,6 +40,9 @@ AssertDeclaration =
 
 WarnIfDeclaration =
   '!' 'warn' 'if' Expr (':' message:Expr)? ';'
+
+RecoveryDeclaration =
+  '!' 'recover' 'at' Expr ';'
 
 StructField =
   name:'ident' ParseType ( '=' expected:Expr )?

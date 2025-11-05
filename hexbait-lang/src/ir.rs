@@ -147,11 +147,25 @@ pub enum Declaration {
         /// The message to display if the condition is true.
         message: Option<Expr>,
     },
+    /// Specifies an offset to recover at in case of errors.
+    Recover {
+        /// The offset at which to recover.
+        at: Expr,
+    },
 }
 
-/// The different types that can by parsed.
+/// A description of a parsing type.
 #[derive(Debug)]
-pub enum ParseType {
+pub struct ParseType {
+    /// The kind of parsing type.
+    pub kind: ParseTypeKind,
+    /// The span of the parsing type.
+    pub span: Span,
+}
+
+/// The different types that can be parsed.
+#[derive(Debug)]
+pub enum ParseTypeKind {
     /// Parses a type of the given name.
     Named {
         /// The name of the type to parse.

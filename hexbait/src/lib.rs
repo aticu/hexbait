@@ -1,5 +1,7 @@
 //! Implements the backbone functionality of the hexbait application.
 
+#![forbid(unsafe_code)]
+
 use std::time::Duration;
 
 /// The idling time in case no user input is present.

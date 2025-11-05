@@ -5,7 +5,18 @@ use std::fmt;
 use crate::span::Span;
 
 /// Describes all kinds of possible tokens.
-#[derive(logos::Logos, Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
+#[derive(
+    logos::Logos,
+    num_enum::TryFromPrimitive,
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    PartialOrd,
+    Ord,
+    Hash,
+)]
 #[repr(u16)]
 pub enum TokenKind {
     // Trivia

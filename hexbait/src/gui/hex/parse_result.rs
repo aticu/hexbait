@@ -160,7 +160,6 @@ pub fn show_value(
                 this_hovered |= hovered;
             });
         }
-        ValueKind::Err => todo!(),
     }
 
     if child_hovered.is_some() {

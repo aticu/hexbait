@@ -1,5 +1,8 @@
 !endian le;
 
+// assume an entry size of 1024 without knowing anything
+!recover at 1024;
+
 header {
     magic bytes = "FILE";
     fixup_value_offset u16;
@@ -22,14 +25,27 @@ header {
 !assert header.used_entry_size <= header.total_entry_size;
 !assert header.num_fixup_values == (header.total_entry_size / 512) + 1;
 
+// entry sizes larger than 4096 are very uncommon
+!assert header.total_entry_size <= 4096;
+
+// now that we know the actual entry size, we can recover more precisely
+!recover at header.total_entry_size;
+
 let fixup_value = peek(bytes len 2 at header.fixup_value_offset);
 let fixup_values = peek([bytes len 2] len header.num_fixup_values - 1 at header.fixup_value_offset + 2);
 
 !seek to header.first_attribute;
 attributes [{
-    !scope at $offset until $offset + peek(u32 at $offset + 4) {
+    // attributes are 8 byte aligned
+    !align 8;
+
+    // parse the size first, so the scope and recovery can be defined
+    let size = peek(u32 at $offset + 4);
+    !recover at size;
+
+    !scope at $offset until $offset + size {
         type u32;
-        size u32;
+        !seek by 4; // skip the already parsed size
         nonresident u8;
         name_size u8;
         name_offset u16;
@@ -85,7 +101,6 @@ attributes [{
                                 allocated_index_node_size u32;
                                 index_node_flags u32;
                             };
-                            // TODO: parse values here
                         },
                         _ => bytes len data_size,
                     };
@@ -106,5 +121,4 @@ attributes [{
         };
     }
     !seek by size;
-    !align 8;
 }] while peek(bytes len 4) != <ff ff ff ff>;

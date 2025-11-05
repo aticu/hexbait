@@ -6,7 +6,7 @@ use crate::{
     Int, Span,
     ir::{
         BinOp, Declaration, Endianness, Expr, ExprKind, File, LetStatement, Lit, ParseType,
-        RepeatKind, StructContent, StructField, Symbol, UnOp,
+        ParseTypeKind, RepeatKind, StructContent, StructField, Symbol, UnOp,
     },
 };
 
@@ -20,18 +20,45 @@ use super::{
 #[derive(Debug, Clone, Copy)]
 struct ByteOffset(u64);
 
+impl TryFrom<&Value> for ByteOffset {
+    type Error = ParseErrKind;
+
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        u64::try_from(value.kind.expect_int())
+            .map(|offset| ByteOffset(offset))
+            .map_err(|_| ParseErrKind::OffsetTooLarge)
+    }
+}
+
 /// An error that occurred during parsing.
 #[derive(Debug)]
-pub enum ParseErr {
+pub enum ParseErrKind {
     /// The input was shorter than expected.
     InputTooShort,
+    /// A value that is meant as an offset was too large.
+    OffsetTooLarge,
+    /// An assertion failed.
+    AssertionFailure,
+    /// An assertion failed.
+    ExpectationFailure,
     /// An I/O error occurred during parsing.
     Io(io::Error),
 }
 
-impl From<io::Error> for ParseErr {
+/// An error that occurred during parsing.
+#[derive(Debug)]
+pub struct ParseErr {
+    /// The kind of error that occurred.
+    kind: ParseErrKind,
+    /// The provenance where the error occurred.
+    provenance: Provenance,
+    /// The span of the node where parsing failed.
+    span: Span,
+}
+
+impl From<io::Error> for ParseErrKind {
     fn from(err: io::Error) -> Self {
-        ParseErr::Io(err)
+        ParseErrKind::Io(err)
     }
 }
 
@@ -42,7 +69,7 @@ pub fn eval_ir(file: &File, view: View<'_>, start_offset: u64) -> Value {
     scope.offset = ByteOffset(start_offset);
 
     for content in &file.content {
-        scope.eval_struct_content(content, &mut ctx);
+        scope.eval_single_struct_content(content, &mut ctx);
     }
 
     ctx.into_value()
@@ -54,6 +81,18 @@ macro_rules! impossible {
     };
 }
 
+/// The different recovery strategies.
+#[derive(Debug)]
+enum RecoveryStrategy {
+    /// Divert to the recovery strategy of the parent `struct`.
+    Fallback,
+    /// Skips to the given offset.
+    SkipTo {
+        /// The offset to skip to.
+        offset: ByteOffset,
+    },
+}
+
 /// The parsing context for a `struct`.
 #[derive(Debug)]
 struct StructContext<'parent> {
@@ -61,6 +100,8 @@ struct StructContext<'parent> {
     parsed_fields: Vec<(Symbol, Value)>,
     /// The parent `struct`.
     parent: Option<&'parent StructContext<'parent>>,
+    /// The recovery strategy to use if parsing fails.
+    recovery_strategy: RecoveryStrategy,
 }
 
 impl<'parent> StructContext<'parent> {
@@ -69,6 +110,7 @@ impl<'parent> StructContext<'parent> {
         StructContext {
             parsed_fields: Vec::new(),
             parent: None,
+            recovery_strategy: RecoveryStrategy::Fallback,
         }
     }
 
@@ -77,6 +119,7 @@ impl<'parent> StructContext<'parent> {
         StructContext {
             parsed_fields: Vec::new(),
             parent: Some(self),
+            recovery_strategy: RecoveryStrategy::Fallback,
         }
     }
 
@@ -143,27 +186,53 @@ impl<'src> Scope<'src> {
     }
 
     /// Reports the given error at the given location.
-    fn error(&self, message: impl Into<String>, location: &Provenance, span: Span) {
+    ///
+    /// This function is generic to allow for the pattern `return self.error(...)` in any function.
+    fn error<T>(
+        &self,
+        message: impl Into<String>,
+        kind: ParseErrKind,
+        location: &Provenance,
+        span: Span,
+    ) -> Result<T, ParseErr> {
         eprintln!(
             "TODO: add proper error handling: {} at {location:?} here {span:?}",
             message.into()
-        )
+        );
+
+        Err(ParseErr {
+            kind,
+            provenance: location.clone(),
+            span,
+        })
     }
 
     /// Reads the specified number of bytes.
-    fn read_bytes(&mut self, count: u64) -> Result<(Vec<u8>, Provenance), ParseErr> {
+    fn read_bytes(&mut self, count: u64, span: Span) -> Result<(Vec<u8>, Provenance), ParseErr> {
         let start = self.offset.0;
 
         let view_len = self.view.len();
         if view_len < start.saturating_add(count) {
-            return Err(ParseErr::InputTooShort);
+            return Err(ParseErr {
+                kind: ParseErrKind::InputTooShort,
+                provenance: self.view.provenance_from_range(start..start + 1),
+                span,
+            });
         }
 
         let count_as_usize = usize::try_from(count).unwrap();
         let mut buf = vec![0; count_as_usize];
-        let window = self.view.read_at(start, &mut buf)?;
+        let window = self.view.read_at(start, &mut buf).map_err(|err| ParseErr {
+            kind: ParseErrKind::Io(err),
+            provenance: self.view.provenance_from_range(start..start + 1),
+            span,
+        })?;
         if window.len() < buf.len() {
-            return Err(ParseErr::InputTooShort);
+            return Err(ParseErr {
+                kind: ParseErrKind::InputTooShort,
+                provenance: self.view.provenance_from_range(start..start + 1),
+                span,
+            });
         }
 
         let provenance = self.view.provenance_from_range(start..start + count);
@@ -316,12 +385,12 @@ impl<'src> Scope<'src> {
                     {
                         ByteOffset(offset)
                     } else {
-                        self.error(
+                        return self.error(
                             "new offset did not fit in available space",
+                            ParseErrKind::InputTooShort,
                             &offset.provenance,
                             expr.span,
                         );
-                        return Err(ParseErr::InputTooShort);
                     }
                 } else {
                     self.offset
@@ -358,12 +427,12 @@ impl<'src> Scope<'src> {
                 {
                     self.offset.0 = new_offset;
                 } else {
-                    self.error(
+                    return self.error(
                         "new offset did not fit in available space",
+                        ParseErrKind::InputTooShort,
                         &value.provenance,
                         expr.span,
                     );
-                    return Err(ParseErr::InputTooShort);
                 }
             }
             Declaration::SeekTo(expr) => {
@@ -375,8 +444,9 @@ impl<'src> Scope<'src> {
                 {
                     self.offset.0 = new_offset;
                 } else {
-                    self.error(
+                    return self.error(
                         "new offset did not fit in available space",
+                        ParseErrKind::InputTooShort,
                         &value.provenance,
                         expr.span,
                     );
@@ -388,40 +458,37 @@ impl<'src> Scope<'src> {
                 content,
             } => {
                 let start_expr = self.eval_expr(start, struct_ctx, Default::default())?;
-                let view_len = self.view.len();
 
                 let start = if let Ok(start) = u64::try_from(start_expr.kind.expect_int())
-                    && start < view_len
+                    && start < self.view.len()
                 {
                     start
                 } else {
-                    self.error(
+                    return self.error(
                         "scope start exceeded the end of the current scope",
+                        ParseErrKind::InputTooShort,
                         &start_expr.provenance,
                         start.span,
                     );
-                    return Ok(());
-                    // TODO: check what to return here
                 };
 
                 let end = if let Some(end) = end {
                     let end_expr = self.eval_expr(end, struct_ctx, Default::default())?;
 
                     if let Ok(end) = u64::try_from(end_expr.kind.expect_int())
-                        && start < view_len
+                        && end < self.view.len()
                     {
                         end
                     } else {
-                        self.error(
+                        return self.error(
                             "scope end exceeded the end of the current scope",
+                            ParseErrKind::InputTooShort,
                             &end_expr.provenance,
                             end.span,
                         );
-                        return Ok(());
-                        // TODO: check what to return here
                     }
                 } else {
-                    view_len
+                    self.view.len()
                 };
 
                 let view = View::Subview {
@@ -431,7 +498,7 @@ impl<'src> Scope<'src> {
                 let mut scope = self.child_with_view_and_offset(&view, ByteOffset(0));
 
                 for single_content in content {
-                    scope.eval_struct_content(single_content, struct_ctx);
+                    scope.eval_single_struct_content(single_content, struct_ctx);
                 }
             }
             Declaration::Assert { condition, message } => {
@@ -450,7 +517,12 @@ impl<'src> Scope<'src> {
                         String::from("assertion failed")
                     };
 
-                    self.error(message, &condition_value.provenance, condition.span);
+                    return self.error(
+                        message,
+                        ParseErrKind::AssertionFailure,
+                        &condition_value.provenance,
+                        condition.span,
+                    );
                 }
             }
             Declaration::WarnIf { condition, message } => {
@@ -471,6 +543,23 @@ impl<'src> Scope<'src> {
                     eprintln!("TODO: fix warning printing: {message}");
                 }
             }
+            Declaration::Recover { at } => {
+                let offset = self.eval_expr(at, struct_ctx, Default::default())?;
+                if let Ok(offset) = u64::try_from(offset.kind.expect_int())
+                    && offset < self.view.len()
+                {
+                    struct_ctx.recovery_strategy = RecoveryStrategy::SkipTo {
+                        offset: ByteOffset(offset),
+                    };
+                } else {
+                    return self.error(
+                        "recovery offset exceeded the end of the current scope",
+                        ParseErrKind::InputTooShort,
+                        &offset.provenance,
+                        at.span,
+                    );
+                }
+            }
         }
 
         Ok(())
@@ -482,33 +571,38 @@ impl<'src> Scope<'src> {
         parse_type: &ParseType,
         struct_ctx: &StructContext,
     ) -> Result<Value, ParseErr> {
-        let value = match parse_type {
-            ParseType::Named { name } => todo!("trying to parse named `{name:?}` unimplemented"),
-            ParseType::Bytes { repetition_kind } => match repetition_kind {
-                RepeatKind::Len { count } => {
-                    let count_val = self.eval_expr(&count, struct_ctx, Default::default())?;
+        let value = match &parse_type.kind {
+            ParseTypeKind::Named { name } => {
+                todo!("trying to parse named `{name:?}` unimplemented")
+            }
+            ParseTypeKind::Bytes { repetition_kind } => match repetition_kind {
+                RepeatKind::Len { count: count_expr } => {
+                    let count_val = self.eval_expr(&count_expr, struct_ctx, Default::default())?;
 
                     if let Ok(count) = u64::try_from(count_val.kind.expect_int()) {
-                        let (bytes, provenance) = self.read_bytes(count)?;
+                        let (bytes, provenance) = self.read_bytes(count, count_expr.span)?;
 
                         Value {
                             kind: ValueKind::Bytes(bytes),
                             provenance,
                         }
                     } else {
-                        self.error("count too large", &count_val.provenance, count.span);
-                        return Ok(Value {
-                            kind: ValueKind::Err,
-                            provenance: count_val.provenance,
-                        });
+                        return self.error(
+                            "count too large",
+                            ParseErrKind::InputTooShort,
+                            &count_val.provenance,
+                            count_expr.span,
+                        );
                     }
                 }
                 RepeatKind::While { condition } => {
-                    todo!("condition {condition:?} is unimplemented for bytes repetitions yet")
+                    todo!(
+                        "while condition {condition:?} is unimplemented for bytes repetitions yet"
+                    )
                 }
                 RepeatKind::Error => impossible!(),
             },
-            ParseType::Integer { bit_width, signed } => {
+            ParseTypeKind::Integer { bit_width, signed } => {
                 let bit_width = *bit_width;
                 let signed = *signed;
 
@@ -524,7 +618,7 @@ impl<'src> Scope<'src> {
                 let size_in_bytes = (bit_width / 8) as usize;
 
                 let (parsed_bytes, provenance) =
-                    self.read_bytes(u64::try_from(size_in_bytes).unwrap())?;
+                    self.read_bytes(u64::try_from(size_in_bytes).unwrap(), parse_type.span)?;
 
                 let mut parse_buf = [0; 8];
 
@@ -555,7 +649,7 @@ impl<'src> Scope<'src> {
                     provenance,
                 }
             }
-            ParseType::Repeating {
+            ParseTypeKind::Repeating {
                 parse_type,
                 repetition_kind,
             } => match repetition_kind {
@@ -572,11 +666,12 @@ impl<'src> Scope<'src> {
                             values.push(parsed_value);
                         }
                     } else {
-                        self.error("count too large", &count_val.provenance, count.span);
-                        return Ok(Value {
-                            kind: ValueKind::Err,
-                            provenance,
-                        });
+                        return self.error(
+                            "count too large",
+                            ParseErrKind::InputTooShort,
+                            &count_val.provenance,
+                            count.span,
+                        );
                     }
 
                     Value {
@@ -615,16 +710,16 @@ impl<'src> Scope<'src> {
                 }
                 crate::ir::RepeatKind::Error => impossible!(),
             },
-            ParseType::Struct { content } => {
+            ParseTypeKind::Struct { content } => {
                 let mut ctx = struct_ctx.child();
 
                 for single_content in content {
-                    self.eval_struct_content(single_content, &mut ctx);
+                    self.eval_single_struct_content(single_content, &mut ctx);
                 }
 
                 ctx.into_value()
             }
-            ParseType::Switch {
+            ParseTypeKind::Switch {
                 scrutinee,
                 branches,
                 default,
@@ -641,14 +736,18 @@ impl<'src> Scope<'src> {
                     self.eval_parse_type(default, struct_ctx)?
                 }
             }
-            ParseType::Error => impossible!(),
+            ParseTypeKind::Error => impossible!(),
         };
 
         Ok(value)
     }
 
     /// Evaluates the given `struct` field.
-    fn eval_struct_field(&mut self, field: &StructField, struct_ctx: &mut StructContext) {
+    fn eval_struct_field(
+        &mut self,
+        field: &StructField,
+        struct_ctx: &mut StructContext,
+    ) -> Result<(), ParseErr> {
         let Ok(value) = self.eval_parse_type(&field.ty, struct_ctx) else {
             todo!("proper error handling")
         };
@@ -659,11 +758,12 @@ impl<'src> Scope<'src> {
                 todo!("error")
             };
             if expected != value {
-                self.error(
+                return self.error(
                     format!(
                         "field expectation failed: {:?} != {:?}",
                         &expected.kind, &value.kind
                     ),
+                    ParseErrKind::ExpectationFailure,
                     &expected.provenance,
                     span,
                 );
@@ -674,34 +774,55 @@ impl<'src> Scope<'src> {
         struct_ctx
             .parsed_fields
             .push((field.name.inner.clone(), value));
+
+        Ok(())
     }
 
     /// Evaluates the given `let` statement.
-    fn eval_let_statement(&mut self, let_statement: &LetStatement, struct_ctx: &mut StructContext) {
-        let Ok(value) = self.eval_expr(&let_statement.expr, struct_ctx, Default::default()) else {
-            todo!("error")
-        };
+    fn eval_let_statement(
+        &mut self,
+        let_statement: &LetStatement,
+        struct_ctx: &mut StructContext,
+    ) -> Result<(), ParseErr> {
+        let value = self.eval_expr(&let_statement.expr, struct_ctx, Default::default())?;
 
         // TODO: use resolved names here later
         struct_ctx
             .parsed_fields
             .push((let_statement.name.inner.clone(), value));
+
+        Ok(())
     }
 
-    /// Evaluates the given `struct` content.
-    fn eval_struct_content(&mut self, content: &StructContent, struct_ctx: &mut StructContext) {
+    /// Evaluates the given single `struct` content.
+    fn eval_single_struct_content(
+        &mut self,
+        content: &StructContent,
+        struct_ctx: &mut StructContext,
+    ) -> Result<(), ParseErr> {
         match content {
             StructContent::Field(field) => self.eval_struct_field(field, struct_ctx),
             StructContent::Declaration(declaration) => {
-                if let Err(err) = self.eval_declaration(declaration, struct_ctx) {
-                    todo!("handle err: {err:?}");
-                }
+                self.eval_declaration(declaration, struct_ctx)
             }
             StructContent::LetStatement(let_statement) => {
                 self.eval_let_statement(let_statement, struct_ctx)
             }
             StructContent::Error => impossible!(),
         }
+    }
+
+    /// Evaluates the content of a `struct`.
+    fn eval_struct_content(
+        &mut self,
+        content: &[StructContent],
+        struct_ctx: &mut StructContext,
+    ) -> Result<(), ParseErr> {
+        for content in content {
+            self.eval_single_struct_content(content, struct_ctx);
+        }
+
+        Ok(())
     }
 }
 
