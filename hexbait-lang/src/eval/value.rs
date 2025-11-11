@@ -4,6 +4,7 @@ use std::fmt;
 
 use crate::{
     Int,
+    eval::parse::ParseErrId,
     ir::{
         Lit, Symbol,
         path::{Path, PathComponent},
@@ -53,9 +54,19 @@ pub enum ValueKind {
     ///
     /// This is a `Vec` and not a map, to preserve field ordering for the purposes of displaying
     /// them.
-    Struct(Vec<(Symbol, Value)>),
+    Struct {
+        /// The fields of the `struct`.
+        fields: Vec<(Symbol, Value)>,
+        /// An error that occurred while parsing the `struct`.
+        error: Option<ParseErrId>,
+    },
     /// Represents an array of values.
-    Array(Vec<Value>),
+    Array {
+        /// The items in the array.
+        items: Vec<Value>,
+        /// An error that occurred while parsing the array.
+        error: Option<ParseErrId>,
+    },
 }
 
 impl fmt::Debug for ValueKind {
@@ -85,14 +96,27 @@ impl fmt::Debug for ValueKind {
                     write!(f, "]")
                 }
             },
-            Self::Struct(fields) => {
+            Self::Struct { fields, error } => {
                 let mut debug_struct = f.debug_struct("struct");
                 for (name, value) in fields {
                     debug_struct.field(name.as_str(), value);
                 }
+                if let Some(err) = error {
+                    debug_struct.field("__error", &err);
+                }
                 debug_struct.finish()
             }
-            Self::Array(array) => f.debug_list().entries(array).finish(),
+            Self::Array { items, error } => {
+                let mut arr = f.debug_list();
+                arr.entries(items);
+
+                if let Some(err) = error {
+                    arr.entry(&format!("__error: {err:?}"));
+                    arr.finish_non_exhaustive()
+                } else {
+                    arr.finish()
+                }
+            }
         }
     }
 }
@@ -153,7 +177,7 @@ impl ValueKind {
     #[track_caller]
     pub fn expect_struct(&self) -> &Vec<(Symbol, Value)> {
         match self {
-            ValueKind::Struct(value) => value,
+            ValueKind::Struct { fields, .. } => fields,
             _ => unreachable!("impossible because of static analysis"),
         }
     }
@@ -167,12 +191,12 @@ impl Value {
         for component in path.iter() {
             match component {
                 PathComponent::FieldAccess(field) => {
-                    let ValueKind::Struct(items) = &current_value.kind else {
+                    let ValueKind::Struct { fields, .. } = &current_value.kind else {
                         return None;
                     };
 
                     'find_entry: {
-                        for (name, value) in items {
+                        for (name, value) in fields {
                             if name == field {
                                 current_value = value;
                                 break 'find_entry;
@@ -182,11 +206,11 @@ impl Value {
                     }
                 }
                 PathComponent::Indexing(index) => {
-                    let ValueKind::Array(array) = &current_value.kind else {
+                    let ValueKind::Array { items, .. } = &current_value.kind else {
                         return None;
                     };
 
-                    current_value = array.get(*index)?;
+                    current_value = items.get(*index)?;
                 }
             }
         }

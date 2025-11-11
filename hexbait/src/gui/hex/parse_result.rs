@@ -88,7 +88,7 @@ pub fn show_value(
                 ui.spacing_mut().item_spacing = old_spacing;
             });
         }
-        ValueKind::Struct(children) => {
+        ValueKind::Struct { fields, error } => {
             ui.vertical(|ui| {
                 let hovered = ui
                     .label(
@@ -105,7 +105,7 @@ pub fn show_value(
                         .max_rect(child_rect)
                         .layout(egui::Layout::top_down(egui::Align::Min)),
                     |ui| {
-                        for (name, value) in children {
+                        for (name, value) in fields {
                             let mut path = path.clone();
                             path.push(PathComponent::FieldAccess(name.clone()));
 
@@ -113,6 +113,15 @@ pub fn show_value(
                             if hovered.is_some() {
                                 child_hovered = hovered;
                             }
+                        }
+                        if let Some(err) = error {
+                            // TODO: highlight the error when this is hovered
+                            ui.label(
+                                egui::RichText::new(format!("... parsing error {err:?},"))
+                                    .size(settings.font_size())
+                                    .color(ui.visuals().error_fg_color),
+                            )
+                            .hovered();
                         }
                     },
                 );
@@ -124,7 +133,7 @@ pub fn show_value(
                 this_hovered |= hovered;
             });
         }
-        ValueKind::Array(children) => {
+        ValueKind::Array { items, error } => {
             ui.vertical(|ui| {
                 let hovered = ui
                     .label(
@@ -141,7 +150,7 @@ pub fn show_value(
                         .max_rect(child_rect)
                         .layout(egui::Layout::top_down(egui::Align::Min)),
                     |ui| {
-                        for (i, value) in children.iter().enumerate() {
+                        for (i, value) in items.iter().enumerate() {
                             let mut path = path.clone();
                             path.push(PathComponent::Indexing(i));
 
@@ -149,6 +158,15 @@ pub fn show_value(
                             if hovered.is_some() {
                                 child_hovered = hovered;
                             }
+                        }
+                        if let Some(err) = error {
+                            // TODO: highlight the error when this is hovered
+                            ui.label(
+                                egui::RichText::new(format!("... parsing error {err:?},"))
+                                    .size(settings.font_size())
+                                    .color(ui.visuals().error_fg_color),
+                            )
+                            .hovered();
                         }
                     },
                 );

@@ -233,17 +233,17 @@ impl HexdumpView {
                                         view: &view,
                                         valid_range: parse_offset..view.len(),
                                     };
-                                    let value = hexbait_lang::eval_ir(&parse_type, view, 0);
+                                    let result = hexbait_lang::eval_ir(&parse_type, view, 0);
                                     let hovered = parse_result::show_value(
                                         ui,
                                         hexbait_lang::ir::path::Path::new(),
                                         None,
-                                        &value,
+                                        &result.value,
                                         settings,
                                     );
 
                                     if let Some(hovered) = hovered
-                                        && let Some(value) = value.subvalue_at_path(&hovered)
+                                        && let Some(value) = result.value.subvalue_at_path(&hovered)
                                     {
                                         for range in value.provenance.byte_ranges() {
                                             marked_locations.add(MarkedLocation::new(
