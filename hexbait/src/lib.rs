@@ -12,5 +12,6 @@ pub mod data;
 pub mod gui;
 pub mod model;
 pub mod search;
+pub mod state;
 pub mod statistics;
 pub mod window;

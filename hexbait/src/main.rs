@@ -8,18 +8,18 @@
 use std::{collections::BTreeMap, io::Read, path::PathBuf};
 
 use clap::Parser;
+use egui::{RichText, TextStyle};
 use hexbait::{
     built_in_format_descriptions::built_in_format_descriptions,
     data::{DataSource as _, Input},
     gui::{
         hex::HexdumpView,
         marking::{MarkedLocation, MarkedLocations, MarkingKind},
-        settings::Settings,
         signature_display::SignatureDisplay,
         zoombars::Zoombars,
     },
     model::Endianness,
-    search::Searcher,
+    state::State,
     statistics::{Statistics, StatisticsHandler},
 };
 
@@ -77,8 +77,7 @@ fn main() -> eframe::Result {
         Box::new(|_| {
             Ok(Box::new(MyApp {
                 frame_time: std::time::Duration::ZERO,
-                settings: Settings::new(),
-                searcher: Searcher::new(&input),
+                state: State::new(&input),
                 statistics_handler: StatisticsHandler::new(input.clone().unwrap()),
                 input,
                 hexdump_context: HexdumpView::new(),
@@ -86,9 +85,6 @@ fn main() -> eframe::Result {
                 zoombars: Zoombars::new(),
                 signature_display: SignatureDisplay::new(),
                 xor_value: 0,
-                search_text: String::new(),
-                search_ascii_case_insensitive: false,
-                search_utf16: false,
                 parse_type: "none",
                 parse_offset: String::from("0"),
                 sync_parse_offset_to_selection_start: true,
@@ -102,8 +98,7 @@ fn main() -> eframe::Result {
 
 struct MyApp {
     frame_time: std::time::Duration,
-    settings: Settings,
-    searcher: Searcher,
+    state: State,
     statistics_handler: StatisticsHandler,
     input: Input,
     hexdump_context: HexdumpView,
@@ -111,9 +106,6 @@ struct MyApp {
     zoombars: Zoombars,
     signature_display: SignatureDisplay,
     xor_value: u8,
-    search_text: String,
-    search_ascii_case_insensitive: bool,
-    search_utf16: bool,
     parse_type: &'static str,
     parse_offset: String,
     sync_parse_offset_to_selection_start: bool,
@@ -126,16 +118,14 @@ impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let start = std::time::Instant::now();
         egui::CentralPanel::default().show(ctx, |ui| {
+            self.state.settings.apply_settings_to_ui(ui);
+
             if let Some(fps) = 1_000_000_000u128.checked_div(self.frame_time.as_nanos()) {
                 ui.painter().text(
                     ui.max_rect().right_top(),
                     egui::Align2::RIGHT_TOP,
                     format!("{fps} FPS"),
-                    ui.style()
-                        .text_styles
-                        .get(&egui::TextStyle::Body)
-                        .unwrap()
-                        .clone(),
+                    TextStyle::Small.resolve(ui.style()),
                     ui.visuals().text_color(),
                 );
             }
@@ -166,7 +156,7 @@ impl eframe::App for MyApp {
                 );
 
                 ui.checkbox(
-                    self.settings.linear_byte_colors_mut(),
+                    self.state.settings.linear_byte_colors_mut(),
                     "Use linear byte colors",
                 );
             });
@@ -179,7 +169,7 @@ impl eframe::App for MyApp {
                 ui,
                 file_size,
                 &mut self.input,
-                &self.settings,
+                &self.state.settings,
                 &mut self.marked_locations,
                 &self.statistics_handler,
                 |ui, source, start, marked_locations| {
@@ -210,7 +200,7 @@ impl eframe::App for MyApp {
 
                     self.hexdump_context.render(
                         ui,
-                        &self.settings,
+                        &self.state.settings,
                         source,
                         &mut self.endianness,
                         start,
@@ -236,59 +226,63 @@ impl eframe::App for MyApp {
                             &signature,
                             self.xor_value,
                             quality,
-                            &self.settings,
+                            &self.state.settings,
                         );
 
                         let old = ui.spacing_mut().slider_width;
-                        ui.spacing_mut().slider_width = self.settings.font_size() * 20.0;
+                        ui.spacing_mut().slider_width = self.state.settings.font_size() * 20.0;
                         ui.add(egui::Slider::new(&mut self.xor_value, 0..=255).text("xor value"));
                         ui.spacing_mut().slider_width = old;
 
                         ui.label(format!(
                             "search {:.02}% complete ({} results)",
-                            self.searcher.progress() * 100.0,
-                            self.searcher.results().len()
+                            self.state.search.searcher.progress() * 100.0,
+                            self.state.search.searcher.results().len()
                         ));
 
                         ui.horizontal(|ui| {
-                            ui.text_edit_singleline(&mut self.search_text);
-                            let mut search_bytes = Vec::new();
-                            let valid = match hexbait_lang::ir::str_lit_content_to_bytes(
-                                &self.search_text,
-                                &mut search_bytes,
-                            ) {
-                                Ok(()) => true,
-                                Err((msg, _)) => {
-                                    ui.label(
-                                        egui::RichText::new("⚠").color(ui.visuals().warn_fg_color),
-                                    )
-                                    .on_hover_ui(|ui| {
-                                        ui.label(format!("invalid string literal: {msg}"));
-                                    });
-                                    false
+                            ui.text_edit_singleline(&mut self.state.search.search_text);
+                            let search_bytes = match self.state.search.search_bytes() {
+                                Ok(bytes) => Some(bytes),
+                                Err(msg) => {
+                                    ui.label(RichText::new("⚠").color(ui.visuals().warn_fg_color))
+                                        .on_hover_ui(|ui| {
+                                            ui.label(format!("invalid string literal: {msg}"));
+                                        });
+                                    None
                                 }
                             };
-                            let valid_utf8 = std::str::from_utf8(&search_bytes).is_ok();
+
+                            let valid_utf8 = search_bytes
+                                .as_ref()
+                                .map(|search_bytes| std::str::from_utf8(search_bytes).is_ok())
+                                .unwrap_or(false);
 
                             ui.checkbox(
-                                &mut self.search_ascii_case_insensitive,
+                                &mut self.state.search.search_ascii_case_insensitive,
                                 "ASCII case insensitive",
                             );
                             ui.add_enabled(
                                 valid_utf8,
-                                egui::Checkbox::new(&mut self.search_utf16, "include UTF-16"),
+                                egui::Checkbox::new(
+                                    &mut self.state.search.search_utf16,
+                                    "include UTF-16",
+                                ),
                             );
                             if ui
                                 .add_enabled(
-                                    valid && !search_bytes.is_empty(),
+                                    search_bytes
+                                        .as_ref()
+                                        .is_some_and(|search_bytes| !search_bytes.is_empty()),
                                     egui::Button::new("start search"),
                                 )
                                 .clicked()
+                                && let Some(search_bytes) = &search_bytes
                             {
-                                self.searcher.start_new_search(
+                                self.state.search.searcher.start_new_search(
                                     &search_bytes,
-                                    self.search_ascii_case_insensitive,
-                                    self.search_utf16 && valid_utf8,
+                                    self.state.search.search_ascii_case_insensitive,
+                                    self.state.search.search_utf16 && valid_utf8,
                                 );
                             }
                         });
@@ -298,7 +292,7 @@ impl eframe::App for MyApp {
 
             self.marked_locations
                 .remove_where(|loc| loc.kind() == MarkingKind::SearchResult);
-            for result in self.searcher.results().iter() {
+            for result in self.state.search.searcher.results().iter() {
                 self.marked_locations
                     .add(MarkedLocation::new(*result, MarkingKind::SearchResult));
             }

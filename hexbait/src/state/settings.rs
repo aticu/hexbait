@@ -1,8 +1,8 @@
-//! Handles GUI settings.
+//! Handles the user settings.
 
-use egui::Color32;
+use egui::{Color32, FontId, TextStyle, Ui};
 
-use super::color::{BYTE_COLORS, ColorMap};
+use crate::gui::color::{BYTE_COLORS, ColorMap};
 
 /// The settings of the GUI.
 pub struct Settings {
@@ -26,6 +26,18 @@ impl Settings {
         }
     }
 
+    /// Applies the current settings to the [`Ui`].
+    pub fn apply_settings_to_ui(&self, ui: &mut Ui) {
+        let text_styles = &mut ui.style_mut().text_styles;
+
+        text_styles.insert(TextStyle::Small, FontId::proportional(self.scale * 0.65));
+        text_styles.insert(TextStyle::Body, FontId::proportional(self.scale * 0.75));
+        text_styles.insert(TextStyle::Monospace, FontId::monospace(self.scale * 0.75));
+        text_styles.insert(TextStyle::Button, FontId::proportional(self.scale * 0.75));
+        text_styles.insert(TextStyle::Heading, FontId::proportional(self.scale * 1.15));
+        text_styles.insert(TextStyle::Name("hex".into()), FontId::monospace(self.scale));
+    }
+
     /// Mutable access to the field determining whether linear byte colors are used.
     pub fn linear_byte_colors_mut(&mut self) -> &mut bool {
         &mut self.linear_byte_colors
@@ -41,14 +53,9 @@ impl Settings {
         self.scale * 0.75
     }
 
-    /// The font size of large text.
-    pub fn large_font_size(&self) -> f32 {
-        self.scale * 0.75
-    }
-
     /// The font size of hex text.
-    pub fn hex_font_size(&self) -> f32 {
-        self.scale
+    pub fn hex_font(&self) -> FontId {
+        FontId::monospace(self.scale)
     }
 
     /// The height of a hex char.

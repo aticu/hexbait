@@ -2,12 +2,11 @@
 
 use egui::{Align2, Color32, FontId, Rect, Sense, Ui, Vec2, show_tooltip_at_pointer, vec2};
 
-use crate::{IDLE_TIME, statistics::Signature, window::Window};
+use crate::{IDLE_TIME, state::Settings, statistics::Signature, window::Window};
 
 use super::{
     cached_image::CachedImage,
     hex::{render_glyph, render_hex},
-    settings::Settings,
 };
 
 /// Displays a data signature as an image of bigram probabilities.
@@ -90,20 +89,8 @@ impl SignatureDisplay {
                 |ui| {
                     ui.vertical(|ui| {
                         ui.horizontal(|ui| {
-                            render_hex(
-                                ui,
-                                settings,
-                                Sense::hover(),
-                                first,
-                                settings.hex_font_size(),
-                            );
-                            render_hex(
-                                ui,
-                                settings,
-                                Sense::hover(),
-                                second,
-                                settings.hex_font_size(),
-                            );
+                            render_hex(ui, settings, Sense::hover(), first, settings.hex_font());
+                            render_hex(ui, settings, Sense::hover(), second, settings.hex_font());
 
                             ui.spacing_mut().item_spacing = Vec2::ZERO;
                             ui.add_space(settings.large_space());

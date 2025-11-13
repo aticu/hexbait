@@ -1,6 +1,6 @@
 //! Implements display logic for parsing results.
 
-use egui::Sense;
+use egui::{FontId, RichText, Sense, TextStyle};
 use hexbait_lang::{
     Value, ValueKind,
     ir::{
@@ -9,7 +9,7 @@ use hexbait_lang::{
     },
 };
 
-use crate::gui::{hex::render_hex, settings::Settings};
+use crate::{gui::hex::render_hex, state::Settings};
 
 /// Displays the given [`Value`] in the GUI.
 ///
@@ -33,10 +33,7 @@ pub fn show_value(
     match &value.kind {
         ValueKind::Boolean(_) | ValueKind::Integer(_) | ValueKind::Float(_) => {
             let hovered = ui
-                .label(
-                    egui::RichText::new(format!("{name_prefix}{:?},", value.kind))
-                        .size(settings.font_size()),
-                )
+                .label(format!("{name_prefix}{:?},", value.kind))
                 .hovered();
 
             this_hovered |= hovered;
@@ -46,55 +43,46 @@ pub fn show_value(
                 let old_spacing = ui.spacing_mut().item_spacing;
                 ui.spacing_mut().item_spacing.x = 0.0;
 
+                let font_size = TextStyle::Body.resolve(ui.style()).size;
+                let hex_font = FontId::monospace(font_size);
+
                 let space = settings.small_space() * 0.6;
 
-                this_hovered |= ui
-                    .label(
-                        egui::RichText::new(format!("{name_prefix}<")).size(settings.font_size()),
-                    )
-                    .hovered();
+                this_hovered |= ui.label(format!("{name_prefix}<")).hovered();
                 if bytes.len() > 16 {
                     for byte in &bytes[..8] {
                         this_hovered |=
-                            render_hex(ui, settings, Sense::hover(), *byte, settings.font_size())
+                            render_hex(ui, settings, Sense::hover(), *byte, hex_font.clone())
                                 .hovered();
                         ui.add_space(space);
                     }
 
-                    this_hovered |= ui
-                        .label(egui::RichText::new("...").size(settings.font_size()))
-                        .hovered();
+                    this_hovered |= ui.label("...").hovered();
 
                     for byte in &bytes[bytes.len() - 8..] {
                         ui.add_space(space);
                         this_hovered |=
-                            render_hex(ui, settings, Sense::hover(), *byte, settings.font_size())
+                            render_hex(ui, settings, Sense::hover(), *byte, hex_font.clone())
                                 .hovered();
                     }
                 } else {
                     for (i, byte) in bytes.iter().enumerate() {
                         this_hovered |=
-                            render_hex(ui, settings, Sense::hover(), *byte, settings.font_size())
+                            render_hex(ui, settings, Sense::hover(), *byte, hex_font.clone())
                                 .hovered();
                         if i != bytes.len() - 1 {
                             ui.add_space(space);
                         }
                     }
                 }
-                this_hovered |= ui
-                    .label(egui::RichText::new(">,").size(settings.font_size()))
-                    .hovered();
+                this_hovered |= ui.label(">,").hovered();
 
                 ui.spacing_mut().item_spacing = old_spacing;
             });
         }
         ValueKind::Struct { fields, error } => {
             ui.vertical(|ui| {
-                let hovered = ui
-                    .label(
-                        egui::RichText::new(format!("{name_prefix}{{")).size(settings.font_size()),
-                    )
-                    .hovered();
+                let hovered = ui.label(format!("{name_prefix}{{")).hovered();
 
                 this_hovered |= hovered;
 
@@ -117,8 +105,7 @@ pub fn show_value(
                         if let Some(err) = error {
                             // TODO: highlight the error when this is hovered
                             ui.label(
-                                egui::RichText::new(format!("... parsing error {err:?},"))
-                                    .size(settings.font_size())
+                                RichText::new(format!("... parsing error {err:?},"))
                                     .color(ui.visuals().error_fg_color),
                             )
                             .hovered();
@@ -126,20 +113,14 @@ pub fn show_value(
                     },
                 );
 
-                let hovered = ui
-                    .label(egui::RichText::new("},").size(settings.font_size()))
-                    .hovered();
+                let hovered = ui.label("},").hovered();
 
                 this_hovered |= hovered;
             });
         }
         ValueKind::Array { items, error } => {
             ui.vertical(|ui| {
-                let hovered = ui
-                    .label(
-                        egui::RichText::new(format!("{name_prefix}[")).size(settings.font_size()),
-                    )
-                    .hovered();
+                let hovered = ui.label(format!("{name_prefix}[")).hovered();
 
                 this_hovered |= hovered;
 
@@ -162,8 +143,7 @@ pub fn show_value(
                         if let Some(err) = error {
                             // TODO: highlight the error when this is hovered
                             ui.label(
-                                egui::RichText::new(format!("... parsing error {err:?},"))
-                                    .size(settings.font_size())
+                                RichText::new(format!("... parsing error {err:?},"))
                                     .color(ui.visuals().error_fg_color),
                             )
                             .hovered();
@@ -171,9 +151,7 @@ pub fn show_value(
                     },
                 );
 
-                let hovered = ui
-                    .label(egui::RichText::new("],").size(settings.font_size()))
-                    .hovered();
+                let hovered = ui.label("],").hovered();
 
                 this_hovered |= hovered;
             });

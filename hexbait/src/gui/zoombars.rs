@@ -6,17 +6,18 @@ use std::{
 };
 
 use egui::{
-    Align, Color32, Context, FontId, Layout, PointerButton, Pos2, Rect, RichText, Sense, Ui,
-    UiBuilder, show_tooltip_at_pointer, vec2,
+    Align, Color32, Context, FontId, Layout, PointerButton, Pos2, Rect, Sense, Ui, UiBuilder,
+    show_tooltip_at_pointer, vec2,
 };
 
-use crate::{IDLE_TIME, data::DataSource, statistics::StatisticsHandler, window::Window};
+use crate::{
+    IDLE_TIME, data::DataSource, state::Settings, statistics::StatisticsHandler, window::Window,
+};
 
 use super::{
     cached_image::CachedImage,
     color,
     marking::{MarkedLocations, render_locations_on_bar},
-    settings::Settings,
 };
 
 /// The selection of a zoombar that selected nothing.
@@ -163,20 +164,32 @@ impl Zoombars {
                         currently_hovered.clone(),
                     );
 
-                    if let Some(location) = marked_locations.hovered() && ui.input(|input| input.pointer.latest_pos().map(|pos| rect.contains(pos)).unwrap_or(false)) {
+                    if let Some(location) = marked_locations.hovered()
+                        && ui.input(|input| {
+                            input
+                                .pointer
+                                .latest_pos()
+                                .map(|pos| rect.contains(pos))
+                                .unwrap_or(false)
+                        })
+                    {
                         let offset = location.window().start();
                         show_tooltip_at_pointer(
                             ui.ctx(),
                             ui.layer_id(),
                             "position_highlight_hover".into(),
                             |ui| {
-                                ui.label(
-                                    RichText::new(format!("{}", offset)).size(settings.font_size()),
-                                );
+                                ui.label(format!("{}", offset));
                             },
                         );
                         if ui.input(|input| input.pointer.primary_clicked()) {
-                            self.rearrange_bars_for_point(rect.height(), file_size, i, offset, total_bytes);
+                            self.rearrange_bars_for_point(
+                                rect.height(),
+                                file_size,
+                                i,
+                                offset,
+                                total_bytes,
+                            );
                             tmp_rearrange_flag = true;
                             show_hex = true;
                             break;
@@ -193,20 +206,15 @@ impl Zoombars {
                                     .unwrap()
                                 {
                                     if quality < 1.0 {
-                                        ui.label(
-                                            RichText::new(format!("Entropy: {entropy:.02} (Estimation quality: {:.2}%)", quality * 100.0))
-                                                .size(settings.font_size()),
-                                        );
+                                        ui.label(format!(
+                                            "Entropy: {entropy:.02} (Estimation quality: {:.2}%)",
+                                            quality * 100.0
+                                        ));
                                     } else {
-                                        ui.label(
-                                            RichText::new(format!("Entropy: {entropy:.02}"))
-                                                .size(settings.font_size()),
-                                        );
+                                        ui.label(format!("Entropy: {entropy:.02}"));
                                     }
                                 } else {
-                                    ui.label(
-                                        RichText::new("Entropy unknown").size(settings.font_size()),
-                                    );
+                                    ui.label("Entropy unknown");
                                 }
                             },
                         );

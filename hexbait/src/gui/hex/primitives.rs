@@ -2,7 +2,7 @@
 
 use egui::{Align2, Color32, FontId, Response, Sense, Ui, vec2};
 
-use crate::gui::settings::Settings;
+use crate::state::Settings;
 
 /// Shows the given offset.
 pub fn render_offset(ui: &mut Ui, settings: &Settings, sense: Sense, offset: u64) -> Response {
@@ -15,7 +15,7 @@ pub fn render_offset(ui: &mut Ui, settings: &Settings, sense: Sense, offset: u64
         ui.cursor().min,
         Align2::LEFT_TOP,
         format!("{offset:016x}"),
-        FontId::monospace(settings.hex_font_size()),
+        settings.hex_font(),
         Color32::from_rgb(100, 100, 100),
     );
 
@@ -28,9 +28,10 @@ pub fn render_hex(
     settings: &Settings,
     sense: Sense,
     byte: u8,
-    font_size: f32,
+    font: FontId,
 ) -> Response {
-    let char_width = font_size * 0.6;
+    // TODO: replace this with a better calculation
+    let char_width = font.size * 0.6;
     let mut rect = ui.cursor();
     rect.max.x = rect.min.x + char_width * 2.0;
     rect.max.y = rect.min.y + settings.char_height();
@@ -42,7 +43,7 @@ pub fn render_hex(
         rect.center(),
         Align2::CENTER_CENTER,
         format!("{byte:02x}"),
-        FontId::monospace(font_size),
+        font,
         color,
     );
 
@@ -76,7 +77,7 @@ pub fn render_glyph(ui: &mut Ui, settings: &Settings, sense: Sense, byte: u8) ->
             ui.cursor().min,
             Align2::LEFT_TOP,
             format!("{c}"),
-            FontId::monospace(settings.hex_font_size()),
+            settings.hex_font(),
             color,
         );
     } else {

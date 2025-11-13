@@ -8,7 +8,7 @@ use egui::{
     pos2,
 };
 
-use crate::gui::{color, settings::Settings};
+use crate::{gui::color, state::Settings};
 
 /// Renders the selection polygon on screen.
 pub(crate) fn highlight(

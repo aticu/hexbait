@@ -1,8 +1,8 @@
 //! Implements rendering of the inspector window for bytes.
 
-use egui::{Color32, FontId, Rect, RichText, Sense, Ui, vec2};
+use egui::{Color32, Rect, RichText, Sense, Ui, vec2};
 
-use crate::{gui::settings::Settings, model::Endianness};
+use crate::{model::Endianness, state::Settings};
 
 /// Renders a data inspector, showing different views on the selected data.
 pub(crate) fn render_inspector(
@@ -12,19 +12,10 @@ pub(crate) fn render_inspector(
     settings: &Settings,
 ) {
     let row_height = settings.font_size() * 1.1;
-    let font = FontId::proportional(settings.font_size());
 
     ui.horizontal(|ui| {
-        ui.selectable_value(
-            endianness,
-            Endianness::Little,
-            RichText::new("Little Endian").font(font.clone()),
-        );
-        ui.selectable_value(
-            endianness,
-            Endianness::Big,
-            RichText::new("Big Endian").font(font.clone()),
-        );
+        ui.selectable_value(endianness, Endianness::Little, "Little Endian");
+        ui.selectable_value(endianness, Endianness::Big, "Big Endian");
     });
 
     let buf = selected.unwrap_or(&[]);
@@ -211,16 +202,11 @@ pub(crate) fn render_inspector(
         .column(Column::remainder())
         .drag_to_scroll(false)
         .header(row_height * 1.5, |mut header| {
-            let font = FontId {
-                size: settings.large_font_size(),
-                ..font.clone()
-            };
-
             header.col(|ui| {
-                ui.heading(RichText::new("Type").font(font.clone()));
+                ui.heading(RichText::new("Type").heading());
             });
             header.col(|ui| {
-                ui.heading(RichText::new("Value").font(font.clone()));
+                ui.heading(RichText::new("Value").heading());
             });
         })
         .body(|mut body| {
@@ -228,10 +214,10 @@ pub(crate) fn render_inspector(
                 if let Some(value) = value {
                     body.row(row_height, |mut row| {
                         row.col(|ui| {
-                            ui.label(RichText::new(*name).font(font.clone()));
+                            ui.label(*name);
                         });
                         row.col(|ui| {
-                            ui.label(RichText::new(value).font(font.clone()));
+                            ui.label(value);
                         });
                     });
                 }
@@ -240,7 +226,7 @@ pub(crate) fn render_inspector(
             if buf.len() >= 3 {
                 body.row(row_height, |mut row| {
                     row.col(|ui| {
-                        ui.label(RichText::new("RGB8 color").font(font.clone()));
+                        ui.label("RGB8 color");
                     });
                     row.col(|ui| {
                         let r = buf[0];
@@ -272,7 +258,7 @@ pub(crate) fn render_inspector(
             if buf.len() >= 2 {
                 body.row(row_height, |mut row| {
                     row.col(|ui| {
-                        ui.label(RichText::new("RGB565 color").font(font.clone()));
+                        ui.label("RGB565 color");
                     });
                     row.col(|ui| {
                         let val = read_int!(u16).unwrap();

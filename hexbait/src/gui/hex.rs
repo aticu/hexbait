@@ -1,11 +1,11 @@
 //! Renders hexdumps in the GUI.
 
-use egui::{Align, Color32, Layout, Rect, RichText, ScrollArea, Sense, Ui, UiBuilder, Vec2, vec2};
+use egui::{Align, Color32, Layout, Rect, ScrollArea, Sense, Ui, UiBuilder, Vec2, vec2};
 use hexbait_lang::{View, ir::File};
 use highlighting::highlight;
 use selection::SelectionContext;
 
-use crate::{data::DataSource, gui::color, model::Endianness, window::Window};
+use crate::{data::DataSource, gui::color, model::Endianness, state::Settings, window::Window};
 
 pub mod highlighting;
 mod inspector;
@@ -20,7 +20,6 @@ pub use primitives::{render_glyph, render_hex, render_offset};
 use super::{
     cached_image::CachedImage,
     marking::{MarkedLocation, MarkedLocations, MarkingKind, render_locations_on_bar},
-    settings::Settings,
 };
 
 /// A hexdump viewer widget.
@@ -298,31 +297,23 @@ impl HexdumpView {
             ui.spacing_mut().item_spacing = Vec2::ZERO;
 
             let render_offset_info = |ui: &mut Ui, byte_offset: u64, selection: Option<Window>| {
-                ui.label(
-                    RichText::new(format!(
-                        "offset from file start: 0x{byte_offset:x} ({byte_offset})"
-                    ))
-                    .size(settings.font_size()),
-                );
+                ui.label(format!(
+                    "offset from file start: 0x{byte_offset:x} ({byte_offset})"
+                ));
                 if let Some(selection) = selection {
                     let selection_offset = byte_offset as i64 - selection.start() as i64;
-                    ui.label(
-                        RichText::new(format!(
-                            "offset from selection start: {}0x{:x} ({selection_offset})",
-                            if selection_offset < 0 { "-" } else { "" },
-                            selection_offset.abs()
-                        ))
-                        .size(settings.font_size()),
-                    );
+                    ui.label(format!(
+                        "offset from selection start: {}0x{:x} ({selection_offset})",
+                        if selection_offset < 0 { "-" } else { "" },
+                        selection_offset.abs()
+                    ));
                 }
             };
 
             // offset
             render_offset(ui, settings, Sense::hover(), offset).on_hover_ui(|ui| {
                 let percentage = offset as f64 / file_size as f64 * 100.0;
-                ui.label(
-                    RichText::new(format!("{percentage:.02}% of file")).size(settings.font_size()),
-                );
+                ui.label(format!("{percentage:.02}% of file"));
             });
             ui.add_space(settings.large_space());
 
@@ -334,8 +325,7 @@ impl HexdumpView {
 
                 let byte_offset = offset + i as u64;
 
-                let response =
-                    render_hex(ui, settings, Sense::hover(), byte, settings.hex_font_size());
+                let response = render_hex(ui, settings, Sense::hover(), byte, settings.hex_font());
                 self.selection_context
                     .handle_selection(ui.ctx(), &response, byte_offset);
 
@@ -380,7 +370,7 @@ impl HexdumpView {
                     .handle_selection(ui.ctx(), &response, byte_offset);
 
                 response.on_hover_ui(|ui| {
-                    render_hex(ui, settings, Sense::hover(), byte, settings.hex_font_size());
+                    render_hex(ui, settings, Sense::hover(), byte, settings.hex_font());
                     render_offset_info(ui, byte_offset, self.selection());
                 });
             }
