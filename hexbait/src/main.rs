@@ -130,6 +130,8 @@ impl eframe::App for MyApp {
                 );
             }
 
+            let mut jump_to_offset = false;
+
             ui.horizontal(|ui| {
                 ui.label("Parse as:");
                 egui::ComboBox::from_label("")
@@ -150,6 +152,15 @@ impl eframe::App for MyApp {
 
                 ui.label("Parse offset:");
                 ui.text_edit_singleline(&mut self.parse_offset);
+                if ui
+                    .add_enabled(
+                        self.parse_offset.parse::<u64>().is_ok(),
+                        egui::Button::new("Jump to offset"),
+                    )
+                    .clicked()
+                {
+                    jump_to_offset = true;
+                }
                 ui.checkbox(
                     &mut self.sync_parse_offset_to_selection_start,
                     "Sync parse offset to selection start",
@@ -162,6 +173,19 @@ impl eframe::App for MyApp {
             });
 
             let file_size = self.input.len().unwrap();
+
+            if jump_to_offset && let Ok(offset) = self.parse_offset.parse() {
+                let height = ui.max_rect().intersect(ui.cursor()).height();
+                let total_rows = (height.trunc() as u64).max(1);
+                let total_bytes = total_rows * 16;
+                self.zoombars.rearrange_bars_for_point(
+                    ui.max_rect().intersect(ui.cursor()).height(),
+                    file_size,
+                    0,
+                    offset,
+                    total_bytes,
+                );
+            }
 
             let mut parse_offset = self.parse_offset.parse().ok();
 
