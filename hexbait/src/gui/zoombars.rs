@@ -6,8 +6,8 @@ use std::{
 };
 
 use egui::{
-    Align, Color32, Context, FontId, Layout, PointerButton, Pos2, Rect, Sense, Ui, UiBuilder,
-    show_tooltip_at_pointer, vec2,
+    Align, Color32, Context, FontId, Layout, PointerButton, PopupAnchor, Pos2, Rect, Sense,
+    Tooltip, Ui, UiBuilder, vec2,
 };
 
 use crate::{
@@ -85,7 +85,7 @@ impl Zoombars {
 
         let mut tmp_rearrange_flag = false;
 
-        ui.allocate_new_ui(
+        ui.scope_builder(
             UiBuilder::new()
                 .max_rect(rect)
                 .layout(Layout::left_to_right(Align::Min)),
@@ -174,14 +174,15 @@ impl Zoombars {
                         })
                     {
                         let offset = location.window().start();
-                        show_tooltip_at_pointer(
-                            ui.ctx(),
+                        Tooltip::always_open(
+                            ui.ctx().clone(),
                             ui.layer_id(),
                             "position_highlight_hover".into(),
-                            |ui| {
-                                ui.label(format!("{}", offset));
-                            },
-                        );
+                            PopupAnchor::Pointer,
+                        )
+                        .show(|ui| {
+                            ui.label(format!("{}", offset));
+                        });
                         if ui.input(|input| input.pointer.primary_clicked()) {
                             self.rearrange_bars_for_point(
                                 rect.height(),
@@ -195,29 +196,30 @@ impl Zoombars {
                             break;
                         }
                     } else if let Some(row_window) = hovered_row_window {
-                        show_tooltip_at_pointer(
-                            ui.ctx(),
+                        Tooltip::always_open(
+                            ui.ctx().clone(),
                             ui.layer_id(),
                             "zoombar_tooltip".into(),
-                            |ui| {
-                                if let Some((entropy, quality)) = handler
-                                    .get_entropy(row_window)
-                                    .into_result_with_quality()
-                                    .unwrap()
-                                {
-                                    if quality < 1.0 {
-                                        ui.label(format!(
-                                            "Entropy: {entropy:.02} (Estimation quality: {:.2}%)",
-                                            quality * 100.0
-                                        ));
-                                    } else {
-                                        ui.label(format!("Entropy: {entropy:.02}"));
-                                    }
+                            PopupAnchor::Pointer,
+                        )
+                        .show(|ui| {
+                            if let Some((entropy, quality)) = handler
+                                .get_entropy(row_window)
+                                .into_result_with_quality()
+                                .unwrap()
+                            {
+                                if quality < 1.0 {
+                                    ui.label(format!(
+                                        "Entropy: {entropy:.02} (Estimation quality: {:.2}%)",
+                                        quality * 100.0
+                                    ));
                                 } else {
-                                    ui.label("Entropy unknown");
+                                    ui.label(format!("Entropy: {entropy:.02}"));
                                 }
-                            },
-                        );
+                            } else {
+                                ui.label("Entropy unknown");
+                            }
+                        });
                     }
 
                     window = bar.selection_window(window, rect.height());

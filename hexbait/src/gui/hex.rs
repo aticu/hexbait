@@ -103,7 +103,7 @@ impl HexdumpView {
             self.selection_context
                 .check_for_selection_process_end(ui.ctx());
 
-            ui.allocate_new_ui(
+            ui.scope_builder(
                 UiBuilder::new()
                     .max_rect(rect)
                     .layout(Layout::left_to_right(Align::Min)),
@@ -186,7 +186,7 @@ impl HexdumpView {
                         vec2(rest_rect.width(), half_height),
                     );
 
-                    ui.allocate_new_ui(
+                    ui.scope_builder(
                         UiBuilder::new()
                             .max_rect(top_rect)
                             .layout(Layout::left_to_right(Align::Min)),
@@ -202,7 +202,7 @@ impl HexdumpView {
                         },
                     );
 
-                    ui.allocate_new_ui(
+                    ui.scope_builder(
                         UiBuilder::new()
                             .max_rect(bottom_rect)
                             .layout(Layout::left_to_right(Align::Min)),

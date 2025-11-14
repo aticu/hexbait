@@ -88,7 +88,7 @@ pub fn show_value(
 
                 let mut child_rect = ui.cursor().intersect(ui.max_rect());
                 child_rect.min.x += settings.font_size();
-                ui.allocate_new_ui(
+                ui.scope_builder(
                     egui::UiBuilder::new()
                         .max_rect(child_rect)
                         .layout(egui::Layout::top_down(egui::Align::Min)),
@@ -126,7 +126,7 @@ pub fn show_value(
 
                 let mut child_rect = ui.cursor().intersect(ui.max_rect());
                 child_rect.min.x += settings.font_size();
-                ui.allocate_new_ui(
+                ui.scope_builder(
                     egui::UiBuilder::new()
                         .max_rect(child_rect)
                         .layout(egui::Layout::top_down(egui::Align::Min)),

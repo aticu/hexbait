@@ -1,6 +1,6 @@
 //! Implements displaying of bigram signatures.
 
-use egui::{Align2, Color32, FontId, Rect, Sense, Ui, Vec2, show_tooltip_at_pointer, vec2};
+use egui::{Align2, Color32, FontId, PopupAnchor, Rect, Sense, Tooltip, Ui, Vec2, vec2};
 
 use crate::{IDLE_TIME, state::Settings, statistics::Signature, window::Window};
 
@@ -82,29 +82,30 @@ impl SignatureDisplay {
         if let Some((first, second)) = hover_positions {
             let intensity = signature.tuple(first ^ xor_value, second ^ xor_value);
 
-            show_tooltip_at_pointer(
-                ui.ctx(),
+            Tooltip::always_open(
+                ui.ctx().clone(),
                 ui.layer_id(),
                 "signature_display_tooltip".into(),
-                |ui| {
-                    ui.vertical(|ui| {
-                        ui.horizontal(|ui| {
-                            render_hex(ui, settings, Sense::hover(), first, settings.hex_font());
-                            render_hex(ui, settings, Sense::hover(), second, settings.hex_font());
+                PopupAnchor::Pointer,
+            )
+            .show(|ui| {
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        render_hex(ui, settings, Sense::hover(), first, settings.hex_font());
+                        render_hex(ui, settings, Sense::hover(), second, settings.hex_font());
 
-                            ui.spacing_mut().item_spacing = Vec2::ZERO;
-                            ui.add_space(settings.large_space());
+                        ui.spacing_mut().item_spacing = Vec2::ZERO;
+                        ui.add_space(settings.large_space());
 
-                            render_glyph(ui, settings, Sense::hover(), first);
-                            render_glyph(ui, settings, Sense::hover(), second);
-                        });
-                        ui.label(format!(
-                            "Relative Density: {:0.02}%",
-                            intensity as f64 / 2.55,
-                        ));
+                        render_glyph(ui, settings, Sense::hover(), first);
+                        render_glyph(ui, settings, Sense::hover(), second);
                     });
-                },
-            );
+                    ui.label(format!(
+                        "Relative Density: {:0.02}%",
+                        intensity as f64 / 2.55,
+                    ));
+                });
+            });
         }
     }
 }
