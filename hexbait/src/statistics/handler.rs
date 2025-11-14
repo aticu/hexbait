@@ -1,6 +1,13 @@
 //! Implements a handler that manages statistics for an input.
 
-use std::sync::{Arc, mpsc};
+use std::{
+    cell::Cell,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
+};
 
 use background_thread::{BackgroundThread, Request, RequestKind};
 use quick_cache::sync::Cache;
@@ -45,10 +52,14 @@ pub struct StatisticsHandler {
     entropy_smallest: Arc<Cache<u64, u8>>,
     /// A cache for entropy values.
     entropy_results: Arc<Cache<Window, u8>>,
+    /// Whether the queue in the background thread is empty.
+    empty_queue: Arc<AtomicBool>,
     /// The requests for new windows to compute.
     requests: mpsc::Sender<background_thread::Message>,
     /// Whether to send requests for new data to the backend.
     send_requests: bool,
+    /// Whether or not an incomplete section was found during computing of the statistics.
+    saw_uncompleteness: Cell<bool>,
 }
 
 impl StatisticsHandler {
@@ -58,15 +69,17 @@ impl StatisticsHandler {
         let aligned_windows = Arc::new(std::array::from_fn(|i| {
             Cache::new(CacheSize::try_from_index(i).unwrap().num_entries())
         }));
-        let unaligned_windows = Arc::new(Cache::new(2));
+        let unaligned_windows = Arc::new(Cache::new(4));
         let entropy_smallest = Arc::new(Cache::new(65_536));
         let entropy_results = Arc::new(Cache::new(65_536));
+        let empty_queue = Arc::new(AtomicBool::new(false));
 
         let background_thread = BackgroundThread {
             aligned_windows: Arc::clone(&aligned_windows),
             unaligned_windows: Arc::clone(&unaligned_windows),
             entropy_smallest: Arc::clone(&entropy_smallest),
             entropy_results: Arc::clone(&entropy_results),
+            empty_queue: Arc::clone(&empty_queue),
             requests: receiver,
             request_buffer: Vec::new(),
             source,
@@ -79,8 +92,10 @@ impl StatisticsHandler {
             unaligned_windows,
             entropy_smallest,
             entropy_results,
+            empty_queue,
             requests: sender,
             send_requests: true,
+            saw_uncompleteness: Cell::new(false),
         }
     }
 
@@ -212,6 +227,7 @@ impl StatisticsHandler {
         assert_eq!(output.window, window);
 
         if total_valid_bytes != window.size() {
+            self.saw_uncompleteness.set(true);
             StatisticsResult::Estimate {
                 value: output,
                 quality: total_valid_bytes as f32 / window.size() as f32,
@@ -253,7 +269,9 @@ impl StatisticsHandler {
                 .unwrap();
             self.send_requests = true;
         } else {
-            self.send_requests = false;
+            self.send_requests =
+                self.saw_uncompleteness.get() && self.empty_queue.load(Ordering::Relaxed);
+            self.saw_uncompleteness.set(false);
         }
     }
 }

@@ -4,6 +4,7 @@ use std::{
     cmp,
     sync::{
         Arc,
+        atomic::{AtomicBool, Ordering},
         mpsc::{self, TryRecvError},
     },
 };
@@ -105,6 +106,8 @@ pub(crate) struct BackgroundThread {
     pub(crate) entropy_smallest: Arc<Cache<u64, u8>>,
     /// A cache for entropy values.
     pub(crate) entropy_results: Arc<Cache<Window, u8>>,
+    /// Whether the queue in the background thread is empty.
+    pub(crate) empty_queue: Arc<AtomicBool>,
     /// The requests for new windows to compute.
     pub(crate) requests: mpsc::Receiver<Message>,
     /// Already received read requests for windows.
@@ -136,6 +139,7 @@ impl BackgroundThread {
         }
 
         if new_requests {
+            self.empty_queue.store(false, Ordering::Relaxed);
             self.request_buffer.sort();
         }
 
@@ -265,6 +269,7 @@ impl BackgroundThread {
             if let Some(request) = self.request_buffer.pop() {
                 self.serve_request(request);
             } else {
+                self.empty_queue.store(true, Ordering::Relaxed);
                 std::thread::sleep(IDLE_TIME);
             }
         }
