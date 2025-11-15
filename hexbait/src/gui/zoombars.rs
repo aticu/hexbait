@@ -9,6 +9,8 @@ use egui::{
     Align, Color32, Context, FontId, Layout, PointerButton, PopupAnchor, Pos2, Rect, Sense,
     Tooltip, Ui, UiBuilder, vec2,
 };
+use hexbait_common::{AbsoluteOffset, Len, RelativeOffset};
+use size_format::SizeFormatterBinary;
 
 use crate::{
     IDLE_TIME, data::DataSource, state::Settings, statistics::StatisticsHandler, window::Window,
@@ -52,7 +54,7 @@ impl Zoombars {
     pub fn render<Source: DataSource>(
         &mut self,
         ui: &mut Ui,
-        file_size: u64,
+        file_size: Len,
         source: &mut Source,
         settings: &Settings,
         marked_locations: &mut MarkedLocations,
@@ -68,7 +70,7 @@ impl Zoombars {
         let size_text_height = settings.font_size() * 0.7;
 
         let total_rows = (rect.height().trunc() as u64).max(1);
-        let total_bytes = total_rows * 16;
+        let total_bytes = Len::from(total_rows * 16);
 
         if total_bytes >= file_size {
             render_hex(ui, source, 0, marked_locations);
@@ -77,7 +79,7 @@ impl Zoombars {
             self.bars.push(Zoombar::new());
         }
 
-        let mut window = Window::new(0, file_size);
+        let mut window = Window::from_start_len(AbsoluteOffset::ZERO, file_size);
         let mut show_hex = false;
 
         let mut new_hovered_location = None;
@@ -102,7 +104,7 @@ impl Zoombars {
                     ui.painter().text(
                         rect.min,
                         egui::Align2::LEFT_BOTTOM,
-                        format!("{}B", size_format::SizeFormatterBinary::new(window.size())),
+                        format!("{}B", SizeFormatterBinary::new(window.size().as_u64())),
                         FontId::proportional(size_text_height),
                         ui.style().noninteractive().text_color(),
                     );
@@ -181,7 +183,7 @@ impl Zoombars {
                             PopupAnchor::Pointer,
                         )
                         .show(|ui| {
-                            ui.label(format!("{}", offset));
+                            ui.label(format!("{}", offset.as_u64()));
                         });
                         if ui.input(|input| input.pointer.primary_clicked()) {
                             self.rearrange_bars_for_point(
@@ -245,22 +247,18 @@ impl Zoombars {
                 }
 
                 if show_hex {
-                    let start = if window.start() == 0 {
+                    let start = if window.start().is_start_of_file() {
                         // ensure that the correction below does not make the start invisible
 
                         0
-                    } else if window.end() > file_size - 16 {
+                    } else if window.end() > AbsoluteOffset::ZERO + file_size - Len::from(16) {
                         // over-correct towards the end to ensure it's guaranteed to be visible
 
-                        let rounded_up_size = if file_size % 16 == 0 {
-                            file_size
-                        } else {
-                            file_size - (file_size % 16) + 16
-                        };
+                        let rounded_up_size = file_size.round_up(16);
 
-                        (rounded_up_size - total_bytes) / 16
+                        (rounded_up_size - total_bytes).as_u64() / 16
                     } else {
-                        window.start() / 16
+                        window.start().as_u64() / 16
                     };
 
                     render_hex(ui, source, start, marked_locations);
@@ -280,10 +278,10 @@ impl Zoombars {
     pub fn rearrange_bars_for_point(
         &mut self,
         bar_height: f32,
-        file_size: u64,
+        file_size: Len,
         start_bar: usize,
-        point: u64,
-        total_bytes: u64,
+        point: AbsoluteOffset,
+        total_bytes: Len,
     ) {
         let from_center_len = |center: f32, len: f32| -> RangeInclusive<f32> {
             let tentative_start = center - (len / 2.0);
@@ -298,7 +296,7 @@ impl Zoombars {
             start..=start + len
         };
 
-        let mut window = Window::new(0, file_size);
+        let mut window = Window::from_start_len(AbsoluteOffset::ZERO, file_size);
         for bar in self.bars.iter_mut().take(start_bar + 1) {
             let selected_window = bar.selection_window(window, bar_height);
             if selected_window.contains(point) {
@@ -310,7 +308,8 @@ impl Zoombars {
             let selection = bar.selection(min_selection_size);
 
             let selection_len = selection.end() - selection.start();
-            let selection_center = (point - window.start()) as f32 / window.size() as f32;
+            let selection_center =
+                (point - window.start()).as_u64() as f32 / window.size().as_u64() as f32;
 
             bar.set_selection(from_center_len(selection_center, selection_len));
 
@@ -326,7 +325,8 @@ impl Zoombars {
         while window.size() > total_bytes {
             let min_selection_size = min_selection_size(window, bar_height);
             let selection_len = 0.05f32.max(min_selection_size);
-            let selection_center = (point - window.start()) as f32 / window.size() as f32;
+            let selection_center =
+                (point - window.start()).as_u64() as f32 / window.size().as_u64() as f32;
 
             let mut bar = Zoombar::new();
             bar.set_selection(from_center_len(selection_center, selection_len));
@@ -424,11 +424,14 @@ impl Zoombar {
         let min_selection_size = min_selection_size(prev_window, bar_height);
         let selection = self.selection(min_selection_size);
 
-        let new_start_offset = (prev_window.size() as f32 * selection.start()) as u64;
+        let new_start_offset =
+            RelativeOffset::from((prev_window.size().as_u64() as f32 * selection.start()) as u64);
 
         let start = prev_window.start() + new_start_offset;
-        let selection_size =
-            ((selection.end() - selection.start()) as f64 * prev_window.size() as f64) as u64;
+        let selection_size = Len::from(
+            ((selection.end() - selection.start()) as f64 * prev_window.size().as_u64() as f64)
+                as u64,
+        );
 
         Window::new(
             start,
@@ -551,7 +554,8 @@ impl Zoombar {
         let selection_start = (rect.height() * *selection.start()).trunc() as usize;
         let selection_end = (rect.height() * *selection.end()).trunc() as usize;
 
-        let bytes_per_row = (window.size() as f64 / total_rows as f64).round() as u64;
+        let bytes_per_row =
+            Len::from((window.size().as_u64() as f64 / total_rows as f64).round() as u64);
 
         let side_start = (rect.width() - 2.0) as usize;
 
@@ -561,7 +565,8 @@ impl Zoombar {
             (self.selection(min_selection_size), window),
             |x, y| {
                 let relative_offset = y as f64 / total_rows as f64;
-                let offset_within_range = (relative_offset * window.size() as f64) as u64;
+                let offset_within_range =
+                    RelativeOffset::from((relative_offset * window.size().as_u64() as f64) as u64);
 
                 let row_window =
                     Window::from_start_len(window.start() + offset_within_range, bytes_per_row);
@@ -591,7 +596,8 @@ impl Zoombar {
                 let y = (pos.y - rect.min.y) as usize;
 
                 let relative_offset = y as f64 / total_rows as f64;
-                let offset_within_range = (relative_offset * window.size() as f64) as u64;
+                let offset_within_range =
+                    RelativeOffset::from((relative_offset * window.size().as_u64() as f64) as u64);
 
                 Window::from_start_len(window.start() + offset_within_range, bytes_per_row)
             })
@@ -605,12 +611,13 @@ impl Default for Zoombar {
 }
 
 /// Returns the position of `offset` on the bar spanning `bar_window` displayed in `bar_rect`.
-pub fn offset_on_bar(bar_rect: Rect, bar_window: Window, offset: u64) -> Option<Pos2> {
+pub fn offset_on_bar(bar_rect: Rect, bar_window: Window, offset: AbsoluteOffset) -> Option<Pos2> {
     if offset < bar_window.start() {
         return None;
     }
 
-    let relative_offset = (offset - bar_window.start()) as f32 / bar_window.size() as f32;
+    let relative_offset =
+        (offset - bar_window.start()).as_u64() as f32 / bar_window.size().as_u64() as f32;
     let height = bar_rect.height().ceil();
 
     if 0.0 <= relative_offset && relative_offset <= 1.0 {
@@ -631,5 +638,5 @@ fn min_selection_size(window: Window, bar_height: f32) -> f32 {
 
     let maximum_min_selection_size = (total_rows - 1) as f32 / total_rows as f32;
 
-    (total_bytes as f32 / window.size() as f32).min(maximum_min_selection_size)
+    (total_bytes as f32 / window.size().as_u64() as f32).min(maximum_min_selection_size)
 }

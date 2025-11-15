@@ -2,5 +2,6 @@
 resolver = "2"
 members = [
     "hexbait",
+    "hexbait-common",
     "hexbait-lang",
 ]

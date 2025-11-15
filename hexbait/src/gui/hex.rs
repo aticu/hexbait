@@ -1,6 +1,7 @@
 //! Renders hexdumps in the GUI.
 
 use egui::{Align, Color32, Layout, Rect, ScrollArea, Sense, Ui, UiBuilder, Vec2, vec2};
+use hexbait_common::{AbsoluteOffset, Len};
 use hexbait_lang::{View, ir::File};
 use highlighting::highlight;
 use selection::SelectionContext;
@@ -51,12 +52,12 @@ impl HexdumpView {
         settings: &Settings,
         source: &mut impl DataSource,
         endianness: &mut Endianness,
-        start: u64,
-        (parse_type, parse_offset): (Option<&File>, &mut Option<u64>),
+        start_row: u64,
+        (parse_type, parse_offset): (Option<&File>, &mut Option<AbsoluteOffset>),
         marked_locations: &mut MarkedLocations,
     ) {
         // start is in rows
-        let start_in_bytes = start * 16;
+        let start_in_bytes = AbsoluteOffset::from(start_row * 16);
 
         let rect = ui.max_rect().intersect(ui.cursor());
         let height = ui.available_height();
@@ -69,7 +70,9 @@ impl HexdumpView {
         let file_size = source.len();
 
         if let Ok(window) = source.window_at(start_in_bytes, &mut buf) {
-            let file_size = file_size.unwrap_or_else(|_| start_in_bytes + window.len() as u64);
+            let file_size = file_size.unwrap_or_else(|_| {
+                Len::from(start_in_bytes.as_u64()) + Len::from(window.len() as u64)
+            });
 
             let hex_rect_width = (16 * settings.bar_width_multiplier()) as f32
                 + ui.spacing().item_spacing.x
@@ -115,7 +118,7 @@ impl HexdumpView {
                         window,
                         rows_onscreen,
                         max_scroll,
-                        start,
+                        start_row,
                         marked_locations,
                         settings,
                     );
@@ -134,7 +137,7 @@ impl HexdumpView {
 
                         for location in marked_locations.iter_window(Window::from_start_len(
                             start_in_bytes,
-                            window.len() as u64,
+                            Len::from(window.len() as u64),
                         )) {
                             let Some(range) = location.window().range_inclusive() else {
                                 continue;
@@ -145,7 +148,7 @@ impl HexdumpView {
                                 location.inner_color(),
                                 location.border_color(),
                                 file_size,
-                                start + self.scroll_offset,
+                                start_row + self.scroll_offset,
                                 rows_onscreen,
                                 settings,
                             );
@@ -159,7 +162,7 @@ impl HexdumpView {
                         {
                             self.render_row(
                                 ui,
-                                start_in_bytes + (i as u64 * 16),
+                                start_in_bytes + Len::from(i as u64 * 16),
                                 row,
                                 file_size,
                                 settings,
@@ -168,7 +171,7 @@ impl HexdumpView {
                     });
                     let mut selected_buf;
                     let selected_buf = if let Some(selection) = self.selection() {
-                        selected_buf = vec![0; selection.size() as usize];
+                        selected_buf = vec![0; selection.size().as_u64() as usize];
                         source.window_at(selection.start(), &mut selected_buf).ok()
                     } else {
                         None
@@ -230,7 +233,7 @@ impl HexdumpView {
                                     };
                                     let view = View::Subview {
                                         view: &view,
-                                        valid_range: parse_offset..view.len(),
+                                        valid_range: parse_offset.as_u64()..view.len(),
                                     };
                                     let result = hexbait_lang::eval_ir(&parse_type, view, 0);
                                     let hovered = parse_result::show_value(
@@ -246,7 +249,9 @@ impl HexdumpView {
                                     {
                                         for range in value.provenance.byte_ranges() {
                                             marked_locations.add(MarkedLocation::new(
-                                                range.into(),
+                                                (AbsoluteOffset::from(*range.start())
+                                                    ..=AbsoluteOffset::from(*range.end()))
+                                                    .into(),
                                                 MarkingKind::HoveredParsed,
                                             ));
                                         }
@@ -262,7 +267,7 @@ impl HexdumpView {
 
             if copy_event
                 && let Some(selection) = self.selection()
-                && let Ok(size) = usize::try_from(selection.size())
+                && let Ok(size) = usize::try_from(selection.size().as_u64())
             {
                 let mut buf = vec![0; size];
                 if let Ok(window) = source.window_at(selection.start(), &mut buf) {
@@ -281,38 +286,41 @@ impl HexdumpView {
     fn selection(&self) -> Option<Window> {
         self.selection_context
             .selection()
-            .map(|selection| Window::new(*selection.start(), *selection.end() + 1))
+            .map(|selection| Window::new(*selection.start(), *selection.end() + Len::from(1)))
     }
 
     /// Renders a single row in a hexdump.
     fn render_row(
         &mut self,
         ui: &mut Ui,
-        offset: u64,
+        offset: AbsoluteOffset,
         row: &[u8],
-        file_size: u64,
+        file_size: Len,
         settings: &Settings,
     ) {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing = Vec2::ZERO;
 
-            let render_offset_info = |ui: &mut Ui, byte_offset: u64, selection: Option<Window>| {
-                ui.label(format!(
-                    "offset from file start: 0x{byte_offset:x} ({byte_offset})"
-                ));
-                if let Some(selection) = selection {
-                    let selection_offset = byte_offset as i64 - selection.start() as i64;
+            let render_offset_info =
+                |ui: &mut Ui, byte_offset: AbsoluteOffset, selection: Option<Window>| {
                     ui.label(format!(
-                        "offset from selection start: {}0x{:x} ({selection_offset})",
-                        if selection_offset < 0 { "-" } else { "" },
-                        selection_offset.abs()
+                        "offset from file start: 0x{:x} ({byte_offset:?})",
+                        byte_offset.as_u64(),
                     ));
-                }
-            };
+                    if let Some(selection) = selection {
+                        let selection_offset =
+                            byte_offset.as_u64() as i64 - selection.start().as_u64() as i64;
+                        ui.label(format!(
+                            "offset from selection start: {}0x{:x} ({selection_offset})",
+                            if selection_offset < 0 { "-" } else { "" },
+                            selection_offset.abs()
+                        ));
+                    }
+                };
 
             // offset
             render_offset(ui, settings, Sense::hover(), offset).on_hover_ui(|ui| {
-                let percentage = offset as f64 / file_size as f64 * 100.0;
+                let percentage = offset.as_u64() as f64 / file_size.as_u64() as f64 * 100.0;
                 ui.label(format!("{percentage:.02}% of file"));
             });
             ui.add_space(settings.large_space());
@@ -323,7 +331,7 @@ impl HexdumpView {
                     ui.add_space(settings.small_space());
                 }
 
-                let byte_offset = offset + i as u64;
+                let byte_offset = offset + Len::from(i as u64);
 
                 let response = render_hex(ui, settings, Sense::hover(), byte, settings.hex_font());
                 self.selection_context
@@ -363,7 +371,7 @@ impl HexdumpView {
                     ui.add_space(settings.small_space());
                 }
 
-                let byte_offset = offset + i as u64;
+                let byte_offset = offset + Len::from(i as u64);
 
                 let response = render_glyph(ui, settings, Sense::click(), byte);
                 self.selection_context
@@ -432,7 +440,10 @@ impl HexdumpView {
         render_locations_on_bar(
             ui,
             rect,
-            Window::from_start_len(start * 16, window.len() as u64),
+            Window::from_start_len(
+                AbsoluteOffset::from(start * 16),
+                Len::from(window.len() as u64),
+            ),
             marked_locations,
             &mut new_hovered_location,
             currently_hovered,

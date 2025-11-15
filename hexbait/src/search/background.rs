@@ -9,6 +9,7 @@ use std::{
 };
 
 use aho_corasick::AhoCorasick;
+use hexbait_common::{AbsoluteOffset, Len};
 
 use crate::{
     IDLE_TIME,
@@ -41,9 +42,9 @@ pub(crate) struct BackgroundSearcher {
     /// The search results.
     results: Arc<RwLock<BTreeSet<Window>>>,
     /// The current offset at which the search happens.
-    current_offset: u64,
-    /// If a search is currently ongoing, this holds the total file size.
-    total_size: u64,
+    current_offset: AbsoluteOffset,
+    /// The total file size.
+    total_size: Len,
     /// The searcher performing the search itself.
     searcher: Option<AhoCorasick>,
     /// The size of the portion of the buffer that needs to overlap between searches.
@@ -69,7 +70,7 @@ impl BackgroundSearcher {
         let searcher = BackgroundSearcher {
             progress: Arc::clone(&progress),
             results: Arc::clone(&results),
-            current_offset: 0,
+            current_offset: AbsoluteOffset::ZERO,
             total_size,
             searcher: None,
             overlap_size: 0,
@@ -98,7 +99,7 @@ impl BackgroundSearcher {
                 *self.progress.write().unwrap() = 0.0;
                 self.results.write().unwrap().clear();
 
-                self.current_offset = 0;
+                self.current_offset = AbsoluteOffset::ZERO;
                 self.searcher = Some(
                     AhoCorasick::builder()
                         .ascii_case_insensitive(request.ascii_case_insensitive)
@@ -126,7 +127,7 @@ impl BackgroundSearcher {
 
     /// Runs one iteration of the search.
     fn run_search(&mut self) {
-        let current_overlap = if self.current_offset == 0 {
+        let current_overlap = if self.current_offset.is_start_of_file() {
             0
         } else {
             self.overlap_size
@@ -143,10 +144,12 @@ impl BackgroundSearcher {
         let buf = &self.buf[..buf_len];
 
         for result in self.searcher.as_ref().unwrap().find_overlapping_iter(buf) {
-            let offset = self.current_offset
-                + u64::try_from(result.start()).expect("read buffer must fit u64")
-                - u64::try_from(current_overlap).expect("overlap cannot exceed u64");
-            let len = u64::try_from(result.len()).expect("search string must fit u64");
+            let offset = AbsoluteOffset::from(
+                self.current_offset.as_u64()
+                    + u64::try_from(result.start()).expect("read buffer must fit u64")
+                    - u64::try_from(current_overlap).expect("overlap cannot exceed u64"),
+            );
+            let len = Len::from(u64::try_from(result.len()).expect("search string must fit u64"));
             let window = Window::from_start_len(offset, len);
             self.results.write().unwrap().insert(window);
         }
@@ -155,9 +158,10 @@ impl BackgroundSearcher {
             .copy_within(buf_len - self.overlap_size..buf_len, 0);
 
         self.current_offset +=
-            u64::try_from(buf_len - current_overlap).expect("read buffer must fit u64");
+            Len::from(u64::try_from(buf_len - current_overlap).expect("read buffer must fit u64"));
 
-        let fraction_completed = (self.current_offset as f32) / (self.total_size as f32);
+        let fraction_completed =
+            (self.current_offset.as_u64() as f32) / (self.total_size.as_u64() as f32);
 
         *self.progress.write().unwrap() = fraction_completed;
     }

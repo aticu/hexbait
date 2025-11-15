@@ -6,6 +6,8 @@ use std::{
     ops::{AddAssign, SubAssign},
 };
 
+use hexbait_common::Len;
+
 use crate::{data::DataSource, window::Window};
 
 /// Computed statistics about bigrams in a window of data.
@@ -134,13 +136,13 @@ fn raw_compute<Source: DataSource, T>(
 ) -> Result<(Window, Option<u8>), Source::Error> {
     const WINDOW_SIZE: usize = 4096;
 
-    let byte_before_window = if window.start() > 0 {
+    let byte_before_window = if window.start().is_start_of_file() {
+        None
+    } else {
         source
-            .window_at(window.start() - 1, &mut [0])?
+            .window_at(window.start() - Len::from(1), &mut [0])?
             .first()
             .copied()
-    } else {
-        None
     };
 
     const DEFAULT_PREV_BYTE: u8 = 0;
@@ -151,7 +153,7 @@ fn raw_compute<Source: DataSource, T>(
     let mut start = window.start();
     while start < window.end() {
         let mut buf = [0; WINDOW_SIZE];
-        let max_size = std::cmp::min((window.end() - start) as usize, WINDOW_SIZE);
+        let max_size = std::cmp::min((window.end() - start).as_u64() as usize, WINDOW_SIZE);
 
         let subwindow = source.window_at(start, &mut buf[..max_size])?;
 
@@ -160,7 +162,7 @@ fn raw_compute<Source: DataSource, T>(
             prev_byte = byte;
         }
 
-        start += subwindow.len() as u64;
+        start += Len::from(subwindow.len() as u64);
 
         if subwindow.is_empty() {
             break;

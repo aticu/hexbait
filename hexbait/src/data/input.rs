@@ -2,6 +2,7 @@
 
 use std::{fs::File, io, path::PathBuf, sync::Arc};
 
+use hexbait_common::{AbsoluteOffset, Len};
 use hexbait_lang::View;
 
 use super::DataSource;
@@ -36,7 +37,7 @@ impl Input {
 impl DataSource for Input {
     type Error = io::Error;
 
-    fn len(&mut self) -> Result<u64, Self::Error> {
+    fn len(&mut self) -> Result<Len, Self::Error> {
         match self {
             Input::File { file, .. } => file.len(),
             Input::Stdin(stdin) => {
@@ -48,7 +49,7 @@ impl DataSource for Input {
 
     fn window_at<'buf>(
         &mut self,
-        offset: u64,
+        offset: AbsoluteOffset,
         buf: &'buf mut [u8],
     ) -> Result<&'buf [u8], Self::Error> {
         match self {

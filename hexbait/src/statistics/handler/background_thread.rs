@@ -9,6 +9,7 @@ use std::{
     },
 };
 
+use hexbait_common::{AbsoluteOffset, Len};
 use quick_cache::sync::Cache;
 
 use crate::{
@@ -97,13 +98,13 @@ pub(crate) struct BackgroundThread {
     /// Statistics for different block-sizes in the input, aligned to the block size.
     ///
     /// Shared with the GUI thread.
-    pub(crate) aligned_windows: Arc<[Cache<u64, Arc<Statistics>>; CacheSize::NUM_SIZES]>,
+    pub(crate) aligned_windows: Arc<[Cache<AbsoluteOffset, Arc<Statistics>>; CacheSize::NUM_SIZES]>,
     /// A cache for unaligned windows.
     ///
     /// Shared with the GUI thread.
     pub(crate) unaligned_windows: Arc<Cache<Window, Arc<Statistics>>>,
     /// A cache for entropy values of the smallest possible window size.
-    pub(crate) entropy_smallest: Arc<Cache<u64, u8>>,
+    pub(crate) entropy_smallest: Arc<Cache<AbsoluteOffset, u8>>,
     /// A cache for entropy values.
     pub(crate) entropy_results: Arc<Cache<Window, u8>>,
     /// Whether the queue in the background thread is empty.
@@ -172,21 +173,16 @@ impl BackgroundThread {
 
                 // split up blocks larger than 64MiB into smaller requests first, so that the
                 // background thread never hangs too long
-                if cache_size.size() > 64 * 1024 * 1024 {
+                if cache_size.size() > Len::from(64 * 1024 * 1024) {
                     let Some(smaller_size) = cache_size.next_down() else {
                         panic!("trying to compute from smaller cache size when there is none")
                     };
-                    let smaller_size_index = smaller_size.index();
-                    let smaller_size = smaller_size.size();
                     let mut all_present = true;
                     let mut statistics = Statistics::empty_for_window(window);
 
-                    for i in 0..window.size() / smaller_size {
-                        let subwindow =
-                            Window::from_start_len(window.start() + i * smaller_size, smaller_size);
-
+                    for subwindow in window.subwindows_of_size(smaller_size.size()) {
                         if let Some(substatistics) =
-                            self.aligned_windows[smaller_size_index].get(&subwindow.start())
+                            self.aligned_windows[smaller_size.index()].get(&subwindow.start())
                         {
                             if all_present {
                                 statistics += &substatistics;

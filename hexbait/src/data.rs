@@ -6,6 +6,7 @@ mod slice;
 
 use std::fmt;
 
+use hexbait_common::{AbsoluteOffset, Len};
 use hexbait_lang::View;
 pub use input::Input;
 
@@ -15,17 +16,17 @@ pub trait DataSource {
     type Error: fmt::Debug + fmt::Display;
 
     /// The length of the data.
-    fn len(&mut self) -> Result<u64, Self::Error>;
+    fn len(&mut self) -> Result<Len, Self::Error>;
 
     /// Determines if the data source is empty.
     fn is_empty(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.len()? == 0)
+        Ok(self.len()?.is_zero())
     }
 
     /// Fills the buffer with the data at the given offset in the data, returning the filled slice.
     fn window_at<'buf>(
         &mut self,
-        offset: u64,
+        offset: AbsoluteOffset,
         buf: &'buf mut [u8],
     ) -> Result<&'buf [u8], Self::Error>;
 

@@ -22,6 +22,7 @@ use hexbait::{
     state::State,
     statistics::{Statistics, StatisticsHandler},
 };
+use hexbait_common::{AbsoluteOffset, Len};
 
 // TODO: change font to render more characters
 // TODO: change default font-size and refactor around that
@@ -174,10 +175,12 @@ impl eframe::App for MyApp {
 
             let file_size = self.input.len().unwrap();
 
-            if jump_to_offset && let Ok(offset) = self.parse_offset.parse() {
+            if jump_to_offset
+                && let Ok(offset) = self.parse_offset.parse().map(AbsoluteOffset::from)
+            {
                 let height = ui.max_rect().intersect(ui.cursor()).height();
                 let total_rows = (height.trunc() as u64).max(1);
-                let total_bytes = total_rows * 16;
+                let total_bytes = Len::from(total_rows * 16);
                 self.zoombars.rearrange_bars_for_point(
                     ui.max_rect().intersect(ui.cursor()).height(),
                     file_size,
@@ -187,7 +190,7 @@ impl eframe::App for MyApp {
                 );
             }
 
-            let mut parse_offset = self.parse_offset.parse().ok();
+            let mut parse_offset = self.parse_offset.parse().ok().map(AbsoluteOffset::from);
 
             self.zoombars.render(
                 ui,
@@ -326,7 +329,7 @@ impl eframe::App for MyApp {
 
             if self.sync_parse_offset_to_selection_start {
                 if let Some(parse_offset) = parse_offset {
-                    self.parse_offset = parse_offset.to_string();
+                    self.parse_offset = parse_offset.as_u64().to_string();
                 }
             }
         });

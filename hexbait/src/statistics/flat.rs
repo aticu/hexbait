@@ -6,6 +6,9 @@ use std::{
     ops::{AddAssign, SubAssign},
 };
 
+use hexbait_common::Len;
+use size_format::SizeFormatterBinary;
+
 use crate::{
     data::DataSource,
     statistics::{Statistics, StatisticsKind},
@@ -27,8 +30,8 @@ impl FlatStatistics {
     /// The capacity of the window is chosen such that it will fit the whole given window.
     pub fn empty_for_window(window: Window) -> FlatStatistics {
         FlatStatistics {
-            statistics: FlatStatisticsKind::with_capacity(window.size()),
-            window: Window::from_start_len(window.start(), 0),
+            statistics: FlatStatisticsKind::with_capacity(window.size().as_u64()),
+            window: Window::empty_from_start(window.start()),
         }
     }
 
@@ -38,7 +41,7 @@ impl FlatStatistics {
         window: Window,
     ) -> Result<FlatStatistics, Source::Error> {
         let capacity = window.size();
-        let mut statistics = FlatStatisticsKind::with_capacity(capacity);
+        let mut statistics = FlatStatisticsKind::with_capacity(capacity.as_u64());
 
         let window = match &mut statistics {
             FlatStatisticsKind::Large(raw_stats) => raw_stats.compute(source, window)?,
@@ -141,7 +144,7 @@ impl fmt::Debug for FlatStatistics {
                         FlatStatisticsKind::Medium(_) => "medium",
                         FlatStatisticsKind::Small(_) => "small",
                     },
-                    size_format::SizeFormatterBinary::new(size)
+                    SizeFormatterBinary::new(size.as_u64())
                 ),
             )
             .field("window", &self.window)
@@ -282,7 +285,7 @@ where
         let mut start = window.start();
         while start < window.end() {
             let mut buf = [0; WINDOW_SIZE];
-            let max_size = std::cmp::min((window.end() - start) as usize, WINDOW_SIZE);
+            let max_size = std::cmp::min((window.end() - start).as_u64() as usize, WINDOW_SIZE);
 
             let subwindow = source.window_at(start, &mut buf[..max_size])?;
 
@@ -290,7 +293,7 @@ where
                 self.counts[byte as usize] += Count::from(1u8);
             }
 
-            start += subwindow.len() as u64;
+            start += Len::from(subwindow.len() as u64);
 
             if subwindow.is_empty() {
                 break;

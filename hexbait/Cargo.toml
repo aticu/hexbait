@@ -16,4 +16,5 @@ quick_cache = { version = "0.6.18", default-features = false }
 malachite-nz = { version = "0.7.0", default-features = false }
 aho-corasick = { version = "1.1.4", default-features = false }
 clap = { version = "4.5.51", features = ["derive"] }
+hexbait-common = { path = "../hexbait-common" }
 hexbait-lang = { path = "../hexbait-lang" }

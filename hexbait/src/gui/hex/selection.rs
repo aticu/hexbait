@@ -3,13 +3,14 @@
 use std::ops::RangeInclusive;
 
 use egui::{Context, Response};
+use hexbait_common::AbsoluteOffset;
 
 /// Contains the necessary context to manage selections in the hex view.
 pub(crate) struct SelectionContext {
     /// The selected bytes as absolute offsets.
-    selection: Option<RangeInclusive<u64>>,
+    selection: Option<RangeInclusive<AbsoluteOffset>>,
     /// The previous_selection.
-    prev_selection: Option<RangeInclusive<u64>>,
+    prev_selection: Option<RangeInclusive<AbsoluteOffset>>,
     /// Whether or not the user is currently selecting bytes.
     selecting: bool,
 }
@@ -42,7 +43,7 @@ impl SelectionContext {
         &mut self,
         ctx: &Context,
         response: &Response,
-        byte_offset: u64,
+        byte_offset: AbsoluteOffset,
     ) {
         ctx.input(|input| {
             if self.selecting
@@ -62,7 +63,7 @@ impl SelectionContext {
     }
 
     /// Returns the current selection.
-    pub(crate) fn selection(&self) -> Option<RangeInclusive<u64>> {
+    pub(crate) fn selection(&self) -> Option<RangeInclusive<AbsoluteOffset>> {
         self.selection.as_ref().map(|selection| {
             if selection.start() <= selection.end() {
                 selection.clone()

@@ -1,11 +1,17 @@
 //! Implements the primitives for showing hex views.
 
 use egui::{Align2, Color32, FontId, Response, Sense, Ui, vec2};
+use hexbait_common::AbsoluteOffset;
 
 use crate::state::Settings;
 
 /// Shows the given offset.
-pub fn render_offset(ui: &mut Ui, settings: &Settings, sense: Sense, offset: u64) -> Response {
+pub fn render_offset(
+    ui: &mut Ui,
+    settings: &Settings,
+    sense: Sense,
+    offset: AbsoluteOffset,
+) -> Response {
     let mut rect = ui.cursor();
     rect.max.x = rect.min.x + settings.char_width() * 16.0;
     rect.max.y = rect.min.y + settings.char_height();
@@ -14,7 +20,7 @@ pub fn render_offset(ui: &mut Ui, settings: &Settings, sense: Sense, offset: u64
     painter.text(
         ui.cursor().min,
         Align2::LEFT_TOP,
-        format!("{offset:016x}"),
+        format!("{:016x}", offset.as_u64()),
         settings.hex_font(),
         Color32::from_rgb(100, 100, 100),
     );

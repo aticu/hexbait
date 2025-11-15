@@ -7,16 +7,17 @@ use egui::{
     epaint::{ColorMode, PathStroke, QuadraticBezierShape},
     pos2,
 };
+use hexbait_common::{AbsoluteOffset, Len};
 
 use crate::{gui::color, state::Settings};
 
 /// Renders the selection polygon on screen.
 pub(crate) fn highlight(
     ui: &mut Ui,
-    mut range: RangeInclusive<u64>,
+    range: RangeInclusive<AbsoluteOffset>,
     inner_color: Color32,
     border_color: Color32,
-    file_size: u64,
+    file_size: Len,
     screen_start_offset_in_rows: u64,
     rows_onscreen: u64,
     settings: &Settings,
@@ -27,9 +28,14 @@ pub(crate) fn highlight(
         0.85,
     );
 
+    // TODO: fix this properly at some point by using the correct types in this function
+    let mut range = range.start().as_u64()..=range.end().as_u64();
+
     let screen_start_offset = screen_start_offset_in_rows * 16;
-    let screen_end_offset =
-        std::cmp::min(screen_start_offset + (rows_onscreen + 1) * 16, file_size);
+    let screen_end_offset = std::cmp::min(
+        screen_start_offset + (rows_onscreen + 1) * 16,
+        file_size.as_u64(),
+    );
 
     if *range.start() > screen_end_offset || *range.end() < screen_start_offset {
         // the selection is off-screen and does not need to be rendered

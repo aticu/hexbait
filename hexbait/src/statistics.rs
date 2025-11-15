@@ -3,6 +3,7 @@
 use std::{fmt, ops::AddAssign};
 
 use raw_bigrams::{RawBigrams, SmallRawBigrams};
+use size_format::SizeFormatterBinary;
 
 use crate::{data::DataSource, window::Window};
 
@@ -55,8 +56,8 @@ impl Statistics {
     /// The capacity of the window is chosen such that it will fit the whole given window.
     pub fn empty_for_window(window: Window) -> Statistics {
         Statistics {
-            statistics: StatisticsKind::with_capacity(window.size()),
-            window: Window::from_start_len(window.start(), 0),
+            statistics: StatisticsKind::with_capacity(window.size().as_u64()),
+            window: Window::empty_from_start(window.start()),
             first_byte: None,
         }
     }
@@ -67,7 +68,7 @@ impl Statistics {
         window: Window,
     ) -> Result<Statistics, Source::Error> {
         let capacity = window.size();
-        let mut statistics = StatisticsKind::with_capacity(capacity);
+        let mut statistics = StatisticsKind::with_capacity(capacity.as_u64());
 
         let (window, first_byte) = match &mut statistics {
             StatisticsKind::Large(raw_bigrams) => raw_bigrams.compute(source, window)?,
@@ -186,7 +187,7 @@ impl fmt::Debug for Statistics {
                         StatisticsKind::Medium(_) => "medium",
                         StatisticsKind::Small(_) => "small",
                     },
-                    size_format::SizeFormatterBinary::new(size)
+                    SizeFormatterBinary::new(size.as_u64())
                 ),
             )
             .field("window", &self.window)

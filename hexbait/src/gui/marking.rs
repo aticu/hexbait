@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use egui::{Color32, Rect, Stroke, Ui, pos2};
+use hexbait_common::{AbsoluteOffset, Len};
 
 use crate::{gui::hex::highlighting::trace_path, window::Window};
 
@@ -11,7 +12,7 @@ use super::{color, zoombars::offset_on_bar};
 /// Stores the marked locations to highlight.
 pub struct MarkedLocations {
     /// The locations that should be highlighted.
-    locations: BTreeMap<u64, Vec<MarkedLocation>>,
+    locations: BTreeMap<AbsoluteOffset, Vec<MarkedLocation>>,
     /// The currently hovered location.
     hovered_location: Option<MarkedLocation>,
 }
@@ -141,7 +142,7 @@ pub fn render_locations_on_bar(
     const TRANSPARENCY: f64 = 0.5;
 
     let bar_start = offset_on_bar(bar_rect, bar_window, bar_window.start()).unwrap();
-    let bar_end = offset_on_bar(bar_rect, bar_window, bar_window.end() - 1).unwrap();
+    let bar_end = offset_on_bar(bar_rect, bar_window, bar_window.end() - Len::from(1)).unwrap();
 
     for location in marked_locations.iter_window(bar_window) {
         let start_pos = offset_on_bar(bar_rect, bar_window, location.window.start());

@@ -10,6 +10,7 @@ use std::{
 };
 
 use background_thread::{BackgroundThread, Request, RequestKind};
+use hexbait_common::{AbsoluteOffset, Len};
 use quick_cache::sync::Cache;
 
 use crate::{data::Input, window::Window};
@@ -24,7 +25,7 @@ mod background_thread;
 mod statistics_result;
 
 /// The minimum window size for entropy requests.
-const MIN_ENTROPY_WINDOW_SIZE: u64 = 1024;
+const MIN_ENTROPY_WINDOW_SIZE: Len = Len::from(1024);
 
 cache_sizes! {
     CacheSize {
@@ -45,11 +46,11 @@ cache_sizes! {
 /// Manages statistics for an input.
 pub struct StatisticsHandler {
     /// Statistics for different block-sizes in the input, aligned to the block size.
-    aligned_windows: Arc<[Cache<u64, Arc<Statistics>>; CacheSize::NUM_SIZES]>,
+    aligned_windows: Arc<[Cache<AbsoluteOffset, Arc<Statistics>>; CacheSize::NUM_SIZES]>,
     /// A cache for unaligned windows.
     unaligned_windows: Arc<Cache<Window, Arc<Statistics>>>,
     /// A cache for entropy values of the smallest possible window size.
-    entropy_smallest: Arc<Cache<u64, u8>>,
+    entropy_smallest: Arc<Cache<AbsoluteOffset, u8>>,
     /// A cache for entropy values.
     entropy_results: Arc<Cache<Window, u8>>,
     /// Whether the queue in the background thread is empty.
@@ -114,7 +115,10 @@ impl StatisticsHandler {
     /// Returns the cached statistics for the given window or requests it.
     fn get_or_request_aligned(&self, window: Window) -> Option<Arc<Statistics>> {
         let size = CacheSize::try_from(window.size()).expect("not a valid cache size");
-        assert_eq!(window.start() % size.size(), 0, "unaligned cache request");
+        assert!(
+            window.start().is_aligned(size.size().as_u64()),
+            "unaligned cache request"
+        );
 
         let cached_stats = self.aligned_windows[size.index()].get(&window.start());
         if cached_stats.is_some() {
@@ -126,7 +130,7 @@ impl StatisticsHandler {
     }
 
     /// Adds an unaligned section to the given statistics.
-    fn add_unaligned_section(&self, stats: &mut Statistics, window: Window) -> u64 {
+    fn add_unaligned_section(&self, stats: &mut Statistics, window: Window) -> Len {
         if let Some(window_stats) = self.unaligned_windows.get(&window) {
             *stats += &window_stats;
             return window.size();
@@ -134,19 +138,17 @@ impl StatisticsHandler {
 
         stats.add_empty_window(window);
         self.request_window(window, RequestKind::Bigrams);
-        0
+        Len::ZERO
     }
 
     /// Adds a section that is aligned to a cache size.
-    fn add_aligned_section(&self, stats: &mut Statistics, window: Window, size: CacheSize) -> u64 {
-        let size_u64 = size.size();
-        let mut total_valid_bytes = 0;
+    fn add_aligned_section(&self, stats: &mut Statistics, window: Window, size: CacheSize) -> Len {
+        let mut total_valid_bytes = Len::ZERO;
 
-        let add_window = |this: &Self, stats: &mut Statistics, window: Window| -> u64 {
-            let mut total_valid_bytes = 0;
+        let add_window = |this: &Self, stats: &mut Statistics, window: Window| -> Len {
+            let mut total_valid_bytes = Len::ZERO;
 
-            for i in 0..window.size() / size_u64 {
-                let subwindow = Window::from_start_len(window.start() + i * size_u64, size_u64);
+            for subwindow in window.subwindows_of_size(size.size()) {
                 if let Some(window_stats) = this.get_or_request_aligned(subwindow) {
                     *stats += &window_stats;
                     total_valid_bytes += subwindow.size();
@@ -167,12 +169,7 @@ impl StatisticsHandler {
                     }
 
                     if let Some(smaller_size) = smaller_size {
-                        let smaller_size_u64 = smaller_size.size();
-                        for i in 0..subwindow.size() / smaller_size_u64 {
-                            let subsubwindow = Window::from_start_len(
-                                subwindow.start() + i * smaller_size_u64,
-                                smaller_size_u64,
-                            );
+                        for subsubwindow in subwindow.subwindows_of_size(smaller_size.size()) {
                             if let Some(subsubwindow_stats) = this.aligned_windows
                                 [smaller_size.index()]
                             .get(&subsubwindow.start())
@@ -194,7 +191,7 @@ impl StatisticsHandler {
         };
 
         if let Some(next_size) = size.next_up()
-            && let Some((before, aligned, after)) = window.align(next_size.size())
+            && let Some((before, aligned, after)) = window.align(next_size.size().as_u64())
         {
             total_valid_bytes += add_window(self, stats, before);
             total_valid_bytes += self.add_aligned_section(stats, aligned, next_size);
@@ -209,9 +206,9 @@ impl StatisticsHandler {
     /// Returns the bigram statistics associated with the given window.
     pub fn get_bigram(&self, window: Window) -> StatisticsResult<Statistics> {
         let mut output = Statistics::empty_for_window(window);
-        let mut total_valid_bytes = 0;
+        let mut total_valid_bytes = Len::ZERO;
 
-        if let Some((before, aligned, after)) = window.align(CacheSize::SMALLEST.size()) {
+        if let Some((before, aligned, after)) = window.align(CacheSize::SMALLEST.size().as_u64()) {
             if !before.is_empty() {
                 total_valid_bytes += self.add_unaligned_section(&mut output, before);
             }
@@ -230,7 +227,7 @@ impl StatisticsHandler {
             self.saw_uncompleteness.set(true);
             StatisticsResult::Estimate {
                 value: output,
-                quality: total_valid_bytes as f32 / window.size() as f32,
+                quality: total_valid_bytes.as_u64() as f32 / window.size().as_u64() as f32,
             }
         } else {
             StatisticsResult::Exact(output)
@@ -239,7 +236,7 @@ impl StatisticsHandler {
 
     /// Returns the entropy of the given window.
     pub fn get_entropy(&self, window: Window) -> StatisticsResult<f32> {
-        let window = window.expand_to_align(MIN_ENTROPY_WINDOW_SIZE);
+        let window = window.expand_to_align(MIN_ENTROPY_WINDOW_SIZE.as_u64());
 
         match self.entropy_results.get(&window) {
             Some(result) => StatisticsResult::Exact(result as f32 / 255.0),
@@ -248,7 +245,9 @@ impl StatisticsHandler {
                 match self.entropy_smallest.get(&window.start()) {
                     Some(result) => StatisticsResult::Estimate {
                         value: result as f32 / 255.0,
-                        quality: (MIN_ENTROPY_WINDOW_SIZE as f64 / window.size() as f64) as f32,
+                        quality: (MIN_ENTROPY_WINDOW_SIZE.as_u64() as f64
+                            / window.size().as_u64() as f64)
+                            as f32,
                     },
                     None => {
                         self.request_window(window, RequestKind::EntropyEstimate);

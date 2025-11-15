@@ -1,5 +1,7 @@
 //! Handles all code for deciding cache sizes.
 
+use hexbait_common::Len;
+
 use super::CacheSize;
 
 /// Generates cache sizes from a specification.
@@ -55,21 +57,27 @@ macro_rules! cache_sizes {
             )*
         }
 
+        const _: () = {
+            $(
+                assert!($enum_name::$name.size().as_u64().is_power_of_two());
+            )*
+        };
+
         impl $enum_name {
             /// The size of the cache entry.
-            const fn size(self) -> u64 {
+            const fn size(self) -> Len {
                 match self {
                     $(
-                        $enum_name::$name => $size * cache_sizes!(__size_mod: $size_mod),
+                        $enum_name::$name => Len::from($size * cache_sizes!(__size_mod: $size_mod)),
                     )*
                 }
             }
 
             /// The size of the cache entry.
-            const fn from_size(size: u64) -> Option<Self> {
+            const fn from_size(size: Len) -> Option<Self> {
                 $(
                     #[allow(non_upper_case_globals)]
-                    const $name: u64 = $size * cache_sizes!(__size_mod: $size_mod);
+                    const $name: Len = $enum_name::$name.size();
                 )*
                 match size {
                     $(
@@ -160,10 +168,10 @@ impl CacheSize {
     }
 }
 
-impl TryFrom<u64> for CacheSize {
+impl TryFrom<Len> for CacheSize {
     type Error = ();
 
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
+    fn try_from(value: Len) -> Result<Self, Self::Error> {
         Self::from_size(value).ok_or(())
     }
 }
