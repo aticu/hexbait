@@ -43,8 +43,6 @@ pub(crate) struct BackgroundSearcher {
     results: Arc<RwLock<BTreeSet<Window>>>,
     /// The current offset at which the search happens.
     current_offset: AbsoluteOffset,
-    /// The total file size.
-    total_size: Len,
     /// The searcher performing the search itself.
     searcher: Option<AhoCorasick>,
     /// The size of the portion of the buffer that needs to overlap between searches.
@@ -64,14 +62,12 @@ impl BackgroundSearcher {
         let results = Arc::new(RwLock::new(BTreeSet::new()));
         let (sender, receiver) = mpsc::channel();
 
-        let mut source = source.clone().unwrap();
-        let total_size = source.len().expect("TODO: improve error handling here");
+        let source = source.clone().unwrap();
 
         let searcher = BackgroundSearcher {
             progress: Arc::clone(&progress),
             results: Arc::clone(&results),
             current_offset: AbsoluteOffset::ZERO,
-            total_size,
             searcher: None,
             overlap_size: 0,
             buf: Vec::new(),
@@ -161,7 +157,7 @@ impl BackgroundSearcher {
             Len::from(u64::try_from(buf_len - current_overlap).expect("read buffer must fit u64"));
 
         let fraction_completed =
-            (self.current_offset.as_u64() as f32) / (self.total_size.as_u64() as f32);
+            (self.current_offset.as_u64() as f32) / (self.source.len().as_u64() as f32);
 
         *self.progress.write().unwrap() = fraction_completed;
     }

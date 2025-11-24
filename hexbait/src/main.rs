@@ -5,10 +5,14 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::{collections::BTreeMap, io::Read, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    io::{Read, Seek as _, SeekFrom},
+    path::PathBuf,
+};
 
 use clap::Parser;
-use egui::{RichText, TextStyle};
+use egui::{Align, Layout, RichText, TextStyle, UiBuilder};
 use hexbait::{
     built_in_format_descriptions::built_in_format_descriptions,
     data::{DataSource as _, Input},
@@ -57,10 +61,15 @@ struct Config {
 fn main() -> eframe::Result {
     let config = Config::parse();
 
-    let input = if let Some(file) = &config.file {
+    let input = if let Some(file_name) = &config.file {
+        let mut file = std::fs::File::open(file_name).unwrap();
+
+        let len = file.seek(SeekFrom::End(0)).unwrap();
+
         Input::File {
-            path: PathBuf::from(&file),
-            file: std::fs::File::open(file).unwrap(),
+            path: PathBuf::from(&file_name),
+            file,
+            len,
         }
     } else {
         let mut buf = Vec::new();
@@ -173,8 +182,6 @@ impl eframe::App for MyApp {
                 );
             });
 
-            let file_size = self.input.len().unwrap();
-
             if jump_to_offset
                 && let Ok(offset) = self.parse_offset.parse().map(AbsoluteOffset::from)
             {
@@ -182,8 +189,8 @@ impl eframe::App for MyApp {
                 let total_rows = (height.trunc() as u64).max(1);
                 let total_bytes = Len::from(total_rows * 16);
                 self.zoombars.rearrange_bars_for_point(
-                    ui.max_rect().intersect(ui.cursor()).height(),
-                    file_size,
+                    &mut self.state.scroll_state,
+                    self.input.len(),
                     0,
                     offset,
                     total_bytes,
@@ -192,128 +199,146 @@ impl eframe::App for MyApp {
 
             let mut parse_offset = self.parse_offset.parse().ok().map(AbsoluteOffset::from);
 
-            self.zoombars.render(
-                ui,
-                file_size,
-                &mut self.input,
-                &self.state.settings,
-                &mut self.marked_locations,
-                &self.statistics_handler,
-                |ui, source, start, marked_locations| {
-                    let ir;
-
-                    let parse_type = if self.parse_type == "custom parser" {
-                        'parse_type: {
-                            let Ok(content) = std::fs::read_to_string(
-                                self.custom_parser
-                                    .as_ref()
-                                    .expect("if a custom parser is selected it should also exist"),
-                            ) else {
-                                break 'parse_type None;
-                            };
-
-                            let parse = hexbait_lang::parse(&content);
-                            if !parse.errors.is_empty() {
-                                break 'parse_type None;
-                            }
-
-                            ir = hexbait_lang::ir::lower_file(parse.ast);
-
-                            Some(&ir)
-                        }
-                    } else {
-                        self.built_in_format_descriptions.get(self.parse_type)
-                    };
-
-                    self.hexdump_context.render(
+            ui.scope_builder(
+                UiBuilder::new()
+                    .max_rect(ui.max_rect().intersect(ui.cursor()))
+                    .layout(Layout::left_to_right(Align::Min)),
+                |ui| {
+                    let scrollbars_changed = self.zoombars.render(
                         ui,
+                        &mut self.input,
+                        &mut self.state.scroll_state,
                         &self.state.settings,
-                        source,
-                        &mut self.endianness,
-                        start,
-                        (parse_type, &mut parse_offset),
-                        marked_locations,
-                    );
-                },
-                |ui, window| {
-                    let (statistics, quality) = self
-                        .statistics_handler
-                        .get_bigram(window)
-                        .into_result_with_quality()
-                        .unwrap()
-                        .unwrap_or_else(|| (Statistics::empty_for_window(window), 0.0));
-                    let signature = statistics.to_signature();
-                    let rect = ui.max_rect().intersect(ui.cursor());
+                        &mut self.marked_locations,
+                        &self.statistics_handler,
+                        |ui, source, start, marked_locations| {
+                            let ir;
 
-                    ui.vertical(|ui| {
-                        self.signature_display.render(
-                            ui,
-                            rect,
-                            window,
-                            &signature,
-                            self.xor_value,
-                            quality,
-                            &self.state.settings,
-                        );
+                            let parse_type = if self.parse_type == "custom parser" {
+                                'parse_type: {
+                                    let Ok(content) = std::fs::read_to_string(
+                                        self.custom_parser.as_ref().expect(
+                                            "if a custom parser is selected it should also exist",
+                                        ),
+                                    ) else {
+                                        break 'parse_type None;
+                                    };
 
-                        let old = ui.spacing_mut().slider_width;
-                        ui.spacing_mut().slider_width = self.state.settings.font_size() * 20.0;
-                        ui.add(egui::Slider::new(&mut self.xor_value, 0..=255).text("xor value"));
-                        ui.spacing_mut().slider_width = old;
+                                    let parse = hexbait_lang::parse(&content);
+                                    if !parse.errors.is_empty() {
+                                        break 'parse_type None;
+                                    }
 
-                        ui.label(format!(
-                            "search {:.02}% complete ({} results)",
-                            self.state.search.searcher.progress() * 100.0,
-                            self.state.search.searcher.results().len()
-                        ));
+                                    ir = hexbait_lang::ir::lower_file(parse.ast);
 
-                        ui.horizontal(|ui| {
-                            ui.text_edit_singleline(&mut self.state.search.search_text);
-                            let search_bytes = match self.state.search.search_bytes() {
-                                Ok(bytes) => Some(bytes),
-                                Err(msg) => {
-                                    ui.label(RichText::new("⚠").color(ui.visuals().warn_fg_color))
-                                        .on_hover_ui(|ui| {
-                                            ui.label(format!("invalid string literal: {msg}"));
-                                        });
-                                    None
+                                    Some(&ir)
                                 }
+                            } else {
+                                self.built_in_format_descriptions.get(self.parse_type)
                             };
 
-                            let valid_utf8 = search_bytes
-                                .as_ref()
-                                .map(|search_bytes| std::str::from_utf8(search_bytes).is_ok())
-                                .unwrap_or(false);
+                            self.hexdump_context.render(
+                                ui,
+                                &self.state.settings,
+                                source,
+                                &mut self.endianness,
+                                start,
+                                (parse_type, &mut parse_offset),
+                                marked_locations,
+                            );
+                        },
+                        |ui, window| {
+                            let (statistics, quality) = self
+                                .statistics_handler
+                                .get_bigram(window)
+                                .into_result_with_quality()
+                                .unwrap()
+                                .unwrap_or_else(|| (Statistics::empty_for_window(window), 0.0));
+                            let signature = statistics.to_signature();
+                            let rect = ui.max_rect().intersect(ui.cursor());
 
-                            ui.checkbox(
-                                &mut self.state.search.search_ascii_case_insensitive,
-                                "ASCII case insensitive",
-                            );
-                            ui.add_enabled(
-                                valid_utf8,
-                                egui::Checkbox::new(
-                                    &mut self.state.search.search_utf16,
-                                    "include UTF-16",
-                                ),
-                            );
-                            if ui
-                                .add_enabled(
-                                    search_bytes
-                                        .as_ref()
-                                        .is_some_and(|search_bytes| !search_bytes.is_empty()),
-                                    egui::Button::new("start search"),
-                                )
-                                .clicked()
-                                && let Some(search_bytes) = &search_bytes
-                            {
-                                self.state.search.searcher.start_new_search(
-                                    &search_bytes,
-                                    self.state.search.search_ascii_case_insensitive,
-                                    self.state.search.search_utf16 && valid_utf8,
+                            ui.vertical(|ui| {
+                                self.signature_display.render(
+                                    ui,
+                                    rect,
+                                    window,
+                                    &signature,
+                                    self.xor_value,
+                                    quality,
+                                    &self.state.settings,
                                 );
-                            }
-                        });
-                    });
+
+                                let old = ui.spacing_mut().slider_width;
+                                ui.spacing_mut().slider_width =
+                                    self.state.settings.font_size() * 20.0;
+                                ui.add(
+                                    egui::Slider::new(&mut self.xor_value, 0..=255)
+                                        .text("xor value"),
+                                );
+                                ui.spacing_mut().slider_width = old;
+
+                                ui.label(format!(
+                                    "search {:.02}% complete ({} results)",
+                                    self.state.search.searcher.progress() * 100.0,
+                                    self.state.search.searcher.results().len()
+                                ));
+
+                                ui.horizontal(|ui| {
+                                    ui.text_edit_singleline(&mut self.state.search.search_text);
+                                    let search_bytes = match self.state.search.search_bytes() {
+                                        Ok(bytes) => Some(bytes),
+                                        Err(msg) => {
+                                            ui.label(
+                                                RichText::new("⚠")
+                                                    .color(ui.visuals().warn_fg_color),
+                                            )
+                                            .on_hover_ui(|ui| {
+                                                ui.label(format!("invalid string literal: {msg}"));
+                                            });
+                                            None
+                                        }
+                                    };
+
+                                    let valid_utf8 = search_bytes
+                                        .as_ref()
+                                        .map(|search_bytes| {
+                                            std::str::from_utf8(search_bytes).is_ok()
+                                        })
+                                        .unwrap_or(false);
+
+                                    ui.checkbox(
+                                        &mut self.state.search.search_ascii_case_insensitive,
+                                        "ASCII case insensitive",
+                                    );
+                                    ui.add_enabled(
+                                        valid_utf8,
+                                        egui::Checkbox::new(
+                                            &mut self.state.search.search_utf16,
+                                            "include UTF-16",
+                                        ),
+                                    );
+                                    if ui
+                                        .add_enabled(
+                                            search_bytes.as_ref().is_some_and(|search_bytes| {
+                                                !search_bytes.is_empty()
+                                            }),
+                                            egui::Button::new("start search"),
+                                        )
+                                        .clicked()
+                                        && let Some(search_bytes) = &search_bytes
+                                    {
+                                        self.state.search.searcher.start_new_search(
+                                            &search_bytes,
+                                            self.state.search.search_ascii_case_insensitive,
+                                            self.state.search.search_utf16 && valid_utf8,
+                                        );
+                                    }
+                                });
+                            });
+                        },
+                    );
+
+                    self.statistics_handler.end_of_frame(scrollbars_changed);
                 },
             );
 
@@ -323,9 +348,6 @@ impl eframe::App for MyApp {
                 self.marked_locations
                     .add(MarkedLocation::new(*result, MarkingKind::SearchResult));
             }
-
-            self.statistics_handler
-                .end_of_frame(self.zoombars.changed());
 
             if self.sync_parse_offset_to_selection_start {
                 if let Some(parse_offset) = parse_offset {

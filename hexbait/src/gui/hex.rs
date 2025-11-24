@@ -70,10 +70,6 @@ impl HexdumpView {
         let file_size = source.len();
 
         if let Ok(window) = source.window_at(start_in_bytes, &mut buf) {
-            let file_size = file_size.unwrap_or_else(|_| {
-                Len::from(start_in_bytes.as_u64()) + Len::from(window.len() as u64)
-            });
-
             let hex_rect_width = (16 * settings.bar_width_multiplier()) as f32
                 + ui.spacing().item_spacing.x
                 + ((16 + 32 + 16) as f32 * settings.char_width())

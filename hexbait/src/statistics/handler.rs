@@ -10,7 +10,7 @@ use std::{
 };
 
 use background_thread::{BackgroundThread, Request, RequestKind};
-use hexbait_common::{AbsoluteOffset, Len};
+use hexbait_common::{AbsoluteOffset, ChangeState, Len};
 use quick_cache::sync::Cache;
 
 use crate::{data::Input, window::Window};
@@ -260,17 +260,20 @@ impl StatisticsHandler {
 
     /// Signals to the statistics handler that a frame has ended.
     ///
-    /// `changed` is `true` if the requests for the handler changed this frame.
-    pub fn end_of_frame(&mut self, changed: bool) {
-        if changed {
-            self.requests
-                .send(background_thread::Message::ClearRequests)
-                .unwrap();
-            self.send_requests = true;
-        } else {
-            self.send_requests =
-                self.saw_uncompleteness.get() && self.empty_queue.load(Ordering::Relaxed);
-            self.saw_uncompleteness.set(false);
+    /// The `changed` parameter corresponds to the change state of the scrollbars.
+    pub fn end_of_frame(&mut self, changed: ChangeState) {
+        match changed {
+            ChangeState::Changed => {
+                self.requests
+                    .send(background_thread::Message::ClearRequests)
+                    .unwrap();
+                self.send_requests = true;
+            }
+            ChangeState::Unchanged => {
+                self.send_requests =
+                    self.saw_uncompleteness.get() && self.empty_queue.load(Ordering::Relaxed);
+                self.saw_uncompleteness.set(false);
+            }
         }
     }
 }

@@ -1,70 +1,47 @@
 //! Implements zoombars to zoom in on the content of a file.
 
-use std::{
-    hash::{Hash as _, Hasher as _},
-    ops::RangeInclusive,
-};
-
 use egui::{
-    Align, Color32, Context, FontId, Layout, PointerButton, PopupAnchor, Pos2, Rect, Sense,
-    Tooltip, Ui, UiBuilder, vec2,
+    Color32, Context, FontId, PointerButton, PopupAnchor, Pos2, Rect, Sense, Tooltip, Ui, vec2,
 };
-use hexbait_common::{AbsoluteOffset, Len, RelativeOffset};
+use hexbait_common::{AbsoluteOffset, ChangeState, Len, RelativeOffset};
 use size_format::SizeFormatterBinary;
 
 use crate::{
-    IDLE_TIME, data::DataSource, state::Settings, statistics::StatisticsHandler, window::Window,
+    IDLE_TIME,
+    data::DataSource,
+    state::{DisplaySuggestion, InteractionState, ScrollState, Scrollbar, Settings},
+    statistics::StatisticsHandler,
+    window::Window,
 };
 
 use super::{
-    cached_image::CachedImage,
     color,
     marking::{MarkedLocations, render_locations_on_bar},
 };
 
-/// The selection of a zoombar that selected nothing.
-const NULL_SELECTION: RangeInclusive<f32> = 0.0..=1.0;
-
 /// Zoombars are a GUI component to narrow in on parts of a file.
-pub struct Zoombars {
-    /// Whether or not a selection is in progress.
-    selecting: bool,
-    /// The zoombars to render.
-    bars: Vec<Zoombar>,
-    /// The height of the zoombars in the previous frame.
-    prev_height: f32,
-    /// The selection state in the previous frame.
-    prev_selection_state: u64,
-}
+pub struct Zoombars {}
 
 impl Zoombars {
     /// Creates new zoombars.
     pub fn new() -> Zoombars {
-        Zoombars {
-            selecting: false,
-            bars: Vec::new(),
-            // the previous height is irrelevant for the first frame
-            prev_height: 0.0,
-            // the initial selection state is irrelevant for the first frame
-            prev_selection_state: 0,
-        }
+        Zoombars {}
     }
 
     /// Renders the zoombars.
     pub fn render<Source: DataSource>(
         &mut self,
         ui: &mut Ui,
-        file_size: Len,
         source: &mut Source,
+        scroll_state: &mut ScrollState,
         settings: &Settings,
         marked_locations: &mut MarkedLocations,
         handler: &StatisticsHandler,
         render_hex: impl FnOnce(&mut Ui, &mut Source, u64, &mut MarkedLocations),
         render_overview: impl FnOnce(&mut Ui, Window),
-    ) {
+    ) -> ChangeState {
+        let file_size = source.len();
         let rect = ui.max_rect().intersect(ui.cursor());
-
-        self.prev_height = rect.height();
 
         // be deliberately small to fit more text here
         let size_text_height = settings.font_size() * 0.7;
@@ -74,201 +51,191 @@ impl Zoombars {
 
         if total_bytes >= file_size {
             render_hex(ui, source, 0, marked_locations);
-            return;
-        } else if self.bars.is_empty() {
-            self.bars.push(Zoombar::new());
+            scroll_state.display_suggestion = DisplaySuggestion::Hexview;
+            return ChangeState::Unchanged;
+        } else if scroll_state.scrollbars.is_empty() {
+            scroll_state.scrollbars.push(Scrollbar::new(file_size));
         }
 
-        let mut window = Window::from_start_len(AbsoluteOffset::ZERO, file_size);
+        let mut window = source.full_window();
         let mut show_hex = false;
 
         let mut new_hovered_location = None;
         let currently_hovered = marked_locations.hovered_location_mut().clone();
 
-        let mut tmp_rearrange_flag = false;
+        for i in 0..scroll_state.scrollbars.len() {
+            let Some(bar) = scroll_state.scrollbars.get_mut(i) else {
+                break;
+            };
 
-        ui.scope_builder(
-            UiBuilder::new()
-                .max_rect(rect)
-                .layout(Layout::left_to_right(Align::Min)),
-            |ui| {
-                let last_bar = self.bars.len() - 1;
-                for (i, bar) in self.bars.iter_mut().enumerate() {
-                    let is_second_last = i + 1 == last_bar;
+            let mut rect = ui.max_rect().intersect(ui.cursor());
+            rect.min += vec2(0.0, size_text_height);
+            rect.set_width(16.0 * settings.bar_width_multiplier() as f32 + 3.0);
+            let rect = rect;
 
-                    let mut rect = ui.max_rect().intersect(ui.cursor());
-                    rect.min += vec2(0.0, size_text_height);
-                    rect.set_width(16.0 * settings.bar_width_multiplier() as f32 + 3.0);
-                    let rect = rect;
+            ui.painter().text(
+                rect.min,
+                egui::Align2::LEFT_BOTTOM,
+                format!("{}B", SizeFormatterBinary::new(window.size().as_u64())),
+                FontId::proportional(size_text_height),
+                ui.style().noninteractive().text_color(),
+            );
 
-                    ui.painter().text(
-                        rect.min,
-                        egui::Align2::LEFT_BOTTOM,
-                        format!("{}B", SizeFormatterBinary::new(window.size().as_u64())),
-                        FontId::proportional(size_text_height),
-                        ui.style().noninteractive().text_color(),
-                    );
+            if window.size() <= total_bytes {
+                show_hex = true;
+                break;
+            }
 
-                    let mut selecting = self.selecting && is_second_last;
-                    let was_selecting = selecting;
+            let mut require_repaint = false;
+            let allow_selection = marked_locations.hovered().is_none();
+            handle_interactions(
+                rect,
+                bar,
+                i,
+                &mut scroll_state.interaction_state,
+                total_bytes,
+                window,
+                allow_selection,
+                ui.ctx(),
+            );
 
-                    if window.size() <= total_bytes {
-                        show_hex = true;
-                        break;
+            let hovered_row_window = render_bar(ui, bar, rect, window, |row_window| {
+                if let Some((entropy, quality)) = handler
+                    .get_entropy(row_window)
+                    .into_result_with_quality()
+                    .unwrap()
+                {
+                    if quality < 1.0 {
+                        require_repaint = true;
                     }
-
-                    let min_selection_size = min_selection_size(window, rect.height());
-
-                    let mut require_repaint = false;
-                    let hovered_row_window = bar.render(
-                        ui,
-                        rect,
-                        &mut selecting,
-                        window,
-                        min_selection_size,
-                        marked_locations.hovered().is_none(),
-                        |row_window| {
-                            if let Some((entropy, quality)) = handler
-                                .get_entropy(row_window)
-                                .into_result_with_quality()
-                                .unwrap()
-                            {
-                                // TODO: investigate why calculations sometimes get stuck
-                                if quality < 1.0 {
-                                    require_repaint = true;
-                                }
-                                let color = settings.entropy_color(entropy);
-                                let secondary_color = if quality < 1.0 {
-                                    Color32::RED
-                                } else {
-                                    Color32::GREEN
-                                };
-                                (color, secondary_color)
-                            } else {
-                                require_repaint = true;
-                                let color = settings.missing_color();
-                                (color, color)
-                            }
-                        },
-                    );
-                    bar.cached_image.require_repaint(require_repaint);
-
-                    if require_repaint {
-                        ui.ctx().request_repaint_after(IDLE_TIME);
-                    }
-
-                    render_locations_on_bar(
-                        ui,
-                        rect,
-                        window,
-                        marked_locations,
-                        &mut new_hovered_location,
-                        currently_hovered.clone(),
-                    );
-
-                    if let Some(location) = marked_locations.hovered()
-                        && ui.input(|input| {
-                            input
-                                .pointer
-                                .latest_pos()
-                                .map(|pos| rect.contains(pos))
-                                .unwrap_or(false)
-                        })
-                    {
-                        let offset = location.window().start();
-                        Tooltip::always_open(
-                            ui.ctx().clone(),
-                            ui.layer_id(),
-                            "position_highlight_hover".into(),
-                            PopupAnchor::Pointer,
-                        )
-                        .show(|ui| {
-                            ui.label(format!("{}", offset.as_u64()));
-                        });
-                        if ui.input(|input| input.pointer.primary_clicked()) {
-                            self.rearrange_bars_for_point(
-                                rect.height(),
-                                file_size,
-                                i,
-                                offset,
-                                total_bytes,
-                            );
-                            tmp_rearrange_flag = true;
-                            show_hex = true;
-                            break;
-                        }
-                    } else if let Some(row_window) = hovered_row_window {
-                        Tooltip::always_open(
-                            ui.ctx().clone(),
-                            ui.layer_id(),
-                            "zoombar_tooltip".into(),
-                            PopupAnchor::Pointer,
-                        )
-                        .show(|ui| {
-                            if let Some((entropy, quality)) = handler
-                                .get_entropy(row_window)
-                                .into_result_with_quality()
-                                .unwrap()
-                            {
-                                if quality < 1.0 {
-                                    ui.label(format!(
-                                        "Entropy: {entropy:.02} (Estimation quality: {:.2}%)",
-                                        quality * 100.0
-                                    ));
-                                } else {
-                                    ui.label(format!("Entropy: {entropy:.02}"));
-                                }
-                            } else {
-                                ui.label("Entropy unknown");
-                            }
-                        });
-                    }
-
-                    window = bar.selection_window(window, rect.height());
-
-                    if !was_selecting && selecting {
-                        self.selecting = true;
-                        self.bars.truncate(i + 1);
-                        self.bars.push(Zoombar::new());
-                        break;
-                    } else if !selecting && is_second_last {
-                        self.selecting = false;
-                    }
-                }
-
-                // keep bars consistent in case of double clicks
-                let last_bar = self.bars.len() - 1;
-                for (i, bar) in self.bars.iter_mut().enumerate() {
-                    if bar.selected == NULL_SELECTION && i != last_bar {
-                        // remove other bars behind this one
-                        self.bars.truncate(i + 1);
-                        break;
-                    }
-                }
-
-                if show_hex {
-                    let start = if window.start().is_start_of_file() {
-                        // ensure that the correction below does not make the start invisible
-
-                        0
-                    } else if window.end() > AbsoluteOffset::ZERO + file_size - Len::from(16) {
-                        // over-correct towards the end to ensure it's guaranteed to be visible
-
-                        let rounded_up_size = file_size.round_up(16);
-
-                        (rounded_up_size - total_bytes).as_u64() / 16
+                    let color = settings.entropy_color(entropy);
+                    let secondary_color = if quality < 1.0 {
+                        Color32::RED
                     } else {
-                        window.start().as_u64() / 16
+                        Color32::GREEN
                     };
-
-                    render_hex(ui, source, start, marked_locations);
+                    (color, secondary_color)
                 } else {
-                    render_overview(ui, window);
+                    require_repaint = true;
+                    let color = settings.missing_color();
+                    (color, color)
                 }
-            },
-        );
+            });
+
+            bar.cached_image.require_repaint(require_repaint);
+
+            if require_repaint {
+                ui.ctx().request_repaint_after(IDLE_TIME);
+            }
+
+            render_locations_on_bar(
+                ui,
+                rect,
+                window,
+                marked_locations,
+                &mut new_hovered_location,
+                currently_hovered.clone(),
+            );
+
+            if let Some(location) = marked_locations.hovered()
+                && ui.input(|input| {
+                    input
+                        .pointer
+                        .latest_pos()
+                        .map(|pos| rect.contains(pos))
+                        .unwrap_or(false)
+                })
+            {
+                let offset = location.window().start();
+                Tooltip::always_open(
+                    ui.ctx().clone(),
+                    ui.layer_id(),
+                    "position_highlight_hover".into(),
+                    PopupAnchor::Pointer,
+                )
+                .show(|ui| {
+                    ui.label(format!("{}", offset.as_u64()));
+                });
+                if ui.input(|input| input.pointer.primary_clicked()) {
+                    self.rearrange_bars_for_point(scroll_state, file_size, i, offset, total_bytes);
+                    show_hex = true;
+                    break;
+                }
+            } else if let Some(row_window) = hovered_row_window {
+                Tooltip::always_open(
+                    ui.ctx().clone(),
+                    ui.layer_id(),
+                    "zoombar_tooltip".into(),
+                    PopupAnchor::Pointer,
+                )
+                .show(|ui| {
+                    if let Some((entropy, quality)) = handler
+                        .get_entropy(row_window)
+                        .into_result_with_quality()
+                        .unwrap()
+                    {
+                        if quality < 1.0 {
+                            ui.label(format!(
+                                "Entropy: {entropy:.02} (Estimation quality: {:.2}%)",
+                                quality * 100.0
+                            ));
+                        } else {
+                            ui.label(format!("Entropy: {entropy:.02}"));
+                        }
+                    } else {
+                        ui.label("Entropy unknown");
+                    }
+                });
+            }
+
+            window = bar.window(window, total_bytes);
+
+            if scroll_state.interaction_state.selecting_bar(i) {
+                scroll_state.scrollbars.truncate(i + 1);
+                scroll_state.scrollbars.push(Scrollbar::new(window.size()));
+            }
+        }
+
+        // keep bars consistent in case of double clicks
+        let mut prev_len = file_size;
+        for (i, bar) in scroll_state.scrollbars[..scroll_state.scrollbars.len() - 1]
+            .iter()
+            .enumerate()
+        {
+            if bar.selection_start == RelativeOffset::ZERO && bar.selection_len == prev_len {
+                // remove other bars behind this one
+                scroll_state.scrollbars.truncate(i + 1);
+                break;
+            }
+
+            prev_len = bar.selection_len;
+        }
+
+        if show_hex {
+            let start = if window.start().is_start_of_file() {
+                // ensure that the correction below does not make the start invisible
+
+                0
+            } else if window.end() > AbsoluteOffset::ZERO + file_size - Len::from(16) {
+                // over-correct towards the end to ensure it's guaranteed to be visible
+
+                let rounded_up_size = file_size.round_up(16);
+
+                (rounded_up_size - total_bytes).as_u64() / 16
+            } else {
+                window.start().as_u64() / 16
+            };
+
+            render_hex(ui, source, start, marked_locations);
+            scroll_state.display_suggestion = DisplaySuggestion::Hexview;
+        } else {
+            render_overview(ui, window);
+            scroll_state.display_suggestion = DisplaySuggestion::Overview;
+        }
 
         *marked_locations.hovered_location_mut() = new_hovered_location;
+
+        scroll_state.changed(rect.height())
     }
 
     /// Rearranges the zoombars to focus on the given point.
@@ -277,337 +244,277 @@ impl Zoombars {
     /// shifted.
     pub fn rearrange_bars_for_point(
         &mut self,
-        bar_height: f32,
+        scroll_state: &mut ScrollState,
         file_size: Len,
         start_bar: usize,
         point: AbsoluteOffset,
         total_bytes: Len,
     ) {
-        let from_center_len = |center: f32, len: f32| -> RangeInclusive<f32> {
-            let tentative_start = center - (len / 2.0);
-            let start = if tentative_start < 0.0 {
-                0.0
-            } else if tentative_start + len > 1.0 {
-                1.0 - len
-            } else {
-                tentative_start
-            };
+        let center_bar_on_point = |bar: &mut Scrollbar, window: Window| {
+            let point_on_bar = point - window.start();
+            let half_len = bar.selection_len / 2;
 
-            start..=start + len
+            if point_on_bar < half_len {
+                bar.selection_start = RelativeOffset::ZERO;
+            } else if point_on_bar + half_len > window.size() {
+                bar.selection_start =
+                    RelativeOffset::from((window.size() - bar.selection_len).as_u64());
+            } else {
+                bar.selection_start = RelativeOffset::from((point_on_bar - half_len).as_u64());
+            }
         };
 
         let mut window = Window::from_start_len(AbsoluteOffset::ZERO, file_size);
-        for bar in self.bars.iter_mut().take(start_bar + 1) {
-            let selected_window = bar.selection_window(window, bar_height);
+        let mut parent_window = window;
+        for bar in scroll_state.scrollbars.iter_mut().take(start_bar + 1) {
+            let selected_window = bar.window(window, total_bytes);
             if selected_window.contains(point) {
+                parent_window = window;
                 window = selected_window;
                 continue;
             }
 
-            let min_selection_size = min_selection_size(window, bar_height);
-            let selection = bar.selection(min_selection_size);
-
-            let selection_len = selection.end() - selection.start();
-            let selection_center =
-                (point - window.start()).as_u64() as f32 / window.size().as_u64() as f32;
-
-            bar.set_selection(from_center_len(selection_center, selection_len));
-
-            window = bar.selection_window(window, bar_height);
+            center_bar_on_point(bar, window);
+            parent_window = window;
+            window = bar.window(window, total_bytes);
         }
-        self.bars.drain(start_bar + 1..);
+        scroll_state.scrollbars.drain(start_bar + 1..);
 
         // if the current bar is full, re-do it instead
-        if self.bars[start_bar].selected == NULL_SELECTION {
-            self.bars.remove(start_bar);
+        if scroll_state.scrollbars[start_bar].selection_len == parent_window.size() {
+            scroll_state.scrollbars.remove(start_bar);
         }
 
         while window.size() > total_bytes {
-            let min_selection_size = min_selection_size(window, bar_height);
-            let selection_len = 0.05f32.max(min_selection_size);
-            let selection_center =
-                (point - window.start()).as_u64() as f32 / window.size().as_u64() as f32;
+            let selection_len = std::cmp::max(
+                Len::from((0.05f64 * window.size().as_u64() as f64) as u64),
+                total_bytes,
+            );
 
-            let mut bar = Zoombar::new();
-            bar.set_selection(from_center_len(selection_center, selection_len));
-            window = bar.selection_window(window, bar_height);
+            let mut bar = Scrollbar::new(window.size());
+            bar.selection_len = selection_len;
 
-            self.bars.push(bar);
+            center_bar_on_point(&mut bar, window);
+            window = bar.window(window, total_bytes);
+
+            scroll_state.scrollbars.push(bar);
         }
 
         // the algorithm expects a full bar at the end, so provide it
-        self.bars.push(Zoombar::new());
-    }
-
-    /// Creates a hash of the zoombar selection state.
-    pub fn selection_state(&self) -> u64 {
-        let mut hasher = std::hash::DefaultHasher::new();
-
-        self.prev_height.to_ne_bytes().hash(&mut hasher);
-        self.bars.len().hash(&mut hasher);
-        for bar in &self.bars {
-            bar.selected.start().to_ne_bytes().hash(&mut hasher);
-            bar.selected.end().to_ne_bytes().hash(&mut hasher);
-        }
-
-        hasher.finish()
-    }
-
-    /// Determines if the zoombar selection state changed since the last call to this method.
-    pub fn changed(&mut self) -> bool {
-        let state = self.selection_state();
-        let prev_state = self.prev_selection_state;
-        self.prev_selection_state = state;
-
-        prev_state != state
+        scroll_state.scrollbars.push(Scrollbar::new(window.size()));
     }
 }
 
-impl Default for Zoombars {
-    fn default() -> Self {
-        Zoombars::new()
-    }
-}
+/// Handles manipulating the selection on the zoombar.
+fn handle_interactions(
+    rect: Rect,
+    scrollbar: &mut Scrollbar,
+    bar_idx: usize,
+    interaction_state: &mut InteractionState,
+    total_bytes: Len,
+    window: Window,
+    allow_selection: bool,
+    ctx: &Context,
+) {
+    ctx.input(|input| {
+        match interaction_state {
+            InteractionState::WindowSelection {
+                start,
+                end,
+                bar_idx: selecting_bar_idx,
+            } if *selecting_bar_idx == bar_idx => {
+                let selection = |start: RelativeOffset, end: RelativeOffset| {
+                    if start <= end {
+                        let len = std::cmp::max(end - start, total_bytes);
 
-/// Represents a single zoombar.
-struct Zoombar {
-    /// The selected range of the bar.
-    selected: RangeInclusive<f32>,
-    /// Whether or not the user is currently dragging the selection.
-    dragging: bool,
-    /// A cached image of the zoombar.
-    cached_image: CachedImage<(RangeInclusive<f32>, Window)>,
-}
+                        if start + len > RelativeOffset::from(window.size().as_u64()) {
+                            (RelativeOffset::from((window.size() - len).as_u64()), len)
+                        } else {
+                            (start, len)
+                        }
+                    } else {
+                        let len = std::cmp::max(start - end, total_bytes);
 
-impl Zoombar {
-    /// Creates a new zoombar.
-    fn new() -> Zoombar {
-        Zoombar {
-            selected: NULL_SELECTION,
-            dragging: false,
-            cached_image: CachedImage::new(),
-        }
-    }
+                        if RelativeOffset::from(len.as_u64()) > start {
+                            (RelativeOffset::ZERO, len)
+                        } else {
+                            (start - len, len)
+                        }
+                    }
+                };
 
-    /// Sets the selection to the given one.
-    fn set_selection(&mut self, selection: RangeInclusive<f32>) {
-        self.selected = selection;
-    }
+                if input.pointer.primary_down() {
+                    // continue ongoing selection
+                    if let Some(pos) = input.pointer.latest_pos() {
+                        let current = (pos.y - rect.min.y) / rect.height();
+                        let current = RelativeOffset::from(
+                            (current as f64 * window.size().as_u64() as f64) as u64,
+                        );
+                        *end = current;
 
-    /// The selection of this zoombar.
-    fn selection(&self, min_selection_size: f32) -> RangeInclusive<f32> {
-        let size = (*self.selected.start() - *self.selected.end())
-            .abs()
-            .clamp(min_selection_size, 1.0);
+                        let (start, len) = selection(*start, *end);
+                        scrollbar.selection_start = start;
+                        scrollbar.selection_len = len;
+                    }
+                } else {
+                    let (start, len) = selection(*start, *end);
+                    scrollbar.selection_start = start;
+                    scrollbar.selection_len = len;
 
-        if self.selected != NULL_SELECTION {
-            let start = if self.selected.start() > self.selected.end() {
-                (*self.selected.start() - size).min(*self.selected.end())
-            } else {
-                *self.selected.start()
-            };
-
-            if start < 0.0 {
-                0.0..=size
-            } else if start + size > 1.0 {
-                1.0 - size..=1.0
-            } else {
-                start..=start + size
-            }
-        } else {
-            NULL_SELECTION
-        }
-    }
-
-    /// Computes the window that this zoombar selected.
-    fn selection_window(&self, prev_window: Window, bar_height: f32) -> Window {
-        let min_selection_size = min_selection_size(prev_window, bar_height);
-        let selection = self.selection(min_selection_size);
-
-        let new_start_offset =
-            RelativeOffset::from((prev_window.size().as_u64() as f32 * selection.start()) as u64);
-
-        let start = prev_window.start() + new_start_offset;
-        let selection_size = Len::from(
-            ((selection.end() - selection.start()) as f64 * prev_window.size().as_u64() as f64)
-                as u64,
-        );
-
-        Window::new(
-            start,
-            std::cmp::min(start + selection_size, prev_window.end()),
-        )
-    }
-
-    /// Handles manipulating the selection on the zoombar.
-    fn handle_selection(
-        &mut self,
-        rect: Rect,
-        selecting: &mut bool,
-        min_selection_size: f32,
-        allow_selection: bool,
-        ctx: &Context,
-    ) {
-        ctx.input(|input| {
-            if *selecting {
-                if let Some(pos) = input.pointer.latest_pos()
-                    && rect.expand2(vec2(f32::INFINITY, 0.0)).contains(pos)
-                {
-                    let start = *self.selected.start();
-                    let current = (pos.y - rect.min.y) / rect.height();
-                    self.selected = start..=current;
-                }
-                if !input.pointer.primary_down() {
-                    *selecting = false;
+                    // the selection process finished
+                    *interaction_state = InteractionState::None;
 
                     // double click resets selection
                     if input.pointer.button_double_clicked(PointerButton::Primary) {
-                        self.selected = NULL_SELECTION;
+                        *scrollbar = Scrollbar::new(window.size());
                     }
                 }
-            } else if input.pointer.primary_pressed()
-                && let Some(pos) = input.pointer.latest_pos()
-                && rect.contains(pos)
-                && !self.dragging
-                && allow_selection
-            {
-                *selecting = true;
-                let current = (pos.y - rect.min.y) / rect.height();
-                self.selected = current..=current;
-            } else if self.dragging {
-                if let Some(pos) = input.pointer.latest_pos()
-                    && rect.expand2(vec2(f32::INFINITY, 0.0)).contains(pos)
+            }
+            InteractionState::Dragging {
+                bar_idx: dragging_bar_idx,
+            } if *dragging_bar_idx == bar_idx => {
+                if input.pointer.secondary_down() {
+                    // continue ongoing dragging
+                    if let Some(pos) = input.pointer.latest_pos()
+                        && rect.expand2(vec2(f32::INFINITY, 0.0)).contains(pos)
+                    {
+                        let current = (pos.y - rect.min.y).clamp(0.0, rect.height()) as f64
+                            / rect.height() as f64;
+                        let center =
+                            RelativeOffset::from((current * window.size().as_u64() as f64) as u64);
+
+                        scrollbar.center_around(center, window);
+                    }
+                } else {
+                    // stop the dragging
+                    *interaction_state = InteractionState::None;
+                }
+            }
+            _ => {
+                if input.pointer.primary_pressed()
+                    && let Some(pos) = input.pointer.latest_pos()
+                    && rect.contains(pos)
+                    && allow_selection
                 {
-                    let selection = self.selection(min_selection_size);
-
+                    // Starting a new selection
                     let current = (pos.y - rect.min.y) / rect.height();
-                    let selection_size = *selection.end() - *selection.start();
-                    let tentative_start = current - (selection_size / 2.0);
-                    let new_start = if tentative_start >= 0.0 {
-                        if tentative_start + selection_size <= 1.0 {
-                            tentative_start
-                        } else {
-                            1.0 - selection_size
-                        }
-                    } else {
-                        0.0
+                    let current = RelativeOffset::from(
+                        (current as f64 * window.size().as_u64() as f64) as u64,
+                    );
+                    *interaction_state = InteractionState::WindowSelection {
+                        start: current,
+                        end: current,
+                        bar_idx,
                     };
-                    self.selected = new_start..=new_start + selection_size;
+
+                    scrollbar.selection_start = current;
+                    scrollbar.selection_len = total_bytes;
+                } else if input.pointer.secondary_pressed()
+                    && let Some(pos) = input.pointer.latest_pos()
+                    && rect.contains(pos)
+                {
+                    // start dragging
+                    *interaction_state = InteractionState::Dragging { bar_idx };
                 }
-                if !input.pointer.secondary_down() {
-                    self.dragging = false;
-                }
-            } else if input.pointer.secondary_pressed()
-                && let Some(pos) = input.pointer.latest_pos()
-                && rect.contains(pos)
-                && !*selecting
-            {
-                self.dragging = true;
             }
+        }
 
-            if let Some(pos) = input.pointer.latest_pos()
-                && rect.contains(pos)
-                && input.smooth_scroll_delta.y != 0.0
-            {
-                let raw_scroll_delta = input.smooth_scroll_delta.y;
-                let scroll_delta = -raw_scroll_delta / 500.0;
+        // scroll if we are within the scroll bar
+        if let Some(pos) = input.pointer.latest_pos()
+            && rect.contains(pos)
+            && input.smooth_scroll_delta.y != 0.0
+        {
+            let scroll_delta = (-input.smooth_scroll_delta.y as f64 / 2.0).trunc();
+            let scroll_up = scroll_delta < 0.0;
+            let scroll_delta = scroll_delta.abs();
+            let row_bytes = window.size().as_u64() as f64 / rect.height() as f64;
+            let scroll_amount = (scroll_delta * row_bytes) as u64;
 
-                let selection = self.selection(min_selection_size);
-                let selection_size = *selection.end() - *selection.start();
-                let tentative_start = *selection.start() + scroll_delta;
-                let new_start = if tentative_start >= 0.0 {
-                    if tentative_start + selection_size <= 1.0 {
-                        tentative_start
-                    } else {
-                        1.0 - selection_size
-                    }
-                } else {
-                    0.0
-                };
-                self.selected = new_start..=new_start + selection_size;
+            if scroll_up {
+                scrollbar.selection_start = RelativeOffset::from(
+                    scrollbar
+                        .selection_start
+                        .as_u64()
+                        .saturating_sub(scroll_amount),
+                );
+            } else {
+                scrollbar.selection_start = RelativeOffset::from(std::cmp::min(
+                    scrollbar
+                        .selection_start
+                        .as_u64()
+                        .saturating_add(scroll_amount),
+                    (window.size() - scrollbar.selection_len).as_u64(),
+                ));
             }
-        });
-    }
-
-    /// Renders a single zoombar.
-    fn render(
-        &mut self,
-        ui: &mut Ui,
-        rect: Rect,
-        selecting: &mut bool,
-        window: Window,
-        min_selection_size: f32,
-        allow_selection: bool,
-        mut row_color: impl FnMut(Window) -> (Color32, Color32),
-    ) -> Option<Window> {
-        let total_rows = rect.height().trunc() as u64;
-
-        self.handle_selection(
-            rect,
-            selecting,
-            min_selection_size,
-            allow_selection,
-            ui.ctx(),
-        );
-
-        let selection = self.selection(min_selection_size);
-        let selection_start = (rect.height() * *selection.start()).trunc() as usize;
-        let selection_end = (rect.height() * *selection.end()).trunc() as usize;
-
-        let bytes_per_row =
-            Len::from((window.size().as_u64() as f64 / total_rows as f64).round() as u64);
-
-        let side_start = (rect.width() - 2.0) as usize;
-
-        self.cached_image.paint_at(
-            ui,
-            rect,
-            (self.selection(min_selection_size), window),
-            |x, y| {
-                let relative_offset = y as f64 / total_rows as f64;
-                let offset_within_range =
-                    RelativeOffset::from((relative_offset * window.size().as_u64() as f64) as u64);
-
-                let row_window =
-                    Window::from_start_len(window.start() + offset_within_range, bytes_per_row);
-
-                let (raw_color, side_color) = row_color(row_window);
-
-                const HIGHLIGHT_STRENGTH: f64 = 0.4;
-
-                if x >= side_start {
-                    side_color
-                } else if x == side_start - 1 {
-                    Color32::BLACK
-                } else {
-                    if selection_start <= y && y <= selection_end {
-                        //color::lerp(raw_color, egui::Color32::WHITE, HIGHLIGHT_STRENGTH)
-                        raw_color
-                    } else {
-                        color::lerp(raw_color, egui::Color32::BLACK, HIGHLIGHT_STRENGTH)
-                    }
-                }
-            },
-        );
-
-        ui.allocate_rect(rect, Sense::hover())
-            .hover_pos()
-            .map(|pos| {
-                let y = (pos.y - rect.min.y) as usize;
-
-                let relative_offset = y as f64 / total_rows as f64;
-                let offset_within_range =
-                    RelativeOffset::from((relative_offset * window.size().as_u64() as f64) as u64);
-
-                Window::from_start_len(window.start() + offset_within_range, bytes_per_row)
-            })
-    }
+        }
+    });
 }
 
-impl Default for Zoombar {
-    fn default() -> Self {
-        Zoombar::new()
-    }
+/// Renders a single scrollbar.
+fn render_bar(
+    ui: &mut Ui,
+    scrollbar: &mut Scrollbar,
+    rect: Rect,
+    window: Window,
+    mut row_color: impl FnMut(Window) -> (Color32, Color32),
+) -> Option<Window> {
+    let total_rows = rect.height().trunc() as u64;
+
+    let selection_start_relative =
+        scrollbar.selection_start.as_u64() as f64 / window.size().as_u64() as f64;
+    let selection_end_relative = (scrollbar.selection_start + scrollbar.selection_len).as_u64()
+        as f64
+        / window.size().as_u64() as f64;
+    let selection_start = (selection_start_relative * rect.height() as f64).round() as usize;
+    let selection_end = (selection_end_relative * rect.height() as f64).round() as usize;
+
+    let bytes_per_row =
+        Len::from((window.size().as_u64() as f64 / total_rows as f64).round() as u64);
+
+    let side_start = (rect.width() - 2.0) as usize;
+
+    scrollbar.cached_image.paint_at(
+        ui,
+        rect,
+        (scrollbar.selection_start, scrollbar.selection_len, window),
+        |x, y| {
+            let relative_offset = y as f64 / total_rows as f64;
+            let offset_within_range =
+                RelativeOffset::from((relative_offset * window.size().as_u64() as f64) as u64);
+
+            let row_window =
+                Window::from_start_len(window.start() + offset_within_range, bytes_per_row);
+
+            let (raw_color, side_color) = row_color(row_window);
+
+            const HIGHLIGHT_STRENGTH: f64 = 0.4;
+
+            if x >= side_start {
+                side_color
+            } else if x == side_start - 1 {
+                Color32::BLACK
+            } else {
+                if selection_start <= y && y <= selection_end {
+                    //color::lerp(raw_color, egui::Color32::WHITE, HIGHLIGHT_STRENGTH)
+                    raw_color
+                } else {
+                    color::lerp(raw_color, egui::Color32::BLACK, HIGHLIGHT_STRENGTH)
+                }
+            }
+        },
+    );
+
+    ui.allocate_rect(rect, Sense::hover())
+        .hover_pos()
+        .map(|pos| {
+            let y = (pos.y - rect.min.y) as usize;
+
+            let relative_offset = y as f64 / total_rows as f64;
+            let offset_within_range =
+                RelativeOffset::from((relative_offset * window.size().as_u64() as f64) as u64);
+
+            Window::from_start_len(window.start() + offset_within_range, bytes_per_row)
+        })
 }
 
 /// Returns the position of `offset` on the bar spanning `bar_window` displayed in `bar_rect`.
@@ -617,8 +524,8 @@ pub fn offset_on_bar(bar_rect: Rect, bar_window: Window, offset: AbsoluteOffset)
     }
 
     let relative_offset =
-        (offset - bar_window.start()).as_u64() as f32 / bar_window.size().as_u64() as f32;
-    let height = bar_rect.height().ceil();
+        (offset - bar_window.start()).as_u64() as f64 / bar_window.size().as_u64() as f64;
+    let height = bar_rect.height().ceil() as f64;
 
     if 0.0 <= relative_offset && relative_offset <= 1.0 {
         let offset = ((16.0 * height) * relative_offset) as u32;
@@ -629,14 +536,4 @@ pub fn offset_on_bar(bar_rect: Rect, bar_window: Window, offset: AbsoluteOffset)
     } else {
         None
     }
-}
-
-/// The minimum size of a selection for the given current window and bar height.
-fn min_selection_size(window: Window, bar_height: f32) -> f32 {
-    let total_rows = (bar_height.trunc() as u64).max(1);
-    let total_bytes = total_rows * 16;
-
-    let maximum_min_selection_size = (total_rows - 1) as f32 / total_rows as f32;
-
-    (total_bytes as f32 / window.size().as_u64() as f32).min(maximum_min_selection_size)
 }

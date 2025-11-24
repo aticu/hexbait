@@ -1,5 +1,7 @@
 //! Efficient drawing of larger pixel areas.
 
+use std::fmt;
+
 use egui::{
     Color32, ColorImage, Image, Rect, TextureHandle, TextureOptions, Ui, load::SizedTexture, vec2,
 };
@@ -129,5 +131,11 @@ impl<T: PartialEq> CachedImage<T> {
 impl<T: PartialEq> Default for CachedImage<T> {
     fn default() -> Self {
         CachedImage::new()
+    }
+}
+
+impl<T: PartialEq> fmt::Debug for CachedImage<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CachedImage").finish_non_exhaustive()
     }
 }
