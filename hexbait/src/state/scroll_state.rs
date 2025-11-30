@@ -2,7 +2,7 @@
 
 use std::hash::{Hash as _, Hasher as _};
 
-use hexbait_common::{ChangeState, Len, RelativeOffset};
+use hexbait_common::{AbsoluteOffset, ChangeState, Len, RelativeOffset};
 
 use crate::{
     data::{DataSource, Input},
@@ -26,6 +26,8 @@ pub struct ScrollState {
     pub display_suggestion: DisplaySuggestion,
     /// How the user is currently interacting with the scrollbars.
     pub interaction_state: InteractionState,
+    /// Store the file size so the scroll state can independently compute windows.
+    file_size: Len,
     /// The height of the zoombars in the current frame.
     height: f32,
     /// The selection state in the previous frame.
@@ -39,6 +41,7 @@ impl ScrollState {
             scrollbars: vec![Scrollbar::new(input.len())],
             display_suggestion: DisplaySuggestion::Overview,
             interaction_state: InteractionState::None,
+            file_size: input.len(),
             // the height is irrelevant for the first frame since we draw anyway
             height: 0.0,
             // the previous selection state is irrelevant for the first frame since we draw anyway
@@ -73,19 +76,134 @@ impl ScrollState {
             false => ChangeState::Changed,
         }
     }
+
+    /// Rearranges the scrollbars to focus on the given point.
+    ///
+    /// Bars before `start_bar` remain unchanged, if `point` lies within them, otherwise they are
+    /// shifted.
+    pub fn rearrange_bars_for_point(
+        &mut self,
+        file_size: Len,
+        start_bar: usize,
+        point: AbsoluteOffset,
+        total_bytes_in_hexview: Len,
+    ) {
+        let center_bar_on_point = |bar: &mut Scrollbar, window: Window| {
+            let point_on_bar = point - window.start();
+            let half_len = bar.selection_len / 2;
+
+            if point_on_bar < half_len {
+                bar.selection_start = RelativeOffset::ZERO;
+            } else if point_on_bar + half_len > window.size() {
+                bar.selection_start =
+                    RelativeOffset::from((window.size() - bar.selection_len).as_u64());
+            } else {
+                bar.selection_start = RelativeOffset::from((point_on_bar - half_len).as_u64());
+            }
+        };
+
+        let mut window = Window::from_start_len(AbsoluteOffset::ZERO, file_size);
+        let mut parent_window = window;
+        for bar in self.scrollbars.iter_mut().take(start_bar + 1) {
+            let selected_window = bar.window(window, total_bytes_in_hexview);
+            if selected_window.contains(point) {
+                parent_window = window;
+                window = selected_window;
+                continue;
+            }
+
+            center_bar_on_point(bar, window);
+            parent_window = window;
+            window = bar.window(window, total_bytes_in_hexview);
+        }
+        self.scrollbars.drain(start_bar + 1..);
+
+        // if the current bar is full, re-do it instead
+        if self.scrollbars[start_bar].selection_len == parent_window.size() {
+            self.scrollbars.remove(start_bar);
+        }
+
+        while window.size() > total_bytes_in_hexview {
+            let selection_len = std::cmp::max(
+                Len::from((0.05f64 * window.size().as_u64() as f64) as u64),
+                total_bytes_in_hexview,
+            );
+
+            let mut bar = Scrollbar::new(window.size());
+            bar.selection_len = selection_len;
+
+            center_bar_on_point(&mut bar, window);
+            window = bar.window(window, total_bytes_in_hexview);
+
+            self.scrollbars.push(bar);
+        }
+
+        // the algorithm expects a full bar at the end, so provide it
+        self.scrollbars.push(Scrollbar::new(window.size()));
+    }
+
+    /// Enforces the invariant that no fully selected bar can be in the middle.
+    pub fn enforce_no_full_bar_in_middle_invariant(&mut self, file_size: Len) {
+        let mut prev_len = file_size;
+        for (i, bar) in self.scrollbars[..self.scrollbars.len() - 1]
+            .iter()
+            .enumerate()
+        {
+            if bar.selection_start == RelativeOffset::ZERO && bar.selection_len == prev_len {
+                // remove other bars behind this one
+                self.scrollbars.truncate(i + 1);
+                break;
+            }
+
+            prev_len = bar.selection_len;
+        }
+    }
+
+    /// Scrolls up by the given amount.
+    pub fn scroll_up(&mut self, bar: usize, amount: u64) {
+        let mut amount_left = amount;
+        for i in (0..=bar).rev() {
+            if amount_left == 0 {
+                break;
+            }
+
+            amount_left = self.scrollbars[i].scroll_up(amount_left);
+        }
+    }
+
+    /// Scrolls up by the given amount.
+    pub fn scroll_down(&mut self, bar: usize, amount: u64, min_size: Len) {
+        let mut parent_size = Vec::with_capacity(bar + 1);
+        let mut window = Window::from_start_len(AbsoluteOffset::ZERO, self.file_size);
+
+        parent_size.push(window.size());
+        for i in 0..=bar {
+            window = self.scrollbars[i].window(window, min_size);
+            parent_size.push(window.size());
+        }
+
+        let mut amount_left = amount;
+        for i in (0..=bar).rev() {
+            if amount_left == 0 {
+                break;
+            }
+
+            amount_left = self.scrollbars[i].scroll_down(amount_left, parent_size[i]);
+        }
+    }
 }
 
 /// The state of a single scrollbar.
 #[derive(Debug)]
 pub struct Scrollbar {
     /// The start offset of the selection relative to the previous scrollbar's start.
-    pub selection_start: RelativeOffset,
+    selection_start: RelativeOffset,
     /// The length of the selected window.
-    pub selection_len: Len,
+    selection_len: Len,
     /// The cached image for this scrollbar.
     ///
     /// This depends on the selection of the scrollbar as well as the full window of the bar.
-    pub cached_image: CachedImage<(RelativeOffset, Len, Window)>,
+    pub cached_image: CachedImage<((RelativeOffset, Len), Window)>,
 }
 
 impl Scrollbar {
@@ -124,6 +242,62 @@ impl Scrollbar {
         } else {
             self.selection_start = center - half_len;
         }
+    }
+
+    /// Sets the selection for this scroll bar.
+    pub fn set_selection(&mut self, start: RelativeOffset, len: Len) {
+        self.selection_start = start;
+        self.selection_len = len;
+    }
+
+    /// Returns the relative start of the selection within the window (range: `0.0..=1.0`).
+    pub fn relative_selection_start(&self, window: Window) -> f64 {
+        self.selection_start.as_u64() as f64 / window.size().as_u64() as f64
+    }
+
+    /// Returns the relative end of the selection within the window (range: `0.0..=1.0`).
+    pub fn relative_selection_end(&self, window: Window) -> f64 {
+        (self.selection_start + self.selection_len).as_u64() as f64 / window.size().as_u64() as f64
+    }
+
+    /// Scrolls the bar up by the given amount of bytes.
+    ///
+    /// The returned value specifies how much the bar was "overscrolled".
+    pub fn scroll_up(&mut self, scroll_amount: u64) -> u64 {
+        let start = self.selection_start.as_u64();
+
+        if scroll_amount > start {
+            self.selection_start = RelativeOffset::ZERO;
+
+            scroll_amount - start
+        } else {
+            self.selection_start = RelativeOffset::from(start - scroll_amount);
+
+            0
+        }
+    }
+
+    /// Scrolls the bar down by the given amount of bytes.
+    ///
+    /// The returned value specifies how much the bar was "overscrolled".
+    pub fn scroll_down(&mut self, scroll_amount: u64, bar_len: Len) -> u64 {
+        let start = self.selection_start.as_u64();
+        let last_possible_position = (bar_len - self.selection_len).as_u64();
+
+        if start.saturating_add(scroll_amount) > last_possible_position {
+            self.selection_start = RelativeOffset::from(last_possible_position);
+
+            start.saturating_add(scroll_amount) - last_possible_position
+        } else {
+            self.selection_start = RelativeOffset::from(start + scroll_amount);
+
+            0
+        }
+    }
+
+    /// Returns state used by the cached image.
+    pub fn state_for_cached_image(&self) -> (RelativeOffset, Len) {
+        (self.selection_start, self.selection_len)
     }
 }
 

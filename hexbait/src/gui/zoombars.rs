@@ -19,94 +19,88 @@ use super::{
     marking::{MarkedLocations, render_locations_on_bar},
 };
 
-/// Zoombars are a GUI component to narrow in on parts of a file.
-pub struct Zoombars {}
+/// Renders the zoombars.
+pub fn render<Source: DataSource>(
+    ui: &mut Ui,
+    source: &mut Source,
+    scroll_state: &mut ScrollState,
+    settings: &Settings,
+    marked_locations: &mut MarkedLocations,
+    handler: &StatisticsHandler,
+    render_hex: impl FnOnce(&mut Ui, &mut Source, u64, &mut ScrollState, &mut MarkedLocations),
+    render_overview: impl FnOnce(&mut Ui, Window),
+) -> ChangeState {
+    let file_size = source.len();
+    let rect = ui.max_rect().intersect(ui.cursor());
 
-impl Zoombars {
-    /// Creates new zoombars.
-    pub fn new() -> Zoombars {
-        Zoombars {}
+    // be deliberately small to fit more text here
+    let size_text_height = settings.font_size() * 0.7;
+
+    let total_rows = (rect.height().trunc() as u64).max(1);
+    let total_bytes = Len::from(total_rows * 16);
+
+    if total_bytes >= file_size {
+        render_hex(ui, source, 0, scroll_state, marked_locations);
+        scroll_state.display_suggestion = DisplaySuggestion::Hexview;
+        return ChangeState::Unchanged;
+    } else if scroll_state.scrollbars.is_empty() {
+        scroll_state.scrollbars.push(Scrollbar::new(file_size));
     }
 
-    /// Renders the zoombars.
-    pub fn render<Source: DataSource>(
-        &mut self,
-        ui: &mut Ui,
-        source: &mut Source,
-        scroll_state: &mut ScrollState,
-        settings: &Settings,
-        marked_locations: &mut MarkedLocations,
-        handler: &StatisticsHandler,
-        render_hex: impl FnOnce(&mut Ui, &mut Source, u64, &mut MarkedLocations),
-        render_overview: impl FnOnce(&mut Ui, Window),
-    ) -> ChangeState {
-        let file_size = source.len();
-        let rect = ui.max_rect().intersect(ui.cursor());
+    let mut window = source.full_window();
+    let mut show_hex = false;
 
-        // be deliberately small to fit more text here
-        let size_text_height = settings.font_size() * 0.7;
+    let mut new_hovered_location = None;
+    let currently_hovered = marked_locations.hovered_location_mut().clone();
 
-        let total_rows = (rect.height().trunc() as u64).max(1);
-        let total_bytes = Len::from(total_rows * 16);
-
-        if total_bytes >= file_size {
-            render_hex(ui, source, 0, marked_locations);
-            scroll_state.display_suggestion = DisplaySuggestion::Hexview;
-            return ChangeState::Unchanged;
-        } else if scroll_state.scrollbars.is_empty() {
-            scroll_state.scrollbars.push(Scrollbar::new(file_size));
+    for i in 0..scroll_state.scrollbars.len() {
+        if i >= scroll_state.scrollbars.len() {
+            break;
         }
 
-        let mut window = source.full_window();
-        let mut show_hex = false;
+        let mut rect = ui.max_rect().intersect(ui.cursor());
+        rect.min += vec2(0.0, size_text_height);
+        rect.set_width(16.0 * settings.bar_width_multiplier() as f32 + 3.0);
+        let rect = rect;
 
-        let mut new_hovered_location = None;
-        let currently_hovered = marked_locations.hovered_location_mut().clone();
+        ui.painter().text(
+            rect.min,
+            egui::Align2::LEFT_BOTTOM,
+            format!("{}B", SizeFormatterBinary::new(window.size().as_u64())),
+            FontId::proportional(size_text_height),
+            ui.style().noninteractive().text_color(),
+        );
 
-        for i in 0..scroll_state.scrollbars.len() {
-            let Some(bar) = scroll_state.scrollbars.get_mut(i) else {
-                break;
-            };
+        if window.size() <= total_bytes {
+            show_hex = true;
+            break;
+        }
 
-            let mut rect = ui.max_rect().intersect(ui.cursor());
-            rect.min += vec2(0.0, size_text_height);
-            rect.set_width(16.0 * settings.bar_width_multiplier() as f32 + 3.0);
-            let rect = rect;
+        let mut full_quality = true;
+        let allow_selection = marked_locations.hovered().is_none();
+        handle_interactions(
+            rect,
+            scroll_state,
+            i,
+            total_bytes,
+            window,
+            allow_selection,
+            ui.ctx(),
+        );
 
-            ui.painter().text(
-                rect.min,
-                egui::Align2::LEFT_BOTTOM,
-                format!("{}B", SizeFormatterBinary::new(window.size().as_u64())),
-                FontId::proportional(size_text_height),
-                ui.style().noninteractive().text_color(),
-            );
-
-            if window.size() <= total_bytes {
-                show_hex = true;
-                break;
-            }
-
-            let mut require_repaint = false;
-            let allow_selection = marked_locations.hovered().is_none();
-            handle_interactions(
-                rect,
-                bar,
-                i,
-                &mut scroll_state.interaction_state,
-                total_bytes,
-                window,
-                allow_selection,
-                ui.ctx(),
-            );
-
-            let hovered_row_window = render_bar(ui, bar, rect, window, |row_window| {
+        let hovered_row_window = render_bar(
+            ui,
+            &mut scroll_state.scrollbars[i],
+            rect,
+            window,
+            |row_window| {
                 if let Some((entropy, quality)) = handler
                     .get_entropy(row_window)
                     .into_result_with_quality()
                     .unwrap()
                 {
                     if quality < 1.0 {
-                        require_repaint = true;
+                        full_quality = false;
                     }
                     let color = settings.entropy_color(entropy);
                     let secondary_color = if quality < 1.0 {
@@ -116,208 +110,130 @@ impl Zoombars {
                     };
                     (color, secondary_color)
                 } else {
-                    require_repaint = true;
+                    full_quality = false;
                     let color = settings.missing_color();
                     (color, color)
                 }
-            });
+            },
+        );
 
-            bar.cached_image.require_repaint(require_repaint);
-
-            if require_repaint {
-                ui.ctx().request_repaint_after(IDLE_TIME);
-            }
-
-            render_locations_on_bar(
-                ui,
-                rect,
-                window,
-                marked_locations,
-                &mut new_hovered_location,
-                currently_hovered.clone(),
-            );
-
-            if let Some(location) = marked_locations.hovered()
-                && ui.input(|input| {
-                    input
-                        .pointer
-                        .latest_pos()
-                        .map(|pos| rect.contains(pos))
-                        .unwrap_or(false)
-                })
-            {
-                let offset = location.window().start();
-                Tooltip::always_open(
-                    ui.ctx().clone(),
-                    ui.layer_id(),
-                    "position_highlight_hover".into(),
-                    PopupAnchor::Pointer,
-                )
-                .show(|ui| {
-                    ui.label(format!("{}", offset.as_u64()));
-                });
-                if ui.input(|input| input.pointer.primary_clicked()) {
-                    self.rearrange_bars_for_point(scroll_state, file_size, i, offset, total_bytes);
-                    show_hex = true;
-                    break;
-                }
-            } else if let Some(row_window) = hovered_row_window {
-                Tooltip::always_open(
-                    ui.ctx().clone(),
-                    ui.layer_id(),
-                    "zoombar_tooltip".into(),
-                    PopupAnchor::Pointer,
-                )
-                .show(|ui| {
-                    if let Some((entropy, quality)) = handler
-                        .get_entropy(row_window)
-                        .into_result_with_quality()
-                        .unwrap()
-                    {
-                        if quality < 1.0 {
-                            ui.label(format!(
-                                "Entropy: {entropy:.02} (Estimation quality: {:.2}%)",
-                                quality * 100.0
-                            ));
-                        } else {
-                            ui.label(format!("Entropy: {entropy:.02}"));
-                        }
-                    } else {
-                        ui.label("Entropy unknown");
-                    }
-                });
-            }
-
-            window = bar.window(window, total_bytes);
-
-            if scroll_state.interaction_state.selecting_bar(i) {
-                scroll_state.scrollbars.truncate(i + 1);
-                scroll_state.scrollbars.push(Scrollbar::new(window.size()));
-            }
+        if !full_quality {
+            scroll_state.scrollbars[i].cached_image.require_repaint();
+            ui.ctx().request_repaint_after(IDLE_TIME);
         }
 
-        // keep bars consistent in case of double clicks
-        let mut prev_len = file_size;
-        for (i, bar) in scroll_state.scrollbars[..scroll_state.scrollbars.len() - 1]
-            .iter()
-            .enumerate()
+        render_locations_on_bar(
+            ui,
+            rect,
+            window,
+            marked_locations,
+            &mut new_hovered_location,
+            currently_hovered.clone(),
+        );
+
+        if let Some(location) = marked_locations.hovered()
+            && ui.input(|input| {
+                input
+                    .pointer
+                    .latest_pos()
+                    .map(|pos| rect.contains(pos))
+                    .unwrap_or(false)
+            })
         {
-            if bar.selection_start == RelativeOffset::ZERO && bar.selection_len == prev_len {
-                // remove other bars behind this one
-                scroll_state.scrollbars.truncate(i + 1);
+            let offset = location.window().start();
+            Tooltip::always_open(
+                ui.ctx().clone(),
+                ui.layer_id(),
+                "position_highlight_hover".into(),
+                PopupAnchor::Pointer,
+            )
+            .show(|ui| {
+                ui.label(format!("{}", offset.as_u64()));
+            });
+            if ui.input(|input| input.pointer.primary_clicked()) {
+                scroll_state.rearrange_bars_for_point(file_size, i, offset, total_bytes);
+                show_hex = true;
                 break;
             }
-
-            prev_len = bar.selection_len;
+        } else if let Some(row_window) = hovered_row_window {
+            Tooltip::always_open(
+                ui.ctx().clone(),
+                ui.layer_id(),
+                "zoombar_tooltip".into(),
+                PopupAnchor::Pointer,
+            )
+            .show(|ui| {
+                if let Some((entropy, quality)) = handler
+                    .get_entropy(row_window)
+                    .into_result_with_quality()
+                    .unwrap()
+                {
+                    if quality < 1.0 {
+                        ui.label(format!(
+                            "Entropy: {entropy:.02} (Estimation quality: {:.2}%)",
+                            quality * 100.0
+                        ));
+                    } else {
+                        ui.label(format!("Entropy: {entropy:.02}"));
+                    }
+                } else {
+                    ui.label("Entropy unknown");
+                }
+            });
         }
 
-        if show_hex {
-            let start = if window.start().is_start_of_file() {
-                // ensure that the correction below does not make the start invisible
+        window = scroll_state.scrollbars[i].window(window, total_bytes);
 
-                0
-            } else if window.end() > AbsoluteOffset::ZERO + file_size - Len::from(16) {
-                // over-correct towards the end to ensure it's guaranteed to be visible
-
-                let rounded_up_size = file_size.round_up(16);
-
-                (rounded_up_size - total_bytes).as_u64() / 16
-            } else {
-                window.start().as_u64() / 16
-            };
-
-            render_hex(ui, source, start, marked_locations);
-            scroll_state.display_suggestion = DisplaySuggestion::Hexview;
-        } else {
-            render_overview(ui, window);
-            scroll_state.display_suggestion = DisplaySuggestion::Overview;
+        if scroll_state.interaction_state.selecting_bar(i) {
+            scroll_state.scrollbars.truncate(i + 1);
+            scroll_state.scrollbars.push(Scrollbar::new(window.size()));
         }
-
-        *marked_locations.hovered_location_mut() = new_hovered_location;
-
-        scroll_state.changed(rect.height())
     }
 
-    /// Rearranges the zoombars to focus on the given point.
-    ///
-    /// Bars before `start_bar` remain unchanged, if `point` lies within them, otherwise they are
-    /// shifted.
-    pub fn rearrange_bars_for_point(
-        &mut self,
-        scroll_state: &mut ScrollState,
-        file_size: Len,
-        start_bar: usize,
-        point: AbsoluteOffset,
-        total_bytes: Len,
-    ) {
-        let center_bar_on_point = |bar: &mut Scrollbar, window: Window| {
-            let point_on_bar = point - window.start();
-            let half_len = bar.selection_len / 2;
+    // keep bars consistent in case of double clicks
+    scroll_state.enforce_no_full_bar_in_middle_invariant(file_size);
 
-            if point_on_bar < half_len {
-                bar.selection_start = RelativeOffset::ZERO;
-            } else if point_on_bar + half_len > window.size() {
-                bar.selection_start =
-                    RelativeOffset::from((window.size() - bar.selection_len).as_u64());
-            } else {
-                bar.selection_start = RelativeOffset::from((point_on_bar - half_len).as_u64());
-            }
+    if show_hex {
+        let start = if window.start().is_start_of_file() {
+            // ensure that the correction below does not make the start invisible
+
+            0
+        } else if window.end() > AbsoluteOffset::ZERO + file_size - Len::from(16) {
+            // over-correct towards the end to ensure it's guaranteed to be visible
+
+            let rounded_up_size = file_size.round_up(16);
+
+            (rounded_up_size - total_bytes).as_u64() / 16
+        } else {
+            window.start().as_u64() / 16
         };
 
-        let mut window = Window::from_start_len(AbsoluteOffset::ZERO, file_size);
-        let mut parent_window = window;
-        for bar in scroll_state.scrollbars.iter_mut().take(start_bar + 1) {
-            let selected_window = bar.window(window, total_bytes);
-            if selected_window.contains(point) {
-                parent_window = window;
-                window = selected_window;
-                continue;
-            }
-
-            center_bar_on_point(bar, window);
-            parent_window = window;
-            window = bar.window(window, total_bytes);
-        }
-        scroll_state.scrollbars.drain(start_bar + 1..);
-
-        // if the current bar is full, re-do it instead
-        if scroll_state.scrollbars[start_bar].selection_len == parent_window.size() {
-            scroll_state.scrollbars.remove(start_bar);
-        }
-
-        while window.size() > total_bytes {
-            let selection_len = std::cmp::max(
-                Len::from((0.05f64 * window.size().as_u64() as f64) as u64),
-                total_bytes,
-            );
-
-            let mut bar = Scrollbar::new(window.size());
-            bar.selection_len = selection_len;
-
-            center_bar_on_point(&mut bar, window);
-            window = bar.window(window, total_bytes);
-
-            scroll_state.scrollbars.push(bar);
-        }
-
-        // the algorithm expects a full bar at the end, so provide it
-        scroll_state.scrollbars.push(Scrollbar::new(window.size()));
+        render_hex(ui, source, start, scroll_state, marked_locations);
+        scroll_state.display_suggestion = DisplaySuggestion::Hexview;
+    } else {
+        render_overview(ui, window);
+        scroll_state.display_suggestion = DisplaySuggestion::Overview;
     }
+
+    *marked_locations.hovered_location_mut() = new_hovered_location;
+
+    scroll_state.changed(rect.height())
 }
 
 /// Handles manipulating the selection on the zoombar.
 fn handle_interactions(
     rect: Rect,
-    scrollbar: &mut Scrollbar,
+    scroll_state: &mut ScrollState,
     bar_idx: usize,
-    interaction_state: &mut InteractionState,
     total_bytes: Len,
     window: Window,
     allow_selection: bool,
     ctx: &Context,
 ) {
     ctx.input(|input| {
-        match interaction_state {
+        let scrollbar = &mut scroll_state.scrollbars[bar_idx];
+
+        match &mut scroll_state.interaction_state {
             InteractionState::WindowSelection {
                 start,
                 end,
@@ -353,16 +269,14 @@ fn handle_interactions(
                         *end = current;
 
                         let (start, len) = selection(*start, *end);
-                        scrollbar.selection_start = start;
-                        scrollbar.selection_len = len;
+                        scrollbar.set_selection(start, len);
                     }
                 } else {
                     let (start, len) = selection(*start, *end);
-                    scrollbar.selection_start = start;
-                    scrollbar.selection_len = len;
+                    scrollbar.set_selection(start, len);
 
                     // the selection process finished
-                    *interaction_state = InteractionState::None;
+                    scroll_state.interaction_state = InteractionState::None;
 
                     // double click resets selection
                     if input.pointer.button_double_clicked(PointerButton::Primary) {
@@ -387,7 +301,7 @@ fn handle_interactions(
                     }
                 } else {
                     // stop the dragging
-                    *interaction_state = InteractionState::None;
+                    scroll_state.interaction_state = InteractionState::None;
                 }
             }
             _ => {
@@ -401,20 +315,19 @@ fn handle_interactions(
                     let current = RelativeOffset::from(
                         (current as f64 * window.size().as_u64() as f64) as u64,
                     );
-                    *interaction_state = InteractionState::WindowSelection {
+                    scroll_state.interaction_state = InteractionState::WindowSelection {
                         start: current,
                         end: current,
                         bar_idx,
                     };
 
-                    scrollbar.selection_start = current;
-                    scrollbar.selection_len = total_bytes;
+                    scrollbar.set_selection(current, total_bytes);
                 } else if input.pointer.secondary_pressed()
                     && let Some(pos) = input.pointer.latest_pos()
                     && rect.contains(pos)
                 {
                     // start dragging
-                    *interaction_state = InteractionState::Dragging { bar_idx };
+                    scroll_state.interaction_state = InteractionState::Dragging { bar_idx };
                 }
             }
         }
@@ -431,20 +344,9 @@ fn handle_interactions(
             let scroll_amount = (scroll_delta * row_bytes) as u64;
 
             if scroll_up {
-                scrollbar.selection_start = RelativeOffset::from(
-                    scrollbar
-                        .selection_start
-                        .as_u64()
-                        .saturating_sub(scroll_amount),
-                );
+                scroll_state.scroll_up(bar_idx, scroll_amount);
             } else {
-                scrollbar.selection_start = RelativeOffset::from(std::cmp::min(
-                    scrollbar
-                        .selection_start
-                        .as_u64()
-                        .saturating_add(scroll_amount),
-                    (window.size() - scrollbar.selection_len).as_u64(),
-                ));
+                scroll_state.scroll_down(bar_idx, scroll_amount, total_bytes);
             }
         }
     });
@@ -460,13 +362,10 @@ fn render_bar(
 ) -> Option<Window> {
     let total_rows = rect.height().trunc() as u64;
 
-    let selection_start_relative =
-        scrollbar.selection_start.as_u64() as f64 / window.size().as_u64() as f64;
-    let selection_end_relative = (scrollbar.selection_start + scrollbar.selection_len).as_u64()
-        as f64
-        / window.size().as_u64() as f64;
-    let selection_start = (selection_start_relative * rect.height() as f64).round() as usize;
-    let selection_end = (selection_end_relative * rect.height() as f64).round() as usize;
+    let selection_start =
+        (scrollbar.relative_selection_start(window) * rect.height() as f64).round() as usize;
+    let selection_end =
+        (scrollbar.relative_selection_end(window) * rect.height() as f64).round() as usize;
 
     let bytes_per_row =
         Len::from((window.size().as_u64() as f64 / total_rows as f64).round() as u64);
@@ -476,7 +375,7 @@ fn render_bar(
     scrollbar.cached_image.paint_at(
         ui,
         rect,
-        (scrollbar.selection_start, scrollbar.selection_len, window),
+        (scrollbar.state_for_cached_image(), window),
         |x, y| {
             let relative_offset = y as f64 / total_rows as f64;
             let offset_within_range =

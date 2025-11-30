@@ -6,7 +6,13 @@ use hexbait_lang::{View, ir::File};
 use highlighting::highlight;
 use selection::SelectionContext;
 
-use crate::{data::DataSource, gui::color, model::Endianness, state::Settings, window::Window};
+use crate::{
+    data::DataSource,
+    gui::color,
+    model::Endianness,
+    state::{ScrollState, Settings},
+    window::Window,
+};
 
 pub mod highlighting;
 mod inspector;
@@ -50,6 +56,7 @@ impl HexdumpView {
         &mut self,
         ui: &mut Ui,
         settings: &Settings,
+        scroll_state: &mut ScrollState,
         source: &mut impl DataSource,
         endianness: &mut Endianness,
         start_row: u64,
@@ -87,9 +94,31 @@ impl HexdumpView {
                 let raw_scroll_delta = ui.ctx().input(|input| input.smooth_scroll_delta).y;
                 let scroll_delta = (-raw_scroll_delta / 2.0).trunc() as i64;
                 if scroll_delta < 0 {
-                    self.scroll_offset =
-                        (self.scroll_offset).saturating_sub((-scroll_delta) as u64);
+                    let scroll_delta = (-scroll_delta) as u64;
+
+                    if scroll_delta > self.scroll_offset {
+                        let diff = scroll_delta - self.scroll_offset;
+                        scroll_state.scroll_up(scroll_state.scrollbars.len() - 1, diff * 16);
+
+                        self.scroll_offset = 0;
+                    } else {
+                        self.scroll_offset -= scroll_delta;
+                    }
                 } else {
+                    let scroll_delta = scroll_delta as u64;
+
+                    if self.scroll_offset + scroll_delta > max_scroll {
+                        let diff = (self.scroll_offset + scroll_delta) - max_scroll;
+                        scroll_state.scroll_down(
+                            scroll_state.scrollbars.len() - 1,
+                            diff * 16,
+                            Len::from(rows_onscreen),
+                        );
+
+                        self.scroll_offset = max_scroll;
+                    } else {
+                        self.scroll_offset += scroll_delta;
+                    }
                     self.scroll_offset = (self.scroll_offset).saturating_add(scroll_delta as u64);
                 }
             }

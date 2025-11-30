@@ -20,7 +20,6 @@ use hexbait::{
         hex::HexdumpView,
         marking::{MarkedLocation, MarkedLocations, MarkingKind},
         signature_display::SignatureDisplay,
-        zoombars::Zoombars,
     },
     model::Endianness,
     state::State,
@@ -92,7 +91,6 @@ fn main() -> eframe::Result {
                 input,
                 hexdump_context: HexdumpView::new(),
                 endianness: Endianness::native(),
-                zoombars: Zoombars::new(),
                 signature_display: SignatureDisplay::new(),
                 xor_value: 0,
                 parse_type: "none",
@@ -113,7 +111,6 @@ struct MyApp {
     input: Input,
     hexdump_context: HexdumpView,
     endianness: Endianness,
-    zoombars: Zoombars,
     signature_display: SignatureDisplay,
     xor_value: u8,
     parse_type: &'static str,
@@ -188,8 +185,7 @@ impl eframe::App for MyApp {
                 let height = ui.max_rect().intersect(ui.cursor()).height();
                 let total_rows = (height.trunc() as u64).max(1);
                 let total_bytes = Len::from(total_rows * 16);
-                self.zoombars.rearrange_bars_for_point(
-                    &mut self.state.scroll_state,
+                self.state.scroll_state.rearrange_bars_for_point(
                     self.input.len(),
                     0,
                     offset,
@@ -204,14 +200,14 @@ impl eframe::App for MyApp {
                     .max_rect(ui.max_rect().intersect(ui.cursor()))
                     .layout(Layout::left_to_right(Align::Min)),
                 |ui| {
-                    let scrollbars_changed = self.zoombars.render(
+                    let scrollbars_changed = hexbait::gui::zoombars::render(
                         ui,
                         &mut self.input,
                         &mut self.state.scroll_state,
                         &self.state.settings,
                         &mut self.marked_locations,
                         &self.statistics_handler,
-                        |ui, source, start, marked_locations| {
+                        |ui, source, start, scroll_state, marked_locations| {
                             let ir;
 
                             let parse_type = if self.parse_type == "custom parser" {
@@ -240,6 +236,7 @@ impl eframe::App for MyApp {
                             self.hexdump_context.render(
                                 ui,
                                 &self.state.settings,
+                                scroll_state,
                                 source,
                                 &mut self.endianness,
                                 start,

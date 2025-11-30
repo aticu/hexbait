@@ -108,8 +108,8 @@ impl Window {
     ///
     /// `align` must be a power of two.
     pub fn expand_to_align(self, align: u64) -> Window {
-        let start = self.start().align_up(align);
-        let end = self.end().align_down(align);
+        let start = self.start().align_down(align);
+        let end = self.end().align_up(align);
 
         Window { start, end }
     }
@@ -127,6 +127,7 @@ impl Window {
     /// `align` must be a power of two.
     ///
     /// # Example
+    ///
     /// ```rust
     /// # use hexbait::window::Window;
     /// assert_eq!(

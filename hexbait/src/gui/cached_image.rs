@@ -122,9 +122,9 @@ impl<T: PartialEq> CachedImage<T> {
             .paint_at(ui, rect);
     }
 
-    /// Updates whether the image requires a repaint.
-    pub fn require_repaint(&mut self, require_repaint: bool) {
-        self.require_repaint = require_repaint;
+    /// Signals that the image requires a repaint.
+    pub fn require_repaint(&mut self) {
+        self.require_repaint = true;
     }
 }
 
