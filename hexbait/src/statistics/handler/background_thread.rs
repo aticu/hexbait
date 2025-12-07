@@ -5,7 +5,7 @@ use std::{
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, TryRecvError},
+        mpsc::{self, RecvError, TryRecvError},
     },
 };
 
@@ -13,7 +13,6 @@ use hexbait_common::{AbsoluteOffset, Len};
 use quick_cache::sync::Cache;
 
 use crate::{
-    IDLE_TIME,
     data::Input,
     statistics::{FlatStatistics, Statistics},
     window::Window,
@@ -119,23 +118,31 @@ pub(crate) struct BackgroundThread {
 
 impl BackgroundThread {
     /// Processes new requests to serve.
-    fn process_new_requests(&mut self) -> bool {
+    fn process_new_requests(&mut self, has_more_work: bool) -> bool {
         let mut new_requests = false;
         loop {
-            match self.requests.try_recv() {
-                Ok(message) => {
-                    new_requests = true;
-                    match message {
-                        Message::Compute(request) => {
-                            self.request_buffer.push(request);
-                        }
-                        Message::ClearRequests => {
-                            self.request_buffer.clear();
-                        }
-                    }
+            let message = if has_more_work || new_requests {
+                match self.requests.try_recv() {
+                    Ok(message) => message,
+                    Err(TryRecvError::Empty) => break,
+                    Err(TryRecvError::Disconnected) => return false,
                 }
-                Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => return false,
+            } else {
+                self.empty_queue.store(true, Ordering::Relaxed);
+                match self.requests.recv() {
+                    Ok(message) => message,
+                    Err(RecvError) => return false,
+                }
+            };
+
+            new_requests = true;
+            match message {
+                Message::Compute(request) => {
+                    self.request_buffer.push(request);
+                }
+                Message::ClearRequests => {
+                    self.request_buffer.clear();
+                }
             }
         }
 
@@ -258,15 +265,12 @@ impl BackgroundThread {
     /// Runs the background thread.
     pub(crate) fn run(mut self) {
         loop {
-            if !self.process_new_requests() {
+            if !self.process_new_requests(!self.request_buffer.is_empty()) {
                 break;
             }
 
             if let Some(request) = self.request_buffer.pop() {
                 self.serve_request(request);
-            } else {
-                self.empty_queue.store(true, Ordering::Relaxed);
-                std::thread::sleep(IDLE_TIME);
             }
         }
     }

@@ -4,7 +4,7 @@ use std::{
     collections::BTreeSet,
     sync::{
         Arc, RwLock,
-        mpsc::{self, TryRecvError},
+        mpsc::{self, RecvError, TryRecvError},
     },
 };
 
@@ -12,7 +12,6 @@ use aho_corasick::AhoCorasick;
 use hexbait_common::{AbsoluteOffset, Len};
 
 use crate::{
-    IDLE_TIME,
     data::{DataSource as _, Input},
     window::Window,
 };
@@ -89,31 +88,38 @@ impl BackgroundSearcher {
     /// Processes new search requests.
     ///
     /// A new request will always cancel previous requests.
-    fn process_new_requests(&mut self) -> bool {
-        match self.requests.try_recv() {
-            Ok(request) => {
-                *self.progress.write().unwrap() = 0.0;
-                self.results.write().unwrap().clear();
-
-                self.current_offset = AbsoluteOffset::ZERO;
-                self.searcher = Some(
-                    AhoCorasick::builder()
-                        .ascii_case_insensitive(request.ascii_case_insensitive)
-                        .build(&request.content)
-                        .unwrap(),
-                );
-
-                self.overlap_size = request.content.len().saturating_sub(1);
-
-                self.buf.clear();
-                let buf_len = std::cmp::max(request.content.len() * 2, 4 * 1024 * 1024);
-                self.buf.resize(buf_len, 0);
-
-                true
+    fn process_new_requests(&mut self, has_more_work: bool) -> bool {
+        let request = if has_more_work {
+            match self.requests.try_recv() {
+                Ok(request) => request,
+                Err(TryRecvError::Empty) => return true,
+                Err(TryRecvError::Disconnected) => return false,
             }
-            Err(TryRecvError::Empty) => true,
-            Err(TryRecvError::Disconnected) => false,
-        }
+        } else {
+            match self.requests.recv() {
+                Ok(request) => request,
+                Err(RecvError) => return false,
+            }
+        };
+
+        *self.progress.write().unwrap() = 0.0;
+        self.results.write().unwrap().clear();
+
+        self.current_offset = AbsoluteOffset::ZERO;
+        self.searcher = Some(
+            AhoCorasick::builder()
+                .ascii_case_insensitive(request.ascii_case_insensitive)
+                .build(&request.content)
+                .unwrap(),
+        );
+
+        self.overlap_size = request.content.len().saturating_sub(1);
+
+        self.buf.clear();
+        let buf_len = std::cmp::max(request.content.len() * 2, 4 * 1024 * 1024);
+        self.buf.resize(buf_len, 0);
+
+        true
     }
 
     /// Returns whether a search is currently running.
@@ -165,15 +171,11 @@ impl BackgroundSearcher {
     /// Runs the background thread.
     fn run(mut self) {
         loop {
-            if !self.process_new_requests() {
+            if !self.process_new_requests(self.search_is_running()) {
                 break;
             }
 
-            if self.search_is_running() {
-                self.run_search();
-            } else {
-                std::thread::sleep(IDLE_TIME);
-            }
+            self.run_search();
         }
     }
 }
