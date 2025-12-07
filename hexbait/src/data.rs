@@ -1,7 +1,6 @@
 //! Models how the raw data is accessed in hexamine.
 
 use std::{
-    fmt,
     fs::File,
     io::{self, Read as _, Seek as _, SeekFrom},
     path::PathBuf,
@@ -10,37 +9,6 @@ use std::{
 
 use hexbait_common::{AbsoluteOffset, Len};
 use hexbait_lang::View;
-
-use crate::window::Window;
-
-/// A data source for hexamine to work with.
-pub trait DataSource {
-    /// The error type for fallible sources.
-    type Error: fmt::Debug + fmt::Display;
-
-    /// The length of the data.
-    fn len(&self) -> Len;
-
-    /// Returns the window spanning the entire input.
-    fn full_window(&self) -> Window {
-        Window::from_start_len(AbsoluteOffset::ZERO, self.len())
-    }
-
-    /// Determines if the data source is empty.
-    fn is_empty(&self) -> bool {
-        self.len().is_zero()
-    }
-
-    /// Fills the buffer with the data at the given offset in the data, returning the filled slice.
-    fn window_at<'buf>(
-        &mut self,
-        offset: AbsoluteOffset,
-        buf: &'buf mut [u8],
-    ) -> Result<&'buf [u8], Self::Error>;
-
-    /// Returns the data source as a parsing view.
-    fn as_view<'this>(&'this self) -> Result<View<'this>, Self::Error>;
-}
 
 /// The input file to examine.
 #[derive(Debug)]
@@ -70,12 +38,9 @@ impl Input {
             Input::Stdin(buf) => Ok(Input::Stdin(Arc::clone(buf))),
         }
     }
-}
 
-impl DataSource for Input {
-    type Error = io::Error;
-
-    fn len(&self) -> Len {
+    /// The length of the data.
+    pub fn len(&self) -> Len {
         match self {
             Input::File { len, .. } => Len::from(*len),
             Input::Stdin(stdin) => Len::from(
@@ -85,11 +50,17 @@ impl DataSource for Input {
         }
     }
 
-    fn window_at<'buf>(
+    /// Determines if the input is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len().is_zero()
+    }
+
+    /// Fills the buffer with the data at the given offset in the input, returning the filled slice.
+    pub fn window_at<'buf>(
         &mut self,
         offset: AbsoluteOffset,
         buf: &'buf mut [u8],
-    ) -> Result<&'buf [u8], Self::Error> {
+    ) -> Result<&'buf [u8], io::Error> {
         match self {
             Input::File { file, len, .. } => {
                 if offset.as_u64() > *len {
@@ -128,7 +99,8 @@ impl DataSource for Input {
         }
     }
 
-    fn as_view<'this>(&'this self) -> Result<View<'this>, Self::Error> {
+    /// Returns the input as a parsing view.
+    pub fn as_view<'this>(&'this self) -> Result<View<'this>, io::Error> {
         View::try_from(self)
     }
 }

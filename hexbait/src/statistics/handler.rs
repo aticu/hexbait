@@ -65,7 +65,7 @@ pub struct StatisticsHandler {
 
 impl StatisticsHandler {
     /// Creates a new statistics handler.
-    pub fn new(source: Input) -> StatisticsHandler {
+    pub fn new(input: Input) -> StatisticsHandler {
         let (sender, receiver) = mpsc::channel();
         let aligned_windows = Arc::new(std::array::from_fn(|i| {
             Cache::new(CacheSize::try_from_index(i).unwrap().num_entries())
@@ -83,7 +83,7 @@ impl StatisticsHandler {
             empty_queue: Arc::clone(&empty_queue),
             requests: receiver,
             request_buffer: Vec::new(),
-            source,
+            input,
         };
 
         std::thread::spawn(|| background_thread.run());

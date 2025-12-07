@@ -2,13 +2,14 @@
 
 use std::{
     collections::BTreeMap,
+    io,
     iter::Sum,
     ops::{AddAssign, SubAssign},
 };
 
 use hexbait_common::Len;
 
-use crate::{data::DataSource, window::Window};
+use crate::{data::Input, window::Window};
 
 /// Computed statistics about bigrams in a window of data.
 #[derive(Eq, PartialEq)]
@@ -35,18 +36,18 @@ where
     }
 
     /// Fills the bigram counts with information about the given window.
-    pub(super) fn compute<Source: DataSource>(
+    pub(super) fn compute(
         &mut self,
-        source: &mut Source,
+        input: &mut Input,
         window: Window,
-    ) -> Result<(Window, Option<u8>), Source::Error> {
+    ) -> Result<(Window, Option<u8>), io::Error> {
         raw_compute(
             self,
             |this, first, second| this.add_count(first, second, Count::from(1u8)),
             |this, first, second| {
                 this.follow[second as usize][first as usize] -= Count::from(1u8);
             },
-            source,
+            input,
             window,
         )
     }
@@ -87,11 +88,11 @@ impl SmallRawBigrams {
     }
 
     /// Fills the bigram counts with information about the given window.
-    pub(super) fn compute<Source: DataSource>(
+    pub(super) fn compute(
         &mut self,
-        source: &mut Source,
+        input: &mut Input,
         window: Window,
-    ) -> Result<(Window, Option<u8>), Source::Error> {
+    ) -> Result<(Window, Option<u8>), io::Error> {
         raw_compute(
             self,
             |this, first, second| this.add_count(first, second, 1),
@@ -105,7 +106,7 @@ impl SmallRawBigrams {
                     }
                 }
             },
-            source,
+            input,
             window,
         )
     }
@@ -127,19 +128,19 @@ impl SmallRawBigrams {
 }
 
 /// Computes the statistics.
-fn raw_compute<Source: DataSource, T>(
+fn raw_compute<T>(
     this: &mut T,
     mut increase_count: impl FnMut(&mut T, u8, u8),
     decrease_count: impl FnOnce(&mut T, u8, u8),
-    source: &mut Source,
+    input: &mut Input,
     window: Window,
-) -> Result<(Window, Option<u8>), Source::Error> {
+) -> Result<(Window, Option<u8>), io::Error> {
     const WINDOW_SIZE: usize = 4096;
 
     let byte_before_window = if window.start().is_start_of_file() {
         None
     } else {
-        source
+        input
             .window_at(window.start() - Len::from(1), &mut [0])?
             .first()
             .copied()
@@ -155,7 +156,7 @@ fn raw_compute<Source: DataSource, T>(
         let mut buf = [0; WINDOW_SIZE];
         let max_size = std::cmp::min((window.end() - start).as_u64() as usize, WINDOW_SIZE);
 
-        let subwindow = source.window_at(start, &mut buf[..max_size])?;
+        let subwindow = input.window_at(start, &mut buf[..max_size])?;
 
         for &byte in subwindow {
             increase_count(this, prev_byte, byte);
@@ -174,7 +175,7 @@ fn raw_compute<Source: DataSource, T>(
     let first_byte = 'first_byte: {
         if byte_before_window.is_none() {
             // if there is no byte before this window, we initialize `prev_byte`
-            if let Some(&first_byte) = source.window_at(window.start(), &mut [0])?.first() {
+            if let Some(&first_byte) = input.window_at(window.start(), &mut [0])?.first() {
                 decrease_count(this, DEFAULT_PREV_BYTE, first_byte);
 
                 break 'first_byte Some(first_byte);

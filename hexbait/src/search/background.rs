@@ -11,10 +11,7 @@ use std::{
 use aho_corasick::AhoCorasick;
 use hexbait_common::{AbsoluteOffset, Len};
 
-use crate::{
-    data::{DataSource as _, Input},
-    window::Window,
-};
+use crate::{data::Input, window::Window};
 
 /// Contains shared state between background and foreground searcher.
 pub(crate) struct BackgroundSearcherStartResult {
@@ -50,18 +47,18 @@ pub(crate) struct BackgroundSearcher {
     buf: Vec<u8>,
     /// The requests for new searches to run.
     requests: mpsc::Receiver<SearchRequest>,
-    /// The source to read from.
-    source: Input,
+    /// The input to read from.
+    input: Input,
 }
 
 impl BackgroundSearcher {
     /// Starts a background searcher thread.
-    pub(crate) fn start(source: &Input) -> BackgroundSearcherStartResult {
+    pub(crate) fn start(input: &Input) -> BackgroundSearcherStartResult {
         let progress = Arc::new(RwLock::new(1.0));
         let results = Arc::new(RwLock::new(BTreeSet::new()));
         let (sender, receiver) = mpsc::channel();
 
-        let source = source.try_clone().unwrap();
+        let source = input.try_clone().unwrap();
 
         let searcher = BackgroundSearcher {
             progress: Arc::clone(&progress),
@@ -71,7 +68,7 @@ impl BackgroundSearcher {
             overlap_size: 0,
             buf: Vec::new(),
             requests: receiver,
-            source,
+            input: source,
         };
 
         std::thread::spawn(move || {
@@ -135,7 +132,7 @@ impl BackgroundSearcher {
             self.overlap_size
         };
         let buf = self
-            .source
+            .input
             .window_at(self.current_offset, &mut self.buf[current_overlap..])
             .expect("TODO: improve error handling here");
         if buf.is_empty() {
@@ -163,7 +160,7 @@ impl BackgroundSearcher {
             Len::from(u64::try_from(buf_len - current_overlap).expect("read buffer must fit u64"));
 
         let fraction_completed =
-            (self.current_offset.as_u64() as f32) / (self.source.len().as_u64() as f32);
+            (self.current_offset.as_u64() as f32) / (self.input.len().as_u64() as f32);
 
         *self.progress.write().unwrap() = fraction_completed;
     }

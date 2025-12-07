@@ -1,7 +1,7 @@
 //! Implements statistics that count the frequencies of different byte values.
 
 use std::{
-    fmt,
+    fmt, io,
     iter::Sum,
     ops::{AddAssign, SubAssign},
 };
@@ -10,7 +10,7 @@ use hexbait_common::Len;
 use size_format::SizeFormatterBinary;
 
 use crate::{
-    data::DataSource,
+    data::Input,
     statistics::{Statistics, StatisticsKind},
     window::Window,
 };
@@ -36,17 +36,14 @@ impl FlatStatistics {
     }
 
     /// Computes statistics about a given window of data.
-    pub fn compute<Source: DataSource>(
-        source: &mut Source,
-        window: Window,
-    ) -> Result<FlatStatistics, Source::Error> {
+    pub fn compute(input: &mut Input, window: Window) -> Result<FlatStatistics, io::Error> {
         let capacity = window.size();
         let mut statistics = FlatStatisticsKind::with_capacity(capacity.as_u64());
 
         let window = match &mut statistics {
-            FlatStatisticsKind::Large(raw_stats) => raw_stats.compute(source, window)?,
-            FlatStatisticsKind::Medium(raw_stats) => raw_stats.compute(source, window)?,
-            FlatStatisticsKind::Small(raw_stats) => raw_stats.compute(source, window)?,
+            FlatStatisticsKind::Large(raw_stats) => raw_stats.compute(input, window)?,
+            FlatStatisticsKind::Medium(raw_stats) => raw_stats.compute(input, window)?,
+            FlatStatisticsKind::Small(raw_stats) => raw_stats.compute(input, window)?,
         };
 
         Ok(FlatStatistics { statistics, window })
@@ -273,11 +270,7 @@ where
     }
 
     /// Computes raw statistics for the given window.
-    fn compute<Source: DataSource>(
-        &mut self,
-        source: &mut Source,
-        window: Window,
-    ) -> Result<Window, Source::Error> {
+    fn compute(&mut self, input: &mut Input, window: Window) -> Result<Window, io::Error> {
         const WINDOW_SIZE: usize = 4096;
 
         // TODO: this can probably be optimized using SIMD, since this is completely independent of
@@ -287,7 +280,7 @@ where
             let mut buf = [0; WINDOW_SIZE];
             let max_size = std::cmp::min((window.end() - start).as_u64() as usize, WINDOW_SIZE);
 
-            let subwindow = source.window_at(start, &mut buf[..max_size])?;
+            let subwindow = input.window_at(start, &mut buf[..max_size])?;
 
             for &byte in subwindow {
                 self.counts[byte as usize] += Count::from(1u8);

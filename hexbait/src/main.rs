@@ -33,7 +33,7 @@ use hexbait_common::AbsoluteOffset;
 // TODO: re-use non-flat statistics for flat statistics
 // TODO: fix up main file
 // TODO: join polygons of adjoining marked locations
-// TODO: remove data source and use concrete types instead
+// TODO: unify views and input
 // TODO: improve hover text for marked locations
 // TODO: refactor zoombars.rs
 // TODO: refactor hex.rs

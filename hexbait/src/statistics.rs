@@ -1,11 +1,11 @@
 //! Compute and represent statistics about windows of data.
 
-use std::{fmt, ops::AddAssign};
+use std::{fmt, io, ops::AddAssign};
 
 use raw_bigrams::{RawBigrams, SmallRawBigrams};
 use size_format::SizeFormatterBinary;
 
-use crate::{data::DataSource, window::Window};
+use crate::{data::Input, window::Window};
 
 mod flat;
 mod handler;
@@ -63,17 +63,14 @@ impl Statistics {
     }
 
     /// Computes statistics about a given window of data.
-    pub fn compute<Source: DataSource>(
-        source: &mut Source,
-        window: Window,
-    ) -> Result<Statistics, Source::Error> {
+    pub fn compute(input: &mut Input, window: Window) -> Result<Statistics, io::Error> {
         let capacity = window.size();
         let mut statistics = StatisticsKind::with_capacity(capacity.as_u64());
 
         let (window, first_byte) = match &mut statistics {
-            StatisticsKind::Large(raw_bigrams) => raw_bigrams.compute(source, window)?,
-            StatisticsKind::Medium(raw_bigrams) => raw_bigrams.compute(source, window)?,
-            StatisticsKind::Small(raw_bigrams) => raw_bigrams.compute(source, window)?,
+            StatisticsKind::Large(raw_bigrams) => raw_bigrams.compute(input, window)?,
+            StatisticsKind::Medium(raw_bigrams) => raw_bigrams.compute(input, window)?,
+            StatisticsKind::Small(raw_bigrams) => raw_bigrams.compute(input, window)?,
         };
 
         Ok(Statistics {

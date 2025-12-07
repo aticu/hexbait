@@ -113,7 +113,7 @@ pub(crate) struct BackgroundThread {
     /// Already received read requests for windows.
     pub(crate) request_buffer: Vec<Request>,
     /// The source to read from.
-    pub(crate) source: Input,
+    pub(crate) input: Input,
 }
 
 impl BackgroundThread {
@@ -166,7 +166,7 @@ impl BackgroundThread {
     /// Serves the given bigram request.
     fn serve_bigram_request(&mut self, window: Window) {
         let mut compute = || {
-            let stats = Statistics::compute(&mut self.source, window)
+            let stats = Statistics::compute(&mut self.input, window)
                 .expect("TODO: improve error handling here in the future");
             Arc::new(stats)
         };
@@ -238,7 +238,7 @@ impl BackgroundThread {
             return;
         }
 
-        let stats = FlatStatistics::compute(&mut self.source, window)
+        let stats = FlatStatistics::compute(&mut self.input, window)
             .expect("TODO: improve error handling here in the future");
         let entropy = stats.entropy();
 
@@ -254,7 +254,7 @@ impl BackgroundThread {
             return;
         }
 
-        let stats = FlatStatistics::compute(&mut self.source, window)
+        let stats = FlatStatistics::compute(&mut self.input, window)
             .expect("TODO: improve error handling here in the future");
         let entropy = stats.entropy();
 

@@ -4,12 +4,7 @@ use std::hash::{Hash as _, Hasher as _};
 
 use hexbait_common::{AbsoluteOffset, ChangeState, Len, RelativeOffset};
 
-use crate::{
-    data::{DataSource, Input},
-    gui::cached_image::CachedImage,
-    state::Settings,
-    window::Window,
-};
+use crate::{data::Input, gui::cached_image::CachedImage, state::Settings, window::Window};
 
 /// The suggestion of what to display in the main content view.
 pub enum DisplaySuggestion {

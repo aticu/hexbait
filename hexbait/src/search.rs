@@ -25,8 +25,8 @@ pub struct Searcher {
 
 impl Searcher {
     /// Creates a new searcher.
-    pub fn new(source: &Input) -> Searcher {
-        let background = BackgroundSearcher::start(source);
+    pub fn new(input: &Input) -> Searcher {
+        let background = BackgroundSearcher::start(input);
 
         Searcher {
             progress: background.progress,

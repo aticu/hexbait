@@ -7,7 +7,7 @@ use highlighting::highlight;
 use selection::SelectionContext;
 
 use crate::{
-    data::DataSource,
+    data::Input,
     gui::color,
     model::Endianness,
     state::{ScrollState, Settings},
@@ -55,7 +55,7 @@ impl HexdumpView {
         ui: &mut Ui,
         settings: &Settings,
         scroll_state: &mut ScrollState,
-        source: &mut impl DataSource,
+        input: &mut Input,
         endianness: &mut Endianness,
         parse_type: Option<&File>,
         parse_offset: &mut Option<AbsoluteOffset>,
@@ -72,9 +72,9 @@ impl HexdumpView {
         // add 16 more to show one row "beyond the screen"
         let mut buf = vec![0; window_size as usize + 16];
 
-        let file_size = source.len();
+        let file_size = input.len();
 
-        if let Ok(window) = source.window_at(start, &mut buf) {
+        if let Ok(window) = input.window_at(start, &mut buf) {
             let hex_rect_width = (16 * settings.bar_width_multiplier()) as f32
                 + ui.spacing().item_spacing.x
                 + ((16 + 32 + 16) as f32 * settings.char_width())
@@ -197,7 +197,7 @@ impl HexdumpView {
                     let mut selected_buf;
                     let selected_buf = if let Some(selection) = self.selection() {
                         selected_buf = vec![0; selection.size().as_u64() as usize];
-                        source.window_at(selection.start(), &mut selected_buf).ok()
+                        input.window_at(selection.start(), &mut selected_buf).ok()
                     } else {
                         None
                     };
@@ -252,7 +252,7 @@ impl HexdumpView {
                                     };
 
                                     let Some(parse_type) = parse_type else { return };
-                                    let Ok(view) = source.as_view() else {
+                                    let Ok(view) = input.as_view() else {
                                         eprintln!("TODO: implement better error handling");
                                         return;
                                     };
@@ -294,7 +294,7 @@ impl HexdumpView {
                 && let Ok(size) = usize::try_from(selection.size().as_u64())
             {
                 let mut buf = vec![0; size];
-                if let Ok(window) = source.window_at(selection.start(), &mut buf)
+                if let Ok(window) = input.window_at(selection.start(), &mut buf)
                     && let Ok(as_text) = std::str::from_utf8(window)
                 {
                     ui.ctx().copy_text(as_text.to_string());
