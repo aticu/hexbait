@@ -61,7 +61,7 @@ impl BackgroundSearcher {
         let results = Arc::new(RwLock::new(BTreeSet::new()));
         let (sender, receiver) = mpsc::channel();
 
-        let source = source.clone().unwrap();
+        let source = source.try_clone().unwrap();
 
         let searcher = BackgroundSearcher {
             progress: Arc::clone(&progress),
@@ -138,7 +138,7 @@ impl BackgroundSearcher {
             .source
             .window_at(self.current_offset, &mut self.buf[current_overlap..])
             .expect("TODO: improve error handling here");
-        if buf.len() == 0 {
+        if buf.is_empty() {
             self.searcher = None;
             return;
         }

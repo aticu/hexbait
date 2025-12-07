@@ -49,6 +49,11 @@ impl ScrollState {
         }
     }
 
+    /// Returns the size of the file this scroll state is for.
+    pub fn file_size(&self) -> Len {
+        self.file_size
+    }
+
     /// Creates a hash of the zoombar selection state.
     fn selection_state(&self) -> u64 {
         let mut hasher = std::hash::DefaultHasher::new();

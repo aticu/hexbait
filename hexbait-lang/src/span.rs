@@ -22,8 +22,8 @@ impl fmt::Debug for Span {
 impl From<TextRange> for Span {
     fn from(text_range: TextRange) -> Self {
         Span {
-            start: usize::try_from(text_range.start()).expect("content fits a usize"),
-            end: usize::try_from(text_range.end()).expect("content fits a usize"),
+            start: usize::from(text_range.start()),
+            end: usize::from(text_range.end()),
         }
     }
 }

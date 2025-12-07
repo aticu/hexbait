@@ -12,6 +12,7 @@ use hexbait_common::{AbsoluteOffset, Len};
 use crate::{gui::color, state::Settings};
 
 /// Renders the selection polygon on screen.
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn highlight(
     ui: &mut Ui,
     range: RangeInclusive<AbsoluteOffset>,
@@ -155,7 +156,7 @@ pub(crate) fn highlight(
         }
         add_point(end_x, end_y);
         add_point(first_x, end_y);
-        if *range.start() % 16 != 0 {
+        if !range.start().is_multiple_of(16) {
             add_point(first_x, start_y + char_height);
             add_point(start_x, start_y + char_height);
         }

@@ -87,7 +87,7 @@ fn main() {
                             let current_count = *count;
                             *count += 1;
                             (
-                                format!("children(self.syntax())"),
+                                String::from("children(self.syntax())"),
                                 &*grammar[node].name,
                                 current_count,
                             )
@@ -198,7 +198,7 @@ pub struct {name}(SyntaxNode);
 
 impl AstNode for {name} {{
     fn cast(n: SyntaxNode) -> Option<Self> {{
-        if n.kind() == (SyntaxKind::Node {{ kind: NodeKind::{name} }}).into() {{
+        if n.kind() == (SyntaxKind::Node {{ kind: NodeKind::{name} }}) {{
             Some({name}(n))
         }} else {{
             None

@@ -6,9 +6,13 @@ use super::File;
 // TODO: implement this with fields
 pub struct ResolvedNames {}
 
+/// The error returned upon a failed analysis.
+#[derive(Debug)]
+pub struct AnalysisError {}
+
 /// Checks if the file is well formed.
 // TODO: add an error type here
-pub fn check_ir(_file: &File) -> Result<ResolvedNames, ()> {
+pub fn check_ir(_file: &File) -> Result<ResolvedNames, AnalysisError> {
     // TODO: check types
     // TODO: resolve names
     // TODO: ensure that endianness is properly specified before parsing fields

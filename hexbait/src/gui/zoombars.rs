@@ -8,7 +8,6 @@ use size_format::SizeFormatterBinary;
 
 use crate::{
     IDLE_TIME,
-    data::DataSource,
     state::{DisplaySuggestion, InteractionState, ScrollState, Scrollbar, Settings},
     statistics::StatisticsHandler,
     window::Window,
@@ -20,17 +19,16 @@ use super::{
 };
 
 /// Renders the zoombars.
-pub fn render<Source: DataSource>(
+pub fn render(
     ui: &mut Ui,
-    source: &mut Source,
     scroll_state: &mut ScrollState,
     settings: &Settings,
     marked_locations: &mut MarkedLocations,
     handler: &StatisticsHandler,
-    render_hex: impl FnOnce(&mut Ui, &mut Source, u64, &mut ScrollState, &mut MarkedLocations),
+    render_hex: impl FnOnce(&mut Ui, u64, &mut ScrollState, &mut MarkedLocations),
     render_overview: impl FnOnce(&mut Ui, Window),
 ) -> ChangeState {
-    let file_size = source.len();
+    let file_size = scroll_state.file_size();
     let rect = ui.max_rect().intersect(ui.cursor());
 
     // be deliberately small to fit more text here
@@ -40,14 +38,14 @@ pub fn render<Source: DataSource>(
     let total_bytes = Len::from(total_rows * 16);
 
     if total_bytes >= file_size {
-        render_hex(ui, source, 0, scroll_state, marked_locations);
+        render_hex(ui, 0, scroll_state, marked_locations);
         scroll_state.display_suggestion = DisplaySuggestion::Hexview;
         return ChangeState::Unchanged;
     } else if scroll_state.scrollbars.is_empty() {
         scroll_state.scrollbars.push(Scrollbar::new(file_size));
     }
 
-    let mut window = source.full_window();
+    let mut window = Window::from_start_len(AbsoluteOffset::ZERO, file_size);
     let mut show_hex = false;
 
     let mut new_hovered_location = None;
@@ -208,7 +206,7 @@ pub fn render<Source: DataSource>(
             window.start().as_u64() / 16
         };
 
-        render_hex(ui, source, start, scroll_state, marked_locations);
+        render_hex(ui, start, scroll_state, marked_locations);
         scroll_state.display_suggestion = DisplaySuggestion::Hexview;
     } else {
         render_overview(ui, window);
@@ -392,13 +390,11 @@ fn render_bar(
                 side_color
             } else if x == side_start - 1 {
                 Color32::BLACK
+            } else if selection_start <= y && y <= selection_end {
+                //color::lerp(raw_color, egui::Color32::WHITE, HIGHLIGHT_STRENGTH)
+                raw_color
             } else {
-                if selection_start <= y && y <= selection_end {
-                    //color::lerp(raw_color, egui::Color32::WHITE, HIGHLIGHT_STRENGTH)
-                    raw_color
-                } else {
-                    color::lerp(raw_color, egui::Color32::BLACK, HIGHLIGHT_STRENGTH)
-                }
+                color::lerp(raw_color, egui::Color32::BLACK, HIGHLIGHT_STRENGTH)
             }
         },
     );
@@ -426,7 +422,7 @@ pub fn offset_on_bar(bar_rect: Rect, bar_window: Window, offset: AbsoluteOffset)
         (offset - bar_window.start()).as_u64() as f64 / bar_window.size().as_u64() as f64;
     let height = bar_rect.height().ceil() as f64;
 
-    if 0.0 <= relative_offset && relative_offset <= 1.0 {
+    if (0.0..=1.0).contains(&relative_offset) {
         let offset = ((16.0 * height) * relative_offset) as u32;
         let offset_x = offset % 16;
         let offset_y = offset / 16;

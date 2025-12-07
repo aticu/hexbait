@@ -30,7 +30,7 @@ impl TryFrom<&Value> for ByteOffset {
 
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         u64::try_from(value.kind.expect_int())
-            .map(|offset| ByteOffset(offset))
+            .map(ByteOffset)
             .map_err(|_| ParseErrKind::OffsetTooLarge)
     }
 }
@@ -429,14 +429,14 @@ impl<'src> Scope<'src> {
         match declaration {
             Declaration::Endianness(endianness) => self.endianness = *endianness,
             Declaration::Align(expr) => {
-                let value = self.eval_expr(&expr, struct_ctx, parse_ctx, Default::default())?;
+                let value = self.eval_expr(expr, struct_ctx, parse_ctx, Default::default())?;
                 let align = value.kind.expect_int();
                 let align = u64::try_from(align).static_analysis_expect();
 
                 self.offset.0 = align_up(self.offset.0, align);
             }
             Declaration::SeekBy(expr) => {
-                let value = self.eval_expr(&expr, struct_ctx, parse_ctx, Default::default())?;
+                let value = self.eval_expr(expr, struct_ctx, parse_ctx, Default::default())?;
                 let offset = value.kind.expect_int();
 
                 if let Ok(new_offset) = u64::try_from(offset + Int::from(self.offset.0))
@@ -455,7 +455,7 @@ impl<'src> Scope<'src> {
                 }
             }
             Declaration::SeekTo(expr) => {
-                let value = self.eval_expr(&expr, struct_ctx, parse_ctx, Default::default())?;
+                let value = self.eval_expr(expr, struct_ctx, parse_ctx, Default::default())?;
                 let offset = value.kind.expect_int();
 
                 if let Ok(new_offset) = u64::try_from(offset)
@@ -519,7 +519,7 @@ impl<'src> Scope<'src> {
                 };
 
                 let view = View::Subview {
-                    view: &self.view,
+                    view: self.view,
                     valid_range: start..end,
                 };
                 let mut scope = self.child_with_view_and_offset(&view, ByteOffset(0));
@@ -617,7 +617,7 @@ impl<'src> Scope<'src> {
             ParseTypeKind::Bytes { repetition_kind } => match repetition_kind {
                 RepeatKind::Len { count: count_expr } => {
                     let count_val =
-                        self.eval_expr(&count_expr, struct_ctx, parse_ctx, Default::default())?;
+                        self.eval_expr(count_expr, struct_ctx, parse_ctx, Default::default())?;
 
                     if let Ok(count) = u64::try_from(count_val.kind.expect_int()) {
                         let (bytes, provenance) =
@@ -702,14 +702,14 @@ impl<'src> Scope<'src> {
             } => match repetition_kind {
                 crate::ir::RepeatKind::Len { count } => {
                     let count_val =
-                        self.eval_expr(&count, struct_ctx, parse_ctx, Default::default())?;
+                        self.eval_expr(count, struct_ctx, parse_ctx, Default::default())?;
 
                     let mut values = Vec::new();
                     let mut provenance = Provenance::empty();
 
                     if let Ok(count) = u64::try_from(count_val.kind.expect_int()) {
                         for _ in 0..count {
-                            match self.eval_parse_type(&*parse_type, struct_ctx, parse_ctx) {
+                            match self.eval_parse_type(parse_type, struct_ctx, parse_ctx) {
                                 Ok(parsed_value) => {
                                     provenance += &parsed_value.provenance;
                                     values.push(parsed_value);
@@ -772,7 +772,7 @@ impl<'src> Scope<'src> {
                         .kind
                         .expect_bool()
                     {
-                        match self.eval_parse_type(&*parse_type, struct_ctx, parse_ctx) {
+                        match self.eval_parse_type(parse_type, struct_ctx, parse_ctx) {
                             Ok(parsed_value) => {
                                 provenance += &parsed_value.provenance;
                                 values.push(parsed_value);
@@ -857,7 +857,7 @@ impl<'src> Scope<'src> {
 
         if let Some(expected) = &field.expected {
             let span = expected.span;
-            let expected = self.eval_expr(&expected, struct_ctx, parse_ctx, Default::default())?;
+            let expected = self.eval_expr(expected, struct_ctx, parse_ctx, Default::default())?;
             if expected != value {
                 return Err(ParseErrWithMaybePartialResult {
                     parse_err: parse_ctx.new_err(ParseErr {

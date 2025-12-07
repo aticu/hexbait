@@ -3,7 +3,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut out = String::new();
 
-    out.push_str("const BUILT_IN_DEFINITIONS_RAW: [(&'static str, &'static str); NUM_BUILTIN_DEFINITIONS] = [\n");
+    out.push_str("const BUILT_IN_DEFINITIONS_RAW: [(&str, &str); NUM_BUILTIN_DEFINITIONS] = [\n");
 
     let mut count = 0;
     for entry in std::fs::read_dir("../format_descriptions")? {
@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     out.push_str("];\n");
-    out.push_str("\n");
+    out.push('\n');
     out.push_str(&format!(
         "const NUM_BUILTIN_DEFINITIONS: usize = {count};\n"
     ));

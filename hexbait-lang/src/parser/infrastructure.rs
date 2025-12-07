@@ -139,7 +139,7 @@ impl<'src> Parser<'src> {
     pub(crate) fn new(src: &'src str, tokens: &'src [Token]) -> Parser<'src> {
         Parser {
             src,
-            tokens: &tokens,
+            tokens,
             pos: 0,
             events: Vec::with_capacity(tokens.len() * 2),
         }

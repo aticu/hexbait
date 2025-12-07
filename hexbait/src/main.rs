@@ -87,7 +87,7 @@ fn main() -> eframe::Result {
             Ok(Box::new(MyApp {
                 frame_time: std::time::Duration::ZERO,
                 state: State::new(&input),
-                statistics_handler: StatisticsHandler::new(input.clone().unwrap()),
+                statistics_handler: StatisticsHandler::new(input.try_clone().unwrap()),
                 input,
                 hexdump_context: HexdumpView::new(),
                 endianness: Endianness::native(),
@@ -202,12 +202,11 @@ impl eframe::App for MyApp {
                 |ui| {
                     let scrollbars_changed = hexbait::gui::zoombars::render(
                         ui,
-                        &mut self.input,
                         &mut self.state.scroll_state,
                         &self.state.settings,
                         &mut self.marked_locations,
                         &self.statistics_handler,
-                        |ui, source, start, scroll_state, marked_locations| {
+                        |ui, start, scroll_state, marked_locations| {
                             let ir;
 
                             let parse_type = if self.parse_type == "custom parser" {
@@ -237,10 +236,11 @@ impl eframe::App for MyApp {
                                 ui,
                                 &self.state.settings,
                                 scroll_state,
-                                source,
+                                &mut self.input,
                                 &mut self.endianness,
                                 start,
-                                (parse_type, &mut parse_offset),
+                                parse_type,
+                                &mut parse_offset,
                                 marked_locations,
                             );
                         },
@@ -325,7 +325,7 @@ impl eframe::App for MyApp {
                                         && let Some(search_bytes) = &search_bytes
                                     {
                                         self.state.search.searcher.start_new_search(
-                                            &search_bytes,
+                                            search_bytes,
                                             self.state.search.search_ascii_case_insensitive,
                                             self.state.search.search_utf16 && valid_utf8,
                                         );
@@ -346,10 +346,10 @@ impl eframe::App for MyApp {
                     .add(MarkedLocation::new(*result, MarkingKind::SearchResult));
             }
 
-            if self.sync_parse_offset_to_selection_start {
-                if let Some(parse_offset) = parse_offset {
-                    self.parse_offset = parse_offset.as_u64().to_string();
-                }
+            if self.sync_parse_offset_to_selection_start
+                && let Some(parse_offset) = parse_offset
+            {
+                self.parse_offset = parse_offset.as_u64().to_string();
             }
         });
         self.frame_time = start.elapsed();

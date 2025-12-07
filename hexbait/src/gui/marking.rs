@@ -68,6 +68,12 @@ impl MarkedLocations {
     }
 }
 
+impl Default for MarkedLocations {
+    fn default() -> Self {
+        MarkedLocations::new()
+    }
+}
+
 /// A marked location.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkedLocation {

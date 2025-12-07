@@ -52,6 +52,11 @@ impl View<'_> {
         }
     }
 
+    /// Returns `true` if the view is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Reads data into the buffer at the given offset.
     pub(crate) fn read_at<'buf>(&self, offset: u64, buf: &'buf mut [u8]) -> io::Result<&'buf [u8]> {
         if offset > self.len() {
@@ -91,7 +96,7 @@ impl View<'_> {
                 view.read_at(
                     valid_range.start + offset,
                     &mut buf[..std::cmp::min(
-                        usize::try_from(valid_range.end - offset).unwrap_or(usize::max_value()),
+                        usize::try_from(valid_range.end - offset).unwrap_or(usize::MAX),
                         buf_len,
                     )],
                 )?

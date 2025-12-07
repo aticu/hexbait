@@ -60,7 +60,7 @@ pub enum Input {
 
 impl Input {
     /// Clones the given input.
-    pub fn clone(&self) -> io::Result<Input> {
+    pub fn try_clone(&self) -> io::Result<Input> {
         match self {
             Input::File { path, len, .. } => File::open(path).map(|file| Input::File {
                 path: path.clone(),

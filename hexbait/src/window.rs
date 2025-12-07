@@ -98,7 +98,7 @@ impl Window {
     /// # Panics
     /// This function MAY panic if `self.size()` is not a multiple of `size`.
     pub fn subwindows_of_size(self, size: Len) -> impl Iterator<Item = Window> {
-        debug_assert!(self.size().as_u64() % size.as_u64() == 0);
+        debug_assert!(self.size().as_u64().is_multiple_of(size.as_u64()));
 
         (0..self.size().as_u64() / size.as_u64())
             .map(move |i| Window::from_start_len(self.start() + i * size, size))

@@ -24,6 +24,7 @@ impl SignatureDisplay {
     }
 
     /// Renders the signature into the given rect.
+    #[expect(clippy::too_many_arguments)]
     pub fn render(
         &mut self,
         ui: &mut Ui,

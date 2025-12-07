@@ -52,6 +52,7 @@ impl HexdumpView {
     }
 
     /// Renders a hexdump to the GUI.
+    #[expect(clippy::too_many_arguments)]
     pub fn render(
         &mut self,
         ui: &mut Ui,
@@ -60,7 +61,8 @@ impl HexdumpView {
         source: &mut impl DataSource,
         endianness: &mut Endianness,
         start_row: u64,
-        (parse_type, parse_offset): (Option<&File>, &mut Option<AbsoluteOffset>),
+        parse_type: Option<&File>,
+        parse_offset: &mut Option<AbsoluteOffset>,
         marked_locations: &mut MarkedLocations,
     ) {
         // start is in rows
@@ -119,7 +121,7 @@ impl HexdumpView {
                     } else {
                         self.scroll_offset += scroll_delta;
                     }
-                    self.scroll_offset = (self.scroll_offset).saturating_add(scroll_delta as u64);
+                    self.scroll_offset = (self.scroll_offset).saturating_add(scroll_delta);
                 }
             }
 
@@ -260,7 +262,7 @@ impl HexdumpView {
                                         view: &view,
                                         valid_range: parse_offset.as_u64()..view.len(),
                                     };
-                                    let result = hexbait_lang::eval_ir(&parse_type, view, 0);
+                                    let result = hexbait_lang::eval_ir(parse_type, view, 0);
                                     let hovered = parse_result::show_value(
                                         ui,
                                         hexbait_lang::ir::path::Path::new(),
@@ -287,18 +289,17 @@ impl HexdumpView {
                 },
             );
 
-            let copy_event =
-                ui.input(|input| input.events.iter().any(|event| *event == egui::Event::Copy));
+            let copy_event = ui.input(|input| input.events.contains(&egui::Event::Copy));
 
             if copy_event
                 && let Some(selection) = self.selection()
                 && let Ok(size) = usize::try_from(selection.size().as_u64())
             {
                 let mut buf = vec![0; size];
-                if let Ok(window) = source.window_at(selection.start(), &mut buf) {
-                    if let Ok(as_text) = std::str::from_utf8(window) {
-                        ui.ctx().copy_text(as_text.to_string());
-                    }
+                if let Ok(window) = source.window_at(selection.start(), &mut buf)
+                    && let Ok(as_text) = std::str::from_utf8(window)
+                {
+                    ui.ctx().copy_text(as_text.to_string());
                 }
             }
         } else {
@@ -411,6 +412,7 @@ impl HexdumpView {
     }
 
     /// Shows a "minimap" of the hexview to show the context around it.
+    #[expect(clippy::too_many_arguments)]
     fn render_sidebar(
         &mut self,
         ui: &mut Ui,
@@ -426,7 +428,7 @@ impl HexdumpView {
         let mut rect = ui.max_rect().intersect(ui.cursor());
         rect.set_width(16.0 * bar_width_multiplier as f32);
 
-        let num_rows = (window.len() + 15) / 16;
+        let num_rows = window.len().div_ceil(16);
         rect.set_height(rect.height().min(num_rows as f32));
 
         let response = ui.allocate_rect(rect, Sense::click_and_drag());
