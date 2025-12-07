@@ -33,8 +33,6 @@ use super::{
 ///
 /// Contains the context necessary to render a hexdump.
 pub struct HexdumpView {
-    /// The number of rows that have been scrolled down from the start offset.
-    scroll_offset: u64,
     /// The selection context of the hexview.
     selection_context: SelectionContext,
     /// The cached image for the sidebar in the hex view.
@@ -45,7 +43,6 @@ impl HexdumpView {
     /// Create a new hexdump context.
     pub fn new() -> HexdumpView {
         HexdumpView {
-            scroll_offset: 0,
             selection_context: SelectionContext::new(),
             sidebar_cached_image: CachedImage::new(),
         }
@@ -60,13 +57,12 @@ impl HexdumpView {
         scroll_state: &mut ScrollState,
         source: &mut impl DataSource,
         endianness: &mut Endianness,
-        start_row: u64,
         parse_type: Option<&File>,
         parse_offset: &mut Option<AbsoluteOffset>,
         marked_locations: &mut MarkedLocations,
     ) {
-        // start is in rows
-        let start_in_bytes = AbsoluteOffset::from(start_row * 16);
+        let start = scroll_state.hex_start();
+        let start_row = start.as_u64() / 16;
 
         let rect = ui.max_rect().intersect(ui.cursor());
         let height = ui.available_height();
@@ -78,7 +74,7 @@ impl HexdumpView {
 
         let file_size = source.len();
 
-        if let Ok(window) = source.window_at(start_in_bytes, &mut buf) {
+        if let Ok(window) = source.window_at(start, &mut buf) {
             let hex_rect_width = (16 * settings.bar_width_multiplier()) as f32
                 + ui.spacing().item_spacing.x
                 + ((16 + 32 + 16) as f32 * settings.char_width())
@@ -98,36 +94,37 @@ impl HexdumpView {
                 if scroll_delta < 0 {
                     let scroll_delta = (-scroll_delta) as u64;
 
-                    if scroll_delta > self.scroll_offset {
-                        let diff = scroll_delta - self.scroll_offset;
+                    if scroll_delta > scroll_state.hex_scroll_offset {
+                        let diff = scroll_delta - scroll_state.hex_scroll_offset;
                         scroll_state.scroll_up(scroll_state.scrollbars.len() - 1, diff * 16);
 
-                        self.scroll_offset = 0;
+                        scroll_state.hex_scroll_offset = 0;
                     } else {
-                        self.scroll_offset -= scroll_delta;
+                        scroll_state.hex_scroll_offset -= scroll_delta;
                     }
                 } else {
                     let scroll_delta = scroll_delta as u64;
 
-                    if self.scroll_offset + scroll_delta > max_scroll {
-                        let diff = (self.scroll_offset + scroll_delta) - max_scroll;
+                    if scroll_state.hex_scroll_offset + scroll_delta > max_scroll {
+                        let diff = (scroll_state.hex_scroll_offset + scroll_delta) - max_scroll;
                         scroll_state.scroll_down(
                             scroll_state.scrollbars.len() - 1,
                             diff * 16,
                             Len::from(rows_onscreen),
                         );
 
-                        self.scroll_offset = max_scroll;
+                        scroll_state.hex_scroll_offset = max_scroll;
                     } else {
-                        self.scroll_offset += scroll_delta;
+                        scroll_state.hex_scroll_offset += scroll_delta;
                     }
-                    self.scroll_offset = (self.scroll_offset).saturating_add(scroll_delta);
+                    scroll_state.hex_scroll_offset =
+                        (scroll_state.hex_scroll_offset).saturating_add(scroll_delta);
                 }
             }
 
             // ensure that nothing scrolls too far
-            if self.scroll_offset > max_scroll {
-                self.scroll_offset = max_scroll;
+            if scroll_state.hex_scroll_offset > max_scroll {
+                scroll_state.hex_scroll_offset = max_scroll;
             }
 
             self.selection_context
@@ -142,6 +139,7 @@ impl HexdumpView {
 
                     self.render_sidebar(
                         ui,
+                        scroll_state,
                         window,
                         rows_onscreen,
                         max_scroll,
@@ -163,7 +161,7 @@ impl HexdumpView {
                         }
 
                         for location in marked_locations.iter_window(Window::from_start_len(
-                            start_in_bytes,
+                            start,
                             Len::from(window.len() as u64),
                         )) {
                             let Some(range) = location.window().range_inclusive() else {
@@ -175,7 +173,7 @@ impl HexdumpView {
                                 location.inner_color(),
                                 location.border_color(),
                                 file_size,
-                                start_row + self.scroll_offset,
+                                start_row + scroll_state.hex_scroll_offset,
                                 rows_onscreen,
                                 settings,
                             );
@@ -184,12 +182,12 @@ impl HexdumpView {
                         for (i, row) in window
                             .chunks(16)
                             .enumerate()
-                            .skip(self.scroll_offset as usize)
+                            .skip(scroll_state.hex_scroll_offset as usize)
                             .take(rows_onscreen as usize + 1)
                         {
                             self.render_row(
                                 ui,
-                                start_in_bytes + Len::from(i as u64 * 16),
+                                start + Len::from(i as u64 * 16),
                                 row,
                                 file_size,
                                 settings,
@@ -416,6 +414,7 @@ impl HexdumpView {
     fn render_sidebar(
         &mut self,
         ui: &mut Ui,
+        scroll_state: &mut ScrollState,
         window: &[u8],
         rows_onscreen: u64,
         max_scroll: u64,
@@ -434,20 +433,25 @@ impl HexdumpView {
         let response = ui.allocate_rect(rect, Sense::click_and_drag());
 
         if let Some(pos) = response.interact_pointer_pos() {
-            self.scroll_offset =
+            scroll_state.hex_scroll_offset =
                 ((pos.y - rect.min.y).round() as u64).saturating_sub(rows_onscreen / 2);
 
-            if self.scroll_offset > max_scroll {
-                self.scroll_offset = max_scroll;
+            if scroll_state.hex_scroll_offset > max_scroll {
+                scroll_state.hex_scroll_offset = max_scroll;
             }
         }
 
-        let highlight_row_range = self.scroll_offset..self.scroll_offset + rows_onscreen;
+        let highlight_row_range =
+            scroll_state.hex_scroll_offset..scroll_state.hex_scroll_offset + rows_onscreen;
 
         self.sidebar_cached_image.paint_at(
             ui,
             rect,
-            (start, self.scroll_offset, settings.linear_byte_colors()),
+            (
+                start,
+                scroll_state.hex_scroll_offset,
+                settings.linear_byte_colors(),
+            ),
             |x, y| {
                 let x = x / bar_width_multiplier;
                 if let Some(&byte) = window.get(y * 16 + x) {
@@ -462,8 +466,6 @@ impl HexdumpView {
             },
         );
 
-        let mut new_hovered_location = None;
-        let currently_hovered = marked_locations.hovered_location_mut().clone();
         render_locations_on_bar(
             ui,
             rect,
@@ -472,10 +474,7 @@ impl HexdumpView {
                 Len::from(window.len() as u64),
             ),
             marked_locations,
-            &mut new_hovered_location,
-            currently_hovered,
         );
-        *marked_locations.hovered_location_mut() = new_hovered_location;
     }
 }
 

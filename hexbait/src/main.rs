@@ -25,7 +25,7 @@ use hexbait::{
     state::State,
     statistics::{Statistics, StatisticsHandler},
 };
-use hexbait_common::{AbsoluteOffset, Len};
+use hexbait_common::AbsoluteOffset;
 
 // TODO: change font to render more characters
 // TODO: change default font-size and refactor around that
@@ -182,12 +182,7 @@ impl eframe::App for MyApp {
             if jump_to_offset
                 && let Ok(offset) = self.parse_offset.parse().map(AbsoluteOffset::from)
             {
-                let height = ui.max_rect().intersect(ui.cursor()).height();
-                let total_rows = (height.trunc() as u64).max(1);
-                let total_bytes = Len::from(total_rows * 16);
-                self.state
-                    .scroll_state
-                    .rearrange_bars_for_point(0, offset, total_bytes);
+                self.state.scroll_state.rearrange_bars_for_point(0, offset);
             }
 
             let mut parse_offset = self.parse_offset.parse().ok().map(AbsoluteOffset::from);
@@ -322,15 +317,12 @@ impl eframe::App for MyApp {
                                 self.built_in_format_descriptions.get(self.parse_type)
                             };
 
-                            let start = self.state.scroll_state.hex_start().as_u64() / 16;
-
                             self.hexdump_context.render(
                                 ui,
                                 &self.state.settings,
                                 &mut self.state.scroll_state,
                                 &mut self.input,
                                 &mut self.endianness,
-                                start,
                                 parse_type,
                                 &mut parse_offset,
                                 &mut self.marked_locations,
@@ -349,6 +341,7 @@ impl eframe::App for MyApp {
                 self.marked_locations
                     .add(MarkedLocation::new(*result, MarkingKind::SearchResult));
             }
+            self.marked_locations.end_of_frame();
 
             if self.sync_parse_offset_to_selection_start
                 && let Some(parse_offset) = parse_offset

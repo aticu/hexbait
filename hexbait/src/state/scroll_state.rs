@@ -7,6 +7,7 @@ use hexbait_common::{AbsoluteOffset, ChangeState, Len, RelativeOffset};
 use crate::{
     data::{DataSource, Input},
     gui::cached_image::CachedImage,
+    state::Settings,
     window::Window,
 };
 
@@ -26,10 +27,14 @@ pub struct ScrollState {
     pub display_suggestion: DisplaySuggestion,
     /// How the user is currently interacting with the scrollbars.
     pub interaction_state: InteractionState,
+    /// The number of rows that have been scrolled down from the start in hex view.
+    pub hex_scroll_offset: u64,
     /// Store the file size so the scroll state can independently compute windows.
     file_size: Len,
     /// The height of the zoombars in the current frame.
     height: f32,
+    /// The height of a character in the hex view.
+    hex_char_height: f32,
     /// The selection state in the previous frame.
     prev_selection_state: u64,
 }
@@ -41,19 +46,23 @@ impl ScrollState {
             scrollbars: vec![Scrollbar::new(input.len())],
             display_suggestion: DisplaySuggestion::Overview,
             interaction_state: InteractionState::None,
+            hex_scroll_offset: 0,
             file_size: input.len(),
             // the height is irrelevant for the first frame since we draw anyway
             height: 0.0,
+            // start with a random non-zero height
+            hex_char_height: 20.0,
             // the previous selection state is irrelevant for the first frame since we draw anyway
             prev_selection_state: 0,
         }
     }
 
     /// Sets the height of the scroll scroll bar area.
-    pub fn set_height(&mut self, height: f32) {
+    pub fn update_parameters(&mut self, height: f32, settings: &Settings) {
         let state = self.selection_state();
         self.prev_selection_state = state;
 
+        self.hex_char_height = settings.char_height();
         self.height = height;
     }
 
@@ -112,6 +121,11 @@ impl ScrollState {
         Len::from(total_rows * 16)
     }
 
+    /// The number of bytes visible at once in hex view.
+    fn hex_visible_window_size(&self) -> Len {
+        Len::from((self.height / self.hex_char_height).trunc() as u64 * 16)
+    }
+
     /// Creates a hash of the zoombar selection state.
     fn selection_state(&self) -> u64 {
         let mut hasher = std::hash::DefaultHasher::new();
@@ -140,12 +154,7 @@ impl ScrollState {
     ///
     /// Bars before `start_bar` remain unchanged, if `point` lies within them, otherwise they are
     /// shifted.
-    pub fn rearrange_bars_for_point(
-        &mut self,
-        start_bar: usize,
-        point: AbsoluteOffset,
-        total_bytes_in_hexview: Len,
-    ) {
+    pub fn rearrange_bars_for_point(&mut self, start_bar: usize, point: AbsoluteOffset) {
         let center_bar_on_point = |bar: &mut Scrollbar, window: Window| {
             let point_on_bar = point - window.start();
             let half_len = bar.selection_len / 2;
@@ -160,6 +169,7 @@ impl ScrollState {
             }
         };
 
+        let total_bytes_in_hexview = self.total_hexdump_bytes();
         let mut window = Window::from_start_len(AbsoluteOffset::ZERO, self.file_size());
         let mut parent_window = window;
         for bar in self.scrollbars.iter_mut().take(start_bar + 1) {
@@ -198,6 +208,22 @@ impl ScrollState {
 
         // the algorithm expects a full bar at the end, so provide it
         self.scrollbars.push(Scrollbar::new(window.size()));
+
+        let hex_window_size = self.hex_visible_window_size();
+        let tentative_hex_offset = Len::from(
+            (point - window.start())
+                .as_u64()
+                .saturating_sub(hex_window_size.as_u64() / 2),
+        );
+
+        let unrounded_hex_offset =
+            if tentative_hex_offset + hex_window_size > total_bytes_in_hexview {
+                total_bytes_in_hexview - hex_window_size
+            } else {
+                tentative_hex_offset
+            };
+
+        self.hex_scroll_offset = unrounded_hex_offset.as_u64() / 16;
     }
 
     /// Enforces the invariant that no fully selected bar can be in the middle.

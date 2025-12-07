@@ -15,6 +15,8 @@ pub struct MarkedLocations {
     locations: BTreeMap<AbsoluteOffset, Vec<MarkedLocation>>,
     /// The currently hovered location.
     hovered_location: Option<MarkedLocation>,
+    /// The location that was hovered this frame.
+    new_hovered_location: Option<MarkedLocation>,
 }
 
 impl MarkedLocations {
@@ -23,6 +25,7 @@ impl MarkedLocations {
         MarkedLocations {
             locations: BTreeMap::new(),
             hovered_location: None,
+            new_hovered_location: None,
         }
     }
 
@@ -63,8 +66,13 @@ impl MarkedLocations {
     }
 
     /// Returns a mutable reference to the currently hovered location.
-    pub fn hovered_location_mut(&mut self) -> &mut Option<MarkedLocation> {
-        &mut self.hovered_location
+    pub fn mark_hovered(&mut self, location: MarkedLocation) {
+        self.new_hovered_location = Some(location);
+    }
+
+    /// Marks the end of the frame, updating the marked location.
+    pub fn end_of_frame(&mut self) {
+        self.hovered_location = self.new_hovered_location.take();
     }
 }
 
@@ -135,8 +143,6 @@ pub fn render_locations_on_bar(
     bar_rect: Rect,
     bar_window: Window,
     marked_locations: &mut MarkedLocations,
-    new_hovered: &mut Option<MarkedLocation>,
-    currently_hovered: Option<MarkedLocation>,
 ) {
     // first bin locations to similar y offsets, so that they don't overlap
     let mut location_dots_by_y_bins = BTreeMap::<u32, Vec<_>>::new();
@@ -230,6 +236,8 @@ pub fn render_locations_on_bar(
         trace_path(ui.painter(), &points, 1.0, 0.0, location.border_color());
     }
 
+    let mut mark_location = None;
+
     for (y, mut locations) in location_dots_by_y_bins {
         locations.sort_by_key(|location| (location.window().start(), location.window().end()));
 
@@ -240,7 +248,7 @@ pub fn render_locations_on_bar(
                 y as f32,
             );
 
-            let is_hovered = Some(*location) == currently_hovered.as_ref();
+            let is_hovered = Some(*location) == marked_locations.hovered();
             let radius = if is_hovered {
                 bar_rect.width() / 8.0
             } else {
@@ -259,8 +267,12 @@ pub fn render_locations_on_bar(
                 .map(|pos| (pos - center).length() < radius)
                 .unwrap_or(false);
             if hovered {
-                *new_hovered = Some((*location).clone());
+                mark_location = Some((*location).clone());
             }
         }
+    }
+
+    if let Some(mark_location) = mark_location {
+        marked_locations.mark_hovered(mark_location);
     }
 }

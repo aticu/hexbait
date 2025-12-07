@@ -18,7 +18,7 @@ use super::{
     marking::{MarkedLocations, render_locations_on_bar},
 };
 
-/// Renders the zoombars.
+/// Renders the scrollbars.
 pub fn render(
     ui: &mut Ui,
     scroll_state: &mut ScrollState,
@@ -29,7 +29,7 @@ pub fn render(
     let file_size = scroll_state.file_size();
     let rect = ui.max_rect().intersect(ui.cursor());
 
-    scroll_state.set_height(rect.height());
+    scroll_state.update_parameters(rect.height(), settings);
 
     // be deliberately small to fit more text here
     let size_text_height = settings.font_size() * 0.7;
@@ -45,9 +45,6 @@ pub fn render(
 
     let mut window = scroll_state.first_window();
     let mut show_hex = false;
-
-    let mut new_hovered_location = None;
-    let currently_hovered = marked_locations.hovered_location_mut().clone();
 
     for i in 0..scroll_state.scrollbars.len() {
         if i >= scroll_state.scrollbars.len() {
@@ -118,14 +115,7 @@ pub fn render(
             ui.ctx().request_repaint_after(IDLE_TIME);
         }
 
-        render_locations_on_bar(
-            ui,
-            rect,
-            window,
-            marked_locations,
-            &mut new_hovered_location,
-            currently_hovered.clone(),
-        );
+        render_locations_on_bar(ui, rect, window, marked_locations);
 
         if let Some(location) = marked_locations.hovered()
             && ui.input(|input| {
@@ -147,7 +137,7 @@ pub fn render(
                 ui.label(format!("{}", offset.as_u64()));
             });
             if ui.input(|input| input.pointer.primary_clicked()) {
-                scroll_state.rearrange_bars_for_point(i, offset, total_bytes);
+                scroll_state.rearrange_bars_for_point(i, offset);
                 show_hex = true;
                 break;
             }
@@ -194,8 +184,6 @@ pub fn render(
     } else {
         scroll_state.display_suggestion = DisplaySuggestion::Overview;
     }
-
-    *marked_locations.hovered_location_mut() = new_hovered_location;
 }
 
 /// Handles manipulating the selection on the zoombar.
