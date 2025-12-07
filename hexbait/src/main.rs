@@ -35,13 +35,12 @@ use hexbait_common::AbsoluteOffset;
 // TODO: join polygons of adjoining marked locations
 // TODO: unify views and input
 // TODO: improve hover text for marked locations
-// TODO: refactor zoombars.rs
+// TODO: refactor scrollbars.rs
 // TODO: refactor hex.rs
 // TODO: implement more convenient escaping of byte arrays for search
 // TODO: rearrange UI in a more useful way
 // TODO: figure out why entropy calculations are sometimes so slow
-// TODO: fix dragging across end during initial zoombar selection
-// TODO: add jump to offset button
+// TODO: fix dragging across end during initial scrollbar selection
 // TODO: add relative search (from here backwards/forwards)
 // TODO: add screenshots to README
 // TODO: add some user documentation
@@ -192,7 +191,7 @@ impl eframe::App for MyApp {
                     .max_rect(ui.max_rect().intersect(ui.cursor()))
                     .layout(Layout::left_to_right(Align::Min)),
                 |ui| {
-                    hexbait::gui::zoombars::render(
+                    hexbait::gui::scrollbars::render(
                         ui,
                         &mut self.state.scroll_state,
                         &self.state.settings,

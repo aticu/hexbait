@@ -117,7 +117,7 @@ impl Settings {
         Color32::BROWN
     }
 
-    /// The width multiplier of the zoom and scrollbars.
+    /// The width multiplier of the scrollbars.
     pub fn bar_width_multiplier(&self) -> usize {
         3
     }

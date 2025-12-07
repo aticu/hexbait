@@ -1,4 +1,4 @@
-//! Implements zoombars to zoom in on the content of a file.
+//! Implements scrollbars to zoom in on the content of a file and scroll around in it.
 
 use egui::{
     Color32, Context, FontId, PointerButton, PopupAnchor, Pos2, Rect, Sense, Tooltip, Ui, vec2,
@@ -145,7 +145,7 @@ pub fn render(
             Tooltip::always_open(
                 ui.ctx().clone(),
                 ui.layer_id(),
-                "zoombar_tooltip".into(),
+                "scrollbar_tooltip".into(),
                 PopupAnchor::Pointer,
             )
             .show(|ui| {
@@ -186,7 +186,7 @@ pub fn render(
     }
 }
 
-/// Handles manipulating the selection on the zoombar.
+/// Handles manipulating the selection on the scrollbar.
 fn handle_interactions(
     rect: Rect,
     scroll_state: &mut ScrollState,

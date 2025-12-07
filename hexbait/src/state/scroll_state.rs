@@ -26,7 +26,7 @@ pub struct ScrollState {
     pub hex_scroll_offset: u64,
     /// Store the file size so the scroll state can independently compute windows.
     file_size: Len,
-    /// The height of the zoombars in the current frame.
+    /// The height of the scrollbars in the current frame.
     height: f32,
     /// The height of a character in the hex view.
     hex_char_height: f32,
@@ -121,7 +121,7 @@ impl ScrollState {
         Len::from((self.height / self.hex_char_height).trunc() as u64 * 16)
     }
 
-    /// Creates a hash of the zoombar selection state.
+    /// Creates a hash of the scrollbar selection state.
     fn selection_state(&self) -> u64 {
         let mut hasher = std::hash::DefaultHasher::new();
 
@@ -135,7 +135,7 @@ impl ScrollState {
         hasher.finish()
     }
 
-    /// Determines if the zoombar selection state changed since the last call to this method.
+    /// Determines if the scrollbar selection state changed since the last call to this method.
     pub fn changed(&self) -> ChangeState {
         let state = self.selection_state();
 

@@ -7,7 +7,7 @@ use hexbait_common::{AbsoluteOffset, Len};
 
 use crate::{gui::hex::highlighting::trace_path, window::Window};
 
-use super::{color, zoombars::offset_on_bar};
+use super::{color, scrollbars::offset_on_bar};
 
 /// Stores the marked locations to highlight.
 pub struct MarkedLocations {
