@@ -49,9 +49,67 @@ impl ScrollState {
         }
     }
 
+    /// Sets the height of the scroll scroll bar area.
+    pub fn set_height(&mut self, height: f32) {
+        let state = self.selection_state();
+        self.prev_selection_state = state;
+
+        self.height = height;
+    }
+
     /// Returns the size of the file this scroll state is for.
     pub fn file_size(&self) -> Len {
         self.file_size
+    }
+
+    /// The window of the first bar.
+    pub fn first_window(&self) -> Window {
+        Window::from_start_len(AbsoluteOffset::ZERO, self.file_size())
+    }
+
+    /// Returns the window selected by the scroll state.
+    pub fn selected_window(&self) -> Window {
+        let mut window = self.first_window();
+        let total_hexdump_bytes = self.total_hexdump_bytes();
+
+        for bar in &self.scrollbars {
+            window = bar.window(window, total_hexdump_bytes);
+        }
+
+        window
+    }
+
+    /// Returns the start offset of a hexdump showing the current window.
+    pub fn hex_start(&self) -> AbsoluteOffset {
+        let mut start = AbsoluteOffset::ZERO;
+        for bar in &self.scrollbars {
+            start += bar.selection_start;
+        }
+        let end = start
+            + self
+                .scrollbars
+                .last()
+                .map(|bar| bar.selection_len)
+                .unwrap_or(self.file_size());
+
+        if start.is_start_of_file() {
+            // ensure that the correction below does not make the start invisible
+
+            AbsoluteOffset::ZERO
+        } else if end > AbsoluteOffset::ZERO + self.file_size() - Len::from(16) {
+            // over-correct towards the end to ensure it's guaranteed to be visible
+
+            AbsoluteOffset::from(self.file_size().round_up(16).as_u64())
+                - self.total_hexdump_bytes()
+        } else {
+            start.align_down(16)
+        }
+    }
+
+    /// The number of bytes that a hexdump can show at once.
+    pub fn total_hexdump_bytes(&self) -> Len {
+        let total_rows = (self.height.trunc() as u64).max(1);
+        Len::from(total_rows * 16)
     }
 
     /// Creates a hash of the zoombar selection state.
@@ -69,14 +127,10 @@ impl ScrollState {
     }
 
     /// Determines if the zoombar selection state changed since the last call to this method.
-    pub fn changed(&mut self, height: f32) -> ChangeState {
-        self.height = height;
-
+    pub fn changed(&self) -> ChangeState {
         let state = self.selection_state();
-        let prev_state = self.prev_selection_state;
-        self.prev_selection_state = state;
 
-        match prev_state == state {
+        match self.prev_selection_state == state {
             true => ChangeState::Unchanged,
             false => ChangeState::Changed,
         }
@@ -88,7 +142,6 @@ impl ScrollState {
     /// shifted.
     pub fn rearrange_bars_for_point(
         &mut self,
-        file_size: Len,
         start_bar: usize,
         point: AbsoluteOffset,
         total_bytes_in_hexview: Len,
@@ -107,7 +160,7 @@ impl ScrollState {
             }
         };
 
-        let mut window = Window::from_start_len(AbsoluteOffset::ZERO, file_size);
+        let mut window = Window::from_start_len(AbsoluteOffset::ZERO, self.file_size());
         let mut parent_window = window;
         for bar in self.scrollbars.iter_mut().take(start_bar + 1) {
             let selected_window = bar.window(window, total_bytes_in_hexview);
@@ -148,8 +201,8 @@ impl ScrollState {
     }
 
     /// Enforces the invariant that no fully selected bar can be in the middle.
-    pub fn enforce_no_full_bar_in_middle_invariant(&mut self, file_size: Len) {
-        let mut prev_len = file_size;
+    pub fn enforce_no_full_bar_in_middle_invariant(&mut self) {
+        let mut prev_len = self.file_size();
         for (i, bar) in self.scrollbars[..self.scrollbars.len() - 1]
             .iter()
             .enumerate()
@@ -179,7 +232,7 @@ impl ScrollState {
     /// Scrolls up by the given amount.
     pub fn scroll_down(&mut self, bar: usize, amount: u64, min_size: Len) {
         let mut parent_size = Vec::with_capacity(bar + 1);
-        let mut window = Window::from_start_len(AbsoluteOffset::ZERO, self.file_size);
+        let mut window = Window::from_start_len(AbsoluteOffset::ZERO, self.file_size());
 
         parent_size.push(window.size());
         for i in 0..=bar {

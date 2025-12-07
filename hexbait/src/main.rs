@@ -15,7 +15,7 @@ use clap::Parser;
 use egui::{Align, Layout, RichText, TextStyle, UiBuilder};
 use hexbait::{
     built_in_format_descriptions::built_in_format_descriptions,
-    data::{DataSource as _, Input},
+    data::Input,
     gui::{
         hex::HexdumpView,
         marking::{MarkedLocation, MarkedLocations, MarkingKind},
@@ -185,12 +185,9 @@ impl eframe::App for MyApp {
                 let height = ui.max_rect().intersect(ui.cursor()).height();
                 let total_rows = (height.trunc() as u64).max(1);
                 let total_bytes = Len::from(total_rows * 16);
-                self.state.scroll_state.rearrange_bars_for_point(
-                    self.input.len(),
-                    0,
-                    offset,
-                    total_bytes,
-                );
+                self.state
+                    .scroll_state
+                    .rearrange_bars_for_point(0, offset, total_bytes);
             }
 
             let mut parse_offset = self.parse_offset.parse().ok().map(AbsoluteOffset::from);
@@ -200,51 +197,17 @@ impl eframe::App for MyApp {
                     .max_rect(ui.max_rect().intersect(ui.cursor()))
                     .layout(Layout::left_to_right(Align::Min)),
                 |ui| {
-                    let scrollbars_changed = hexbait::gui::zoombars::render(
+                    hexbait::gui::zoombars::render(
                         ui,
                         &mut self.state.scroll_state,
                         &self.state.settings,
                         &mut self.marked_locations,
                         &self.statistics_handler,
-                        |ui, start, scroll_state, marked_locations| {
-                            let ir;
+                    );
 
-                            let parse_type = if self.parse_type == "custom parser" {
-                                'parse_type: {
-                                    let Ok(content) = std::fs::read_to_string(
-                                        self.custom_parser.as_ref().expect(
-                                            "if a custom parser is selected it should also exist",
-                                        ),
-                                    ) else {
-                                        break 'parse_type None;
-                                    };
-
-                                    let parse = hexbait_lang::parse(&content);
-                                    if !parse.errors.is_empty() {
-                                        break 'parse_type None;
-                                    }
-
-                                    ir = hexbait_lang::ir::lower_file(parse.ast);
-
-                                    Some(&ir)
-                                }
-                            } else {
-                                self.built_in_format_descriptions.get(self.parse_type)
-                            };
-
-                            self.hexdump_context.render(
-                                ui,
-                                &self.state.settings,
-                                scroll_state,
-                                &mut self.input,
-                                &mut self.endianness,
-                                start,
-                                parse_type,
-                                &mut parse_offset,
-                                marked_locations,
-                            );
-                        },
-                        |ui, window| {
+                    match self.state.scroll_state.display_suggestion {
+                        hexbait::state::DisplaySuggestion::Overview => {
+                            let window = self.state.scroll_state.selected_window();
                             let (statistics, quality) = self
                                 .statistics_handler
                                 .get_bigram(window)
@@ -332,10 +295,51 @@ impl eframe::App for MyApp {
                                     }
                                 });
                             });
-                        },
-                    );
+                        }
+                        hexbait::state::DisplaySuggestion::Hexview => {
+                            let ir;
 
-                    self.statistics_handler.end_of_frame(scrollbars_changed);
+                            let parse_type = if self.parse_type == "custom parser" {
+                                'parse_type: {
+                                    let Ok(content) = std::fs::read_to_string(
+                                        self.custom_parser.as_ref().expect(
+                                            "if a custom parser is selected it should also exist",
+                                        ),
+                                    ) else {
+                                        break 'parse_type None;
+                                    };
+
+                                    let parse = hexbait_lang::parse(&content);
+                                    if !parse.errors.is_empty() {
+                                        break 'parse_type None;
+                                    }
+
+                                    ir = hexbait_lang::ir::lower_file(parse.ast);
+
+                                    Some(&ir)
+                                }
+                            } else {
+                                self.built_in_format_descriptions.get(self.parse_type)
+                            };
+
+                            let start = self.state.scroll_state.hex_start().as_u64() / 16;
+
+                            self.hexdump_context.render(
+                                ui,
+                                &self.state.settings,
+                                &mut self.state.scroll_state,
+                                &mut self.input,
+                                &mut self.endianness,
+                                start,
+                                parse_type,
+                                &mut parse_offset,
+                                &mut self.marked_locations,
+                            );
+                        }
+                    }
+
+                    self.statistics_handler
+                        .end_of_frame(self.state.scroll_state.changed());
                 },
             );
 

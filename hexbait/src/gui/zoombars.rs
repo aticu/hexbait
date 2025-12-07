@@ -3,7 +3,7 @@
 use egui::{
     Color32, Context, FontId, PointerButton, PopupAnchor, Pos2, Rect, Sense, Tooltip, Ui, vec2,
 };
-use hexbait_common::{AbsoluteOffset, ChangeState, Len, RelativeOffset};
+use hexbait_common::{AbsoluteOffset, Len, RelativeOffset};
 use size_format::SizeFormatterBinary;
 
 use crate::{
@@ -25,27 +25,25 @@ pub fn render(
     settings: &Settings,
     marked_locations: &mut MarkedLocations,
     handler: &StatisticsHandler,
-    render_hex: impl FnOnce(&mut Ui, u64, &mut ScrollState, &mut MarkedLocations),
-    render_overview: impl FnOnce(&mut Ui, Window),
-) -> ChangeState {
+) {
     let file_size = scroll_state.file_size();
     let rect = ui.max_rect().intersect(ui.cursor());
+
+    scroll_state.set_height(rect.height());
 
     // be deliberately small to fit more text here
     let size_text_height = settings.font_size() * 0.7;
 
-    let total_rows = (rect.height().trunc() as u64).max(1);
-    let total_bytes = Len::from(total_rows * 16);
+    let total_bytes = scroll_state.total_hexdump_bytes();
 
     if total_bytes >= file_size {
-        render_hex(ui, 0, scroll_state, marked_locations);
         scroll_state.display_suggestion = DisplaySuggestion::Hexview;
-        return ChangeState::Unchanged;
+        return;
     } else if scroll_state.scrollbars.is_empty() {
         scroll_state.scrollbars.push(Scrollbar::new(file_size));
     }
 
-    let mut window = Window::from_start_len(AbsoluteOffset::ZERO, file_size);
+    let mut window = scroll_state.first_window();
     let mut show_hex = false;
 
     let mut new_hovered_location = None;
@@ -149,7 +147,7 @@ pub fn render(
                 ui.label(format!("{}", offset.as_u64()));
             });
             if ui.input(|input| input.pointer.primary_clicked()) {
-                scroll_state.rearrange_bars_for_point(file_size, i, offset, total_bytes);
+                scroll_state.rearrange_bars_for_point(i, offset, total_bytes);
                 show_hex = true;
                 break;
             }
@@ -189,33 +187,15 @@ pub fn render(
     }
 
     // keep bars consistent in case of double clicks
-    scroll_state.enforce_no_full_bar_in_middle_invariant(file_size);
+    scroll_state.enforce_no_full_bar_in_middle_invariant();
 
     if show_hex {
-        let start = if window.start().is_start_of_file() {
-            // ensure that the correction below does not make the start invisible
-
-            0
-        } else if window.end() > AbsoluteOffset::ZERO + file_size - Len::from(16) {
-            // over-correct towards the end to ensure it's guaranteed to be visible
-
-            let rounded_up_size = file_size.round_up(16);
-
-            (rounded_up_size - total_bytes).as_u64() / 16
-        } else {
-            window.start().as_u64() / 16
-        };
-
-        render_hex(ui, start, scroll_state, marked_locations);
         scroll_state.display_suggestion = DisplaySuggestion::Hexview;
     } else {
-        render_overview(ui, window);
         scroll_state.display_suggestion = DisplaySuggestion::Overview;
     }
 
     *marked_locations.hovered_location_mut() = new_hovered_location;
-
-    scroll_state.changed(rect.height())
 }
 
 /// Handles manipulating the selection on the zoombar.
