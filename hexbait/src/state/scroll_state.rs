@@ -4,22 +4,19 @@ use std::hash::{Hash as _, Hasher as _};
 
 use hexbait_common::{AbsoluteOffset, ChangeState, Len, RelativeOffset};
 
-use crate::{data::Input, gui::cached_image::CachedImage, state::Settings, window::Window};
-
-/// The suggestion of what to display in the main content view.
-pub enum DisplaySuggestion {
-    /// With the current scroll selection state an overview should be shown.
-    Overview,
-    /// With the current scroll selection state a hexview should be shown.
-    Hexview,
-}
+use crate::{
+    data::Input,
+    gui::cached_image::CachedImage,
+    state::{DisplayType, Settings},
+    window::Window,
+};
 
 /// The state of the scrolling.
 pub struct ScrollState {
     /// The scrollbars.
     pub scrollbars: Vec<Scrollbar>,
     /// What to display in the main content view.
-    pub display_suggestion: DisplaySuggestion,
+    pub display_suggestion: DisplayType,
     /// How the user is currently interacting with the scrollbars.
     pub interaction_state: InteractionState,
     /// The number of rows that have been scrolled down from the start in hex view.
@@ -39,7 +36,7 @@ impl ScrollState {
     pub fn new(input: &Input) -> ScrollState {
         ScrollState {
             scrollbars: vec![Scrollbar::new(input.len())],
-            display_suggestion: DisplaySuggestion::Overview,
+            display_suggestion: DisplayType::Statistics,
             interaction_state: InteractionState::None,
             hex_scroll_offset: 0,
             file_size: input.len(),

@@ -1,8 +1,8 @@
 //! Implements the structures storing the state of the hexbait application.
 
-pub use scroll_state::{DisplaySuggestion, InteractionState, ScrollState, Scrollbar};
+pub use scroll_state::{InteractionState, ScrollState, Scrollbar};
 pub use search_state::SearchState;
-pub use settings::Settings;
+pub use settings::{Settings, ViewKind};
 
 use crate::data::Input;
 
@@ -29,4 +29,13 @@ impl State {
             scroll_state: ScrollState::new(input),
         }
     }
+}
+
+/// The different things that can be displayed in the main views.
+#[derive(Debug, Clone, Copy)]
+pub enum DisplayType {
+    /// Show statistics of the selected byte window.
+    Statistics,
+    /// Show a hexview at the start of the selected byte window.
+    Hexview,
 }

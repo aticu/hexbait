@@ -4,6 +4,29 @@ use egui::{Color32, FontId, TextStyle, Ui};
 
 use crate::gui::color::{BYTE_COLORS, ColorMap};
 
+/// Determine what to show in the main screen.
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
+pub enum ViewKind {
+    /// Determine based on the size of the selected window.
+    #[default]
+    Auto,
+    /// Always show a hex view.
+    ForceHexView,
+    /// Always show a statistics view.
+    ForceStatisticsView,
+}
+
+impl ViewKind {
+    /// Returns this view kind as a displayable string.
+    pub fn display_str(&self) -> &str {
+        match self {
+            ViewKind::Auto => "auto",
+            ViewKind::ForceHexView => "hex only",
+            ViewKind::ForceStatisticsView => "statistics only",
+        }
+    }
+}
+
 /// The settings of the GUI.
 pub struct Settings {
     /// The scale of the GUI.
@@ -14,6 +37,8 @@ pub struct Settings {
     color_map: ColorMap,
     /// Whether to use linear colors for bytes.
     linear_byte_colors: bool,
+    /// The thing to display in the main screen.
+    view_kind: ViewKind,
 }
 
 impl Settings {
@@ -23,6 +48,7 @@ impl Settings {
             scale: 20.0,
             color_map: ColorMap::Viridis,
             linear_byte_colors: false,
+            view_kind: ViewKind::Auto,
         }
     }
 
@@ -86,6 +112,11 @@ impl Settings {
     /// The stroke width to use for lines.
     pub fn stroke_width(&self) -> f32 {
         self.scale * 0.08
+    }
+
+    /// The thing to display on the main screen.
+    pub fn view_kind(&mut self) -> &mut ViewKind {
+        &mut self.view_kind
     }
 
     /// A representative color for the given byte value.

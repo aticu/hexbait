@@ -22,7 +22,7 @@ use hexbait::{
         signature_display::SignatureDisplay,
     },
     model::Endianness,
-    state::State,
+    state::{DisplayType, State, ViewKind},
     statistics::{Statistics, StatisticsHandler},
 };
 use hexbait_common::AbsoluteOffset;
@@ -140,7 +140,7 @@ impl eframe::App for MyApp {
 
             ui.horizontal(|ui| {
                 ui.label("Parse as:");
-                egui::ComboBox::from_label("")
+                egui::ComboBox::new("parse_type", "")
                     .selected_text(self.parse_type)
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut self.parse_type, "none", "none");
@@ -176,6 +176,23 @@ impl eframe::App for MyApp {
                     self.state.settings.linear_byte_colors_mut(),
                     "Use linear byte colors",
                 );
+
+                ui.label("Show:");
+                egui::ComboBox::new("view_kind", "")
+                    .selected_text(self.state.settings.view_kind().display_str())
+                    .show_ui(ui, |ui| {
+                        for kind in [
+                            ViewKind::Auto,
+                            ViewKind::ForceHexView,
+                            ViewKind::ForceStatisticsView,
+                        ] {
+                            ui.selectable_value(
+                                self.state.settings.view_kind(),
+                                kind,
+                                kind.display_str(),
+                            );
+                        }
+                    });
             });
 
             if jump_to_offset
@@ -199,8 +216,14 @@ impl eframe::App for MyApp {
                         &self.statistics_handler,
                     );
 
-                    match self.state.scroll_state.display_suggestion {
-                        hexbait::state::DisplaySuggestion::Overview => {
+                    let display_type = match self.state.settings.view_kind() {
+                        ViewKind::Auto => self.state.scroll_state.display_suggestion,
+                        ViewKind::ForceHexView => DisplayType::Hexview,
+                        ViewKind::ForceStatisticsView => DisplayType::Statistics,
+                    };
+
+                    match display_type {
+                        DisplayType::Statistics => {
                             let window = self.state.scroll_state.selected_window();
                             let (statistics, quality) = self
                                 .statistics_handler
@@ -290,7 +313,7 @@ impl eframe::App for MyApp {
                                 });
                             });
                         }
-                        hexbait::state::DisplaySuggestion::Hexview => {
+                        DisplayType::Hexview => {
                             let ir;
 
                             let parse_type = if self.parse_type == "custom parser" {

@@ -8,7 +8,7 @@ use size_format::SizeFormatterBinary;
 
 use crate::{
     IDLE_TIME,
-    state::{DisplaySuggestion, InteractionState, ScrollState, Scrollbar, Settings},
+    state::{DisplayType, InteractionState, ScrollState, Scrollbar, Settings},
     statistics::StatisticsHandler,
     window::Window,
 };
@@ -37,7 +37,7 @@ pub fn render(
     let total_bytes = scroll_state.total_hexdump_bytes();
 
     if total_bytes >= file_size {
-        scroll_state.display_suggestion = DisplaySuggestion::Hexview;
+        scroll_state.display_suggestion = DisplayType::Hexview;
         return;
     } else if scroll_state.scrollbars.is_empty() {
         scroll_state.scrollbars.push(Scrollbar::new(file_size));
@@ -180,9 +180,9 @@ pub fn render(
     scroll_state.enforce_no_full_bar_in_middle_invariant();
 
     if show_hex {
-        scroll_state.display_suggestion = DisplaySuggestion::Hexview;
+        scroll_state.display_suggestion = DisplayType::Hexview;
     } else {
-        scroll_state.display_suggestion = DisplaySuggestion::Overview;
+        scroll_state.display_suggestion = DisplayType::Statistics;
     }
 }
 
