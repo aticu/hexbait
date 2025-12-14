@@ -17,7 +17,6 @@ use hexbait::{
     built_in_format_descriptions::built_in_format_descriptions,
     data::Input,
     gui::{
-        hex::HexdumpView,
         marking::{MarkedLocation, MarkedLocations, MarkingKind},
         signature_display::SignatureDisplay,
     },
@@ -88,7 +87,6 @@ fn main() -> eframe::Result {
                 state: State::new(&input),
                 statistics_handler: StatisticsHandler::new(input.try_clone().unwrap()),
                 input,
-                hexdump_context: HexdumpView::new(),
                 endianness: Endianness::native(),
                 signature_display: SignatureDisplay::new(),
                 xor_value: 0,
@@ -108,7 +106,6 @@ struct MyApp {
     state: State,
     statistics_handler: StatisticsHandler,
     input: Input,
-    hexdump_context: HexdumpView,
     endianness: Endianness,
     signature_display: SignatureDisplay,
     xor_value: u8,
@@ -339,7 +336,7 @@ impl eframe::App for MyApp {
                                 self.built_in_format_descriptions.get(self.parse_type)
                             };
 
-                            self.hexdump_context.render(
+                            hexbait::gui::hex::render(
                                 ui,
                                 &self.state.settings,
                                 &mut self.state.scroll_state,

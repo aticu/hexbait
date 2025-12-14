@@ -21,6 +21,8 @@ pub struct ScrollState {
     pub interaction_state: InteractionState,
     /// The number of rows that have been scrolled down from the start in hex view.
     pub hex_scroll_offset: u64,
+    /// The cached image for the sidebar in the hex view.
+    pub hex_sidebar_cached_image: CachedImage<(u64, u64, bool)>,
     /// Store the file size so the scroll state can independently compute windows.
     file_size: Len,
     /// The height of the scrollbars in the current frame.
@@ -39,6 +41,7 @@ impl ScrollState {
             display_suggestion: DisplayType::Statistics,
             interaction_state: InteractionState::None,
             hex_scroll_offset: 0,
+            hex_sidebar_cached_image: CachedImage::new(),
             file_size: input.len(),
             // the height is irrelevant for the first frame since we draw anyway
             height: 0.0,
