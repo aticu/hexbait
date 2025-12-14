@@ -2,6 +2,7 @@
 
 use std::fmt;
 
+use hexbait_common::Endianness;
 use smol_str::SmolStr;
 
 use crate::{SyntaxToken, span::Span};
@@ -102,15 +103,6 @@ pub struct LetStatement {
     pub name: Spanned<Symbol>,
     /// The expression that computes the value.
     pub expr: Expr,
-}
-
-/// An endianness as found in an endianness declaration.
-#[derive(Debug, Clone, Copy)]
-pub enum Endianness {
-    /// Little endian byte ordering.
-    Little,
-    /// Big endian byte ordering.
-    Big,
 }
 
 /// A declaration found in a `struct`.

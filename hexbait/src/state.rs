@@ -1,5 +1,6 @@
 //! Implements the structures storing the state of the hexbait application.
 
+use hexbait_common::Endianness;
 pub use scroll_state::{InteractionState, ScrollState, Scrollbar};
 pub use search_state::SearchState;
 pub use selection_state::SelectionState;
@@ -28,6 +29,8 @@ pub struct State {
     pub selection_state: SelectionState,
     /// The marked locations.
     pub marked_locations: MarkedLocations,
+    /// The currently selected endianness.
+    pub endianness: Endianness,
     /// The cached signature display image.
     pub cached_signature_display: CachedImage<(Window, u8, f32)>,
 }
@@ -41,6 +44,7 @@ impl State {
             scroll_state: ScrollState::new(input),
             selection_state: SelectionState::new(),
             marked_locations: MarkedLocations::new(),
+            endianness: Endianness::native(),
             cached_signature_display: CachedImage::new(),
         }
     }

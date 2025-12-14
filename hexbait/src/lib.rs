@@ -10,7 +10,6 @@ pub(crate) const IDLE_TIME: Duration = Duration::from_millis(100);
 pub mod built_in_format_descriptions;
 pub mod data;
 pub mod gui;
-pub mod model;
 pub mod search;
 pub mod state;
 pub mod statistics;

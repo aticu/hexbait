@@ -6,8 +6,8 @@ use crate::{
     Int, Span,
     eval::parse::diagnostics::ParseErrWithMaybePartialResult,
     ir::{
-        BinOp, Declaration, Endianness, Expr, ExprKind, File, LetStatement, Lit, ParseType,
-        ParseTypeKind, RepeatKind, StructContent, StructField, Symbol, UnOp,
+        BinOp, Declaration, Expr, ExprKind, File, LetStatement, Lit, ParseType, ParseTypeKind,
+        RepeatKind, StructContent, StructField, Symbol, UnOp,
     },
 };
 
@@ -18,6 +18,7 @@ use super::{
 };
 
 pub use diagnostics::{ParseErr, ParseErrId, ParseErrKind, ParseWarning};
+use hexbait_common::Endianness;
 
 mod diagnostics;
 

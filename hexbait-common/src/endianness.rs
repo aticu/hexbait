@@ -1,4 +1,4 @@
-//! Models various domain specific things like endianness.
+//! Implements a type to model endianness.
 
 /// Determines the byte-order of multi-byte structures.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

@@ -1,14 +1,13 @@
 //! Renders hexdumps in the GUI.
 
 use egui::{Align, Color32, Layout, Rect, ScrollArea, Sense, Ui, UiBuilder, Vec2, vec2};
-use hexbait_common::{AbsoluteOffset, Len};
+use hexbait_common::{AbsoluteOffset, Endianness, Len};
 use hexbait_lang::{View, ir::File};
 use highlighting::highlight;
 
 use crate::{
     data::Input,
     gui::color,
-    model::Endianness,
     state::{ScrollState, SelectionState, Settings},
     window::Window,
 };

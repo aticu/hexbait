@@ -1,8 +1,9 @@
 //! Implements rendering of the inspector window for bytes.
 
 use egui::{Color32, Rect, RichText, Sense, Ui, vec2};
+use hexbait_common::Endianness;
 
-use crate::{model::Endianness, state::Settings};
+use crate::state::Settings;
 
 /// Renders a data inspector, showing different views on the selected data.
 pub(crate) fn render_inspector(

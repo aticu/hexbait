@@ -1562,6 +1562,7 @@ name = "hexbait-lang"
 version = "0.1.0"
 dependencies = [
  "heck",
+ "hexbait-common",
  "logos",
  "num-bigint",
  "num-traits",
