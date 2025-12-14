@@ -343,6 +343,7 @@ impl eframe::App for MyApp {
                                 ui,
                                 &self.state.settings,
                                 &mut self.state.scroll_state,
+                                &mut self.state.selection_state,
                                 &mut self.input,
                                 &mut self.endianness,
                                 parse_type,

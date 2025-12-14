@@ -2,12 +2,14 @@
 
 pub use scroll_state::{InteractionState, ScrollState, Scrollbar};
 pub use search_state::SearchState;
+pub use selection_state::SelectionState;
 pub use settings::{Settings, ViewKind};
 
 use crate::data::Input;
 
 mod scroll_state;
 mod search_state;
+mod selection_state;
 mod settings;
 
 /// The state of the hexbait application.
@@ -18,6 +20,8 @@ pub struct State {
     pub search: SearchState,
     /// The state of the scrollbars.
     pub scroll_state: ScrollState,
+    /// The state of the hex view selection.
+    pub selection_state: SelectionState,
 }
 
 impl State {
@@ -27,6 +31,7 @@ impl State {
             settings: Settings::new(),
             search: SearchState::new(input),
             scroll_state: ScrollState::new(input),
+            selection_state: SelectionState::new(),
         }
     }
 }
