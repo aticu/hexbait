@@ -16,10 +16,7 @@ use egui::{Align, Layout, RichText, TextStyle, UiBuilder};
 use hexbait::{
     built_in_format_descriptions::built_in_format_descriptions,
     data::Input,
-    gui::{
-        marking::{MarkedLocation, MarkedLocations, MarkingKind},
-        signature_display::SignatureDisplay,
-    },
+    gui::marking::{MarkedLocation, MarkingKind},
     model::Endianness,
     state::{DisplayType, State, ViewKind},
     statistics::{Statistics, StatisticsHandler},
@@ -88,12 +85,10 @@ fn main() -> eframe::Result {
                 statistics_handler: StatisticsHandler::new(input.try_clone().unwrap()),
                 input,
                 endianness: Endianness::native(),
-                signature_display: SignatureDisplay::new(),
                 xor_value: 0,
                 parse_type: "none",
                 parse_offset: String::from("0"),
                 sync_parse_offset_to_selection_start: true,
-                marked_locations: MarkedLocations::new(),
                 built_in_format_descriptions: built_in_format_descriptions(),
                 custom_parser: config.parser_definition,
             }))
@@ -107,12 +102,10 @@ struct MyApp {
     statistics_handler: StatisticsHandler,
     input: Input,
     endianness: Endianness,
-    signature_display: SignatureDisplay,
     xor_value: u8,
     parse_type: &'static str,
     parse_offset: String,
     sync_parse_offset_to_selection_start: bool,
-    marked_locations: MarkedLocations,
     built_in_format_descriptions: BTreeMap<&'static str, hexbait_lang::ir::File>,
     custom_parser: Option<PathBuf>,
 }
@@ -209,7 +202,7 @@ impl eframe::App for MyApp {
                         ui,
                         &mut self.state.scroll_state,
                         &self.state.settings,
-                        &mut self.marked_locations,
+                        &mut self.state.marked_locations,
                         &self.statistics_handler,
                     );
 
@@ -232,7 +225,8 @@ impl eframe::App for MyApp {
                             let rect = ui.max_rect().intersect(ui.cursor());
 
                             ui.vertical(|ui| {
-                                self.signature_display.render(
+                                hexbait::gui::signature_display::render(
+                                    &mut self.state.cached_signature_display,
                                     ui,
                                     rect,
                                     window,
@@ -345,7 +339,7 @@ impl eframe::App for MyApp {
                                 &mut self.endianness,
                                 parse_type,
                                 &mut parse_offset,
-                                &mut self.marked_locations,
+                                &mut self.state.marked_locations,
                             );
                         }
                     }
@@ -355,13 +349,15 @@ impl eframe::App for MyApp {
                 },
             );
 
-            self.marked_locations
+            self.state
+                .marked_locations
                 .remove_where(|loc| loc.kind() == MarkingKind::SearchResult);
             for result in self.state.search.searcher.results().iter() {
-                self.marked_locations
+                self.state
+                    .marked_locations
                     .add(MarkedLocation::new(*result, MarkingKind::SearchResult));
             }
-            self.marked_locations.end_of_frame();
+            self.state.marked_locations.end_of_frame();
 
             if self.sync_parse_offset_to_selection_start
                 && let Some(parse_offset) = parse_offset

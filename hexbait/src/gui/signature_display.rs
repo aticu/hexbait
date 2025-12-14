@@ -9,110 +9,88 @@ use super::{
     hex::{render_glyph, render_hex},
 };
 
-/// Displays a data signature as an image of bigram probabilities.
-pub struct SignatureDisplay {
-    /// The image of the displayed signature.
-    cached_image: CachedImage<(Window, u8, f32)>,
-}
+/// Renders the signature into the given rect.
+#[expect(clippy::too_many_arguments)]
+pub fn render(
+    cached_image: &mut CachedImage<(Window, u8, f32)>,
+    ui: &mut Ui,
+    rect: Rect,
+    window: Window,
+    signature: &Signature,
+    xor_value: u8,
+    quality: f32,
+    settings: &Settings,
+) {
+    let side_len_x = (rect.width().trunc() / 256.0).trunc();
+    let side_len_y = (rect.height().trunc() / 256.0).trunc();
+    let side_len = side_len_x.min(side_len_y);
 
-impl SignatureDisplay {
-    /// Creates a new signature display.
-    pub fn new() -> SignatureDisplay {
-        SignatureDisplay {
-            cached_image: CachedImage::new(),
-        }
-    }
+    let rect = Rect::from_min_size(
+        ui.cursor().left_top(),
+        vec2(side_len * 256.0, side_len * 256.0),
+    );
 
-    /// Renders the signature into the given rect.
-    #[expect(clippy::too_many_arguments)]
-    pub fn render(
-        &mut self,
-        ui: &mut Ui,
-        rect: Rect,
-        window: Window,
-        signature: &Signature,
-        xor_value: u8,
-        quality: f32,
-        settings: &Settings,
-    ) {
-        let side_len_x = (rect.width().trunc() / 256.0).trunc();
-        let side_len_y = (rect.height().trunc() / 256.0).trunc();
-        let side_len = side_len_x.min(side_len_y);
+    cached_image.paint_at(ui, rect, (window, xor_value, quality), |x, y| {
+        let first = x / side_len as usize;
+        let second = y / side_len as usize;
 
-        let rect = Rect::from_min_size(
-            ui.cursor().left_top(),
-            vec2(side_len * 256.0, side_len * 256.0),
+        let intensity = signature.tuple(first as u8 ^ xor_value, second as u8 ^ xor_value);
+
+        settings.scale_color_u8(intensity)
+    });
+    ui.advance_cursor_after_rect(rect);
+
+    if quality < 1.0 {
+        ui.ctx().request_repaint_after(IDLE_TIME);
+
+        ui.painter().text(
+            rect.center(),
+            Align2::CENTER_CENTER,
+            format!("Loading: {:6.2}%", quality * 100.0),
+            FontId::proportional(settings.font_size()),
+            Color32::WHITE,
         );
-
-        self.cached_image
-            .paint_at(ui, rect, (window, xor_value, quality), |x, y| {
-                let first = x / side_len as usize;
-                let second = y / side_len as usize;
-
-                let intensity = signature.tuple(first as u8 ^ xor_value, second as u8 ^ xor_value);
-
-                settings.scale_color_u8(intensity)
-            });
-        ui.advance_cursor_after_rect(rect);
-
-        if quality < 1.0 {
-            ui.ctx().request_repaint_after(IDLE_TIME);
-
-            ui.painter().text(
-                rect.center(),
-                Align2::CENTER_CENTER,
-                format!("Loading: {:6.2}%", quality * 100.0),
-                FontId::proportional(settings.font_size()),
-                Color32::WHITE,
-            );
-        }
-
-        let hover_positions = ui.ctx().input(|input| {
-            if let Some(pos) = input.pointer.latest_pos()
-                && rect.contains(pos)
-            {
-                let first = ((pos - rect.min).x / side_len) as u8;
-                let second = ((pos - rect.min).y / side_len) as u8;
-
-                Some((first, second))
-            } else {
-                None
-            }
-        });
-
-        if let Some((first, second)) = hover_positions {
-            let intensity = signature.tuple(first ^ xor_value, second ^ xor_value);
-
-            Tooltip::always_open(
-                ui.ctx().clone(),
-                ui.layer_id(),
-                "signature_display_tooltip".into(),
-                PopupAnchor::Pointer,
-            )
-            .show(|ui| {
-                ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        render_hex(ui, settings, Sense::hover(), first, settings.hex_font());
-                        render_hex(ui, settings, Sense::hover(), second, settings.hex_font());
-
-                        ui.spacing_mut().item_spacing = Vec2::ZERO;
-                        ui.add_space(settings.large_space());
-
-                        render_glyph(ui, settings, Sense::hover(), first);
-                        render_glyph(ui, settings, Sense::hover(), second);
-                    });
-                    ui.label(format!(
-                        "Relative Density: {:0.02}%",
-                        intensity as f64 / 2.55,
-                    ));
-                });
-            });
-        }
     }
-}
 
-impl Default for SignatureDisplay {
-    fn default() -> Self {
-        SignatureDisplay::new()
+    let hover_positions = ui.ctx().input(|input| {
+        if let Some(pos) = input.pointer.latest_pos()
+            && rect.contains(pos)
+        {
+            let first = ((pos - rect.min).x / side_len) as u8;
+            let second = ((pos - rect.min).y / side_len) as u8;
+
+            Some((first, second))
+        } else {
+            None
+        }
+    });
+
+    if let Some((first, second)) = hover_positions {
+        let intensity = signature.tuple(first ^ xor_value, second ^ xor_value);
+
+        Tooltip::always_open(
+            ui.ctx().clone(),
+            ui.layer_id(),
+            "signature_display_tooltip".into(),
+            PopupAnchor::Pointer,
+        )
+        .show(|ui| {
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    render_hex(ui, settings, Sense::hover(), first, settings.hex_font());
+                    render_hex(ui, settings, Sense::hover(), second, settings.hex_font());
+
+                    ui.spacing_mut().item_spacing = Vec2::ZERO;
+                    ui.add_space(settings.large_space());
+
+                    render_glyph(ui, settings, Sense::hover(), first);
+                    render_glyph(ui, settings, Sense::hover(), second);
+                });
+                ui.label(format!(
+                    "Relative Density: {:0.02}%",
+                    intensity as f64 / 2.55,
+                ));
+            });
+        });
     }
 }

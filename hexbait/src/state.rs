@@ -5,7 +5,11 @@ pub use search_state::SearchState;
 pub use selection_state::SelectionState;
 pub use settings::{Settings, ViewKind};
 
-use crate::data::Input;
+use crate::{
+    data::Input,
+    gui::{cached_image::CachedImage, marking::MarkedLocations},
+    window::Window,
+};
 
 mod scroll_state;
 mod search_state;
@@ -22,6 +26,10 @@ pub struct State {
     pub scroll_state: ScrollState,
     /// The state of the hex view selection.
     pub selection_state: SelectionState,
+    /// The marked locations.
+    pub marked_locations: MarkedLocations,
+    /// The cached signature display image.
+    pub cached_signature_display: CachedImage<(Window, u8, f32)>,
 }
 
 impl State {
@@ -32,6 +40,8 @@ impl State {
             search: SearchState::new(input),
             scroll_state: ScrollState::new(input),
             selection_state: SelectionState::new(),
+            marked_locations: MarkedLocations::new(),
+            cached_signature_display: CachedImage::new(),
         }
     }
 }
