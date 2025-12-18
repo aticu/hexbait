@@ -58,12 +58,53 @@ where
     }
 
     /// Iterates over all non-zero counts.
-    pub(super) fn iter_non_zero(&self) -> impl Iterator<Item = (u8, u8, Count)> {
-        self.follow.iter().enumerate().flat_map(|(second, row)| {
-            row.iter()
-                .enumerate()
-                .map(move |(first, &count)| (first as u8, second as u8, count))
-        })
+    pub(super) fn iter_non_zero(&self) -> RawBigramNonZeroIter<'_, Count> {
+        RawBigramNonZeroIter {
+            raw: &self.follow,
+            second: 0,
+            first: 0,
+        }
+    }
+}
+
+/// An iterator over all non-zero counts.
+pub(super) struct RawBigramNonZeroIter<'raw, Count> {
+    /// The raw counts used by the iterator.
+    raw: &'raw [[Count; 256]; 256],
+    /// The current `second` value.
+    second: usize,
+    /// The current `first` value.
+    first: usize,
+}
+
+impl<'raw, Count> Iterator for RawBigramNonZeroIter<'raw, Count>
+where
+    Count: Copy,
+    u64: From<Count>,
+{
+    type Item = (u8, u8, u64);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.second == 256 {
+            return None;
+        }
+
+        if self.first < 256 {
+            let old_first = self.first;
+            self.first += 1;
+
+            Some((
+                old_first as u8,
+                self.second as u8,
+                u64::from(self.raw[self.second][old_first]),
+            ))
+        } else {
+            let old_second = self.second;
+            self.second += 1;
+            self.first = 0;
+
+            Some((0, self.second as u8, u64::from(self.raw[old_second][0])))
+        }
     }
 }
 
@@ -120,10 +161,26 @@ impl SmallRawBigrams {
     }
 
     /// Iterates over all non-zero counts.
-    pub(super) fn iter_non_zero(&self) -> impl Iterator<Item = (u8, u8, u16)> {
-        self.follow
-            .iter()
-            .map(|(&(second, first), &val)| (first, second, val))
+    pub(super) fn iter_non_zero(&self) -> RawSmallBigramNonZeroIter<'_> {
+        RawSmallBigramNonZeroIter {
+            iter: self.follow.iter(),
+        }
+    }
+}
+
+/// An iterator over all non-zero counts.
+pub(super) struct RawSmallBigramNonZeroIter<'raw> {
+    /// The underlying iterator.
+    iter: std::collections::btree_map::Iter<'raw, (u8, u8), u16>,
+}
+
+impl<'raw> Iterator for RawSmallBigramNonZeroIter<'raw> {
+    type Item = (u8, u8, u64);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next()
+            .map(|(&(second, first), &count)| (first, second, u64::from(count)))
     }
 }
 

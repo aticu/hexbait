@@ -83,7 +83,6 @@ fn main() -> eframe::Result {
                 state: State::new(&input),
                 statistics_handler: StatisticsHandler::new(input.try_clone().unwrap()),
                 input,
-                xor_value: 0,
                 parse_type: "none",
                 parse_offset: String::from("0"),
                 sync_parse_offset_to_selection_start: true,
@@ -99,7 +98,6 @@ struct MyApp {
     state: State,
     statistics_handler: StatisticsHandler,
     input: Input,
-    xor_value: u8,
     parse_type: &'static str,
     parse_offset: String,
     sync_parse_offset_to_selection_start: bool,
@@ -218,17 +216,15 @@ impl eframe::App for MyApp {
                                 .into_result_with_quality()
                                 .unwrap()
                                 .unwrap_or_else(|| (Statistics::empty_for_window(window), 0.0));
-                            let signature = statistics.to_signature();
                             let rect = ui.max_rect().intersect(ui.cursor());
 
                             ui.vertical(|ui| {
-                                hexbait::gui::signature_display::render(
-                                    &mut self.state.cached_signature_display,
+                                hexbait::gui::statistics_display::render(
+                                    &mut self.state.statistics_display_state,
                                     ui,
                                     rect,
                                     window,
-                                    &signature,
-                                    self.xor_value,
+                                    &statistics,
                                     quality,
                                     &self.state.settings,
                                 );
@@ -237,8 +233,11 @@ impl eframe::App for MyApp {
                                 ui.spacing_mut().slider_width =
                                     self.state.settings.font_size() * 20.0;
                                 ui.add(
-                                    egui::Slider::new(&mut self.xor_value, 0..=255)
-                                        .text("xor value"),
+                                    egui::Slider::new(
+                                        &mut self.state.statistics_display_state.xor_value,
+                                        0..=255,
+                                    )
+                                    .text("xor value"),
                                 );
                                 ui.spacing_mut().slider_width = old;
 

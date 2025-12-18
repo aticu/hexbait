@@ -99,75 +99,60 @@ impl Statistics {
         FlatStatistics::from_bigrams(self)
     }
 
-    /// Converts the statistics to a signature.
-    pub fn to_signature(&self) -> Signature {
-        let mut output = Box::new([[0; 256]; 256]);
-
-        // first calculate some statistics
-        let mut nonzero_count = 0;
-        let mut sum = 0;
-        let mut max = 0;
+    /// Returns the number of times that `first` is followed by `second` in the statistics.
+    pub fn follow(&self, first: u8, second: u8) -> u64 {
         match &self.statistics {
-            StatisticsKind::Large(raw_statistics) => {
-                for (_, _, count) in raw_statistics.iter_non_zero() {
-                    if count > max {
-                        max = count;
-                    }
-                    nonzero_count += 1;
-                    sum += count;
-                }
-            }
+            StatisticsKind::Large(raw_statistics) => raw_statistics.follow(first, second),
             StatisticsKind::Medium(raw_statistics) => {
-                for (_, _, count) in raw_statistics.iter_non_zero() {
-                    let count = u64::from(count);
-                    if count > max {
-                        max = count;
-                    }
-                    nonzero_count += 1;
-                    sum += count;
-                }
+                u64::from(raw_statistics.follow(first, second))
             }
             StatisticsKind::Small(raw_statistics) => {
-                for (_, _, count) in raw_statistics.iter_non_zero() {
-                    let count = u64::from(count);
-                    if count > max {
-                        max = count;
-                    }
-                    nonzero_count += 1;
-                    sum += count;
+                u64::from(raw_statistics.follow(first, second))
+            }
+        }
+    }
+
+    /// Iterates over all non-zero values in this statistic.
+    pub fn iter_non_zero(&self) -> impl Iterator<Item = (u8, u8, u64)> {
+        enum IterKind<'this> {
+            Small(raw_bigrams::RawSmallBigramNonZeroIter<'this>),
+            Medium(raw_bigrams::RawBigramNonZeroIter<'this, u32>),
+            Large(raw_bigrams::RawBigramNonZeroIter<'this, u64>),
+        }
+
+        impl<'this> Iterator for IterKind<'this> {
+            type Item = (u8, u8, u64);
+
+            fn next(&mut self) -> Option<Self::Item> {
+                match self {
+                    IterKind::Small(iter) => iter.next(),
+                    IterKind::Medium(iter) => iter.next(),
+                    IterKind::Large(iter) => iter.next(),
                 }
             }
         }
 
-        // the mean scaled as a value between 0 and 1
-        let mean = sum as f64 / nonzero_count as f64 / max as f64;
+        match &self.statistics {
+            StatisticsKind::Large(raw_bigrams) => IterKind::Large(raw_bigrams.iter_non_zero()),
+            StatisticsKind::Medium(raw_bigrams) => IterKind::Medium(raw_bigrams.iter_non_zero()),
+            StatisticsKind::Small(raw_bigrams) => IterKind::Small(raw_bigrams.iter_non_zero()),
+        }
+    }
 
-        // compute gamma such that the mean will get a middle color
-        let gamma = 0.5f64.log2() / mean.log2();
-
-        for first in 0..=255 {
-            for second in 0..=255 {
-                // scale the number as a value between 0 and 1
-                let num = match &self.statistics {
-                    StatisticsKind::Large(raw_statistics) => raw_statistics.follow(first, second),
-                    StatisticsKind::Medium(raw_statistics) => {
-                        u64::from(raw_statistics.follow(first, second))
-                    }
-                    StatisticsKind::Small(raw_statistics) => {
-                        u64::from(raw_statistics.follow(first, second))
-                    }
-                } as f64
-                    / max as f64;
-
-                // apply gamma correction
-                let scaled_num = num.powf(gamma);
-
-                // save the output
-                output[first as usize][second as usize] = (scaled_num * 255.0).round() as u8;
+    /// Adds the given count to the given tuple.
+    ///
+    /// This function only produces correct results under the assumption that this will not
+    /// overflow the underlying storage.
+    fn add_fitting_count(&mut self, first: u8, second: u8, count: u64) {
+        match &mut self.statistics {
+            StatisticsKind::Large(raw_bigrams) => raw_bigrams.add_count(first, second, count),
+            StatisticsKind::Medium(raw_bigrams) => {
+                raw_bigrams.add_count(first, second, count as u32)
+            }
+            StatisticsKind::Small(raw_bigrams) => {
+                raw_bigrams.add_count(first, second, count as u16)
             }
         }
-
-        Signature { values: output }
     }
 }
 
@@ -203,56 +188,11 @@ impl AddAssign<&Statistics> for Statistics {
         // TODO: This only works under the assumption that the left statistics instance is large
         // enough to fit both. It should be upgraded to a larger variant if that is not the case.
 
-        match (&mut self.statistics, &rhs.statistics) {
-            (StatisticsKind::Large(this), StatisticsKind::Large(other)) => {
-                for (first, second, val) in other.iter_non_zero() {
-                    this.add_count(first, second, val);
-                }
-            }
-            (StatisticsKind::Large(this), StatisticsKind::Medium(other)) => {
-                for (first, second, val) in other.iter_non_zero() {
-                    this.add_count(first, second, u64::from(val));
-                }
-            }
-            (StatisticsKind::Medium(this), StatisticsKind::Medium(other)) => {
-                for (first, second, val) in other.iter_non_zero() {
-                    this.add_count(first, second, val);
-                }
-            }
-            (StatisticsKind::Large(this), StatisticsKind::Small(other)) => {
-                for (first, second, val) in other.iter_non_zero() {
-                    this.add_count(first, second, u64::from(val));
-                }
-            }
-            (StatisticsKind::Medium(this), StatisticsKind::Small(other)) => {
-                for (first, second, val) in other.iter_non_zero() {
-                    this.add_count(first, second, u32::from(val));
-                }
-            }
-            (StatisticsKind::Small(this), StatisticsKind::Small(other)) => {
-                for (first, second, val) in other.iter_non_zero() {
-                    this.add_count(first, second, val);
-                }
-            }
-            (StatisticsKind::Medium(_), StatisticsKind::Large(_))
-            | (StatisticsKind::Small(_), StatisticsKind::Large(_))
-            | (StatisticsKind::Small(_), StatisticsKind::Medium(_)) => {
-                unreachable!("trying to add a non-fitting statistic")
-            }
-        };
+        for (first, second, count) in rhs.iter_non_zero() {
+            self.add_fitting_count(first, second, count);
+        }
 
         self.window = window;
         self.first_byte = self.first_byte.or(rhs.first_byte);
-    }
-}
-
-// TODO: document
-pub struct Signature {
-    values: Box<[[u8; 256]; 256]>,
-}
-
-impl Signature {
-    pub fn tuple(&self, first: u8, second: u8) -> u8 {
-        self.values[first as usize][second as usize]
     }
 }
