@@ -70,12 +70,18 @@ fn main() -> eframe::Result {
         Input::Stdin(buf.into())
     };
 
+    let file_name = if let Some(file) = &config.file {
+        file.display().to_string()
+    } else {
+        String::from("stdin")
+    };
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_maximized(true),
         ..Default::default()
     };
     eframe::run_native(
-        "hexbait",
+        &format!("hexbait: {file_name}"),
         options,
         Box::new(|_| {
             Ok(Box::new(MyApp {
