@@ -18,3 +18,4 @@ aho-corasick = { version = "1.1.4", default-features = false }
 clap = { version = "4.5.51", features = ["derive"] }
 hexbait-common = { path = "../hexbait-common" }
 hexbait-lang = { path = "../hexbait-lang" }
+hexbait-builtin-parsers = { path = "../hexbait-builtin-parsers" }

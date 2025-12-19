@@ -14,12 +14,12 @@ use std::{
 use clap::Parser;
 use egui::{Align, Layout, RichText, TextStyle, UiBuilder};
 use hexbait::{
-    built_in_format_descriptions::built_in_format_descriptions,
     data::Input,
     gui::marking::{MarkedLocation, MarkingKind},
     state::{DisplayType, State, ViewKind},
     statistics::{Statistics, StatisticsHandler},
 };
+use hexbait_builtin_parsers::built_in_format_descriptions;
 use hexbait_common::AbsoluteOffset;
 
 // TODO: change font to render more characters

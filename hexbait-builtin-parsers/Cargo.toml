@@ -1,0 +1,7 @@
+[package]
+name = "hexbait-builtin-parsers"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hexbait-lang = { path = "../hexbait-lang" }
