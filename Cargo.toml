@@ -5,4 +5,5 @@ members = [
     "hexbait-builtin-parsers",
     "hexbait-common",
     "hexbait-lang",
+    "hexbait-parse",
 ]
