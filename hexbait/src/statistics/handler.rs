@@ -10,7 +10,7 @@ use std::{
 };
 
 use background_thread::{BackgroundThread, Request, RequestKind};
-use hexbait_common::{AbsoluteOffset, ChangeState, Len};
+use hexbait_common::{AbsoluteOffset, Len, StateChangeFlag};
 use quick_cache::sync::Cache;
 
 use crate::{data::Input, window::Window};
@@ -261,15 +261,15 @@ impl StatisticsHandler {
     /// Signals to the statistics handler that a frame has ended.
     ///
     /// The `changed` parameter corresponds to the change state of the scrollbars.
-    pub fn end_of_frame(&mut self, changed: ChangeState) {
+    pub fn end_of_frame(&mut self, changed: StateChangeFlag) {
         match changed {
-            ChangeState::Changed => {
+            StateChangeFlag::Changed => {
                 self.requests
                     .send(background_thread::Message::ClearRequests)
                     .unwrap();
                 self.send_requests = true;
             }
-            ChangeState::Unchanged => {
+            StateChangeFlag::Unchanged => {
                 self.send_requests =
                     self.saw_uncompleteness.get() && self.empty_queue.load(Ordering::Relaxed);
                 self.saw_uncompleteness.set(false);

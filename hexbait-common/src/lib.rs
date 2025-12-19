@@ -7,9 +7,17 @@ mod endianness;
 mod quantities;
 
 /// Indicates whether something changed or remained the same between frames.
-pub enum ChangeState {
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum StateChangeFlag {
     /// The state in question remained unchanged.
     Unchanged,
     /// The state in question changed.
     Changed,
+}
+
+impl StateChangeFlag {
+    /// Whether the state was changed.
+    pub fn is_changed(self) -> bool {
+        self == StateChangeFlag::Changed
+    }
 }

@@ -2,7 +2,7 @@
 
 use std::hash::{Hash as _, Hasher as _};
 
-use hexbait_common::{AbsoluteOffset, ChangeState, Len, RelativeOffset};
+use hexbait_common::{AbsoluteOffset, Len, RelativeOffset, StateChangeFlag};
 
 use crate::{
     data::Input,
@@ -136,12 +136,12 @@ impl ScrollState {
     }
 
     /// Determines if the scrollbar selection state changed since the last call to this method.
-    pub fn changed(&self) -> ChangeState {
+    pub fn changed(&self) -> StateChangeFlag {
         let state = self.selection_state();
 
         match self.prev_selection_state == state {
-            true => ChangeState::Unchanged,
-            false => ChangeState::Changed,
+            true => StateChangeFlag::Unchanged,
+            false => StateChangeFlag::Changed,
         }
     }
 

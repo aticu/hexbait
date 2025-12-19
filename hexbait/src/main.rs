@@ -186,12 +186,6 @@ impl eframe::App for MyApp {
                     });
             });
 
-            if jump_to_offset
-                && let Ok(offset) = self.parse_offset.parse().map(AbsoluteOffset::from)
-            {
-                self.state.scroll_state.rearrange_bars_for_point(0, offset);
-            }
-
             let mut parse_offset = self.parse_offset.parse().ok().map(AbsoluteOffset::from);
 
             ui.scope_builder(
@@ -344,6 +338,12 @@ impl eframe::App for MyApp {
                                 &mut self.state.marked_locations,
                             );
                         }
+                    }
+
+                    if jump_to_offset
+                        && let Ok(offset) = self.parse_offset.parse().map(AbsoluteOffset::from)
+                    {
+                        self.state.scroll_state.rearrange_bars_for_point(0, offset);
                     }
 
                     self.statistics_handler
