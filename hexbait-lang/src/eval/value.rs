@@ -130,7 +130,7 @@ impl ValueKind {
     pub fn expect_bool(&self) -> bool {
         match self {
             ValueKind::Boolean(value) => *value,
-            _ => unreachable!("impossible because of static analysis"),
+            _ => unreachable!("expected a boolean value"),
         }
     }
 
@@ -142,7 +142,7 @@ impl ValueKind {
     pub fn expect_int(&self) -> &Int {
         match self {
             ValueKind::Integer(value) => value,
-            _ => unreachable!("impossible because of static analysis"),
+            _ => unreachable!("expected an integer value"),
         }
     }
 
@@ -154,7 +154,7 @@ impl ValueKind {
     pub fn expect_float(&self) -> f64 {
         match self {
             ValueKind::Float(value) => *value,
-            _ => unreachable!("impossible because of static analysis"),
+            _ => unreachable!("expected a float value"),
         }
     }
 
@@ -166,7 +166,7 @@ impl ValueKind {
     pub fn expect_bytes(&self) -> &[u8] {
         match self {
             ValueKind::Bytes(value) => value,
-            _ => unreachable!("impossible because of static analysis"),
+            _ => unreachable!("expected a bytes value"),
         }
     }
 
@@ -175,10 +175,22 @@ impl ValueKind {
     /// # Panics
     /// This function will panic if the value is not a struct.
     #[track_caller]
-    pub fn expect_struct(&self) -> &Vec<(Symbol, Value)> {
+    pub fn expect_struct(&self) -> &[(Symbol, Value)] {
         match self {
             ValueKind::Struct { fields, .. } => fields,
-            _ => unreachable!("impossible because of static analysis"),
+            _ => unreachable!("expected a struct value"),
+        }
+    }
+
+    /// Expects the value to be an array, panicking if this is false.
+    ///
+    /// # Panics
+    /// This function will panic if the value is not an array.
+    #[track_caller]
+    pub fn expect_array(&self) -> &[Value] {
+        match self {
+            ValueKind::Array { items, .. } => items,
+            _ => unreachable!("expected an array value"),
         }
     }
 }
