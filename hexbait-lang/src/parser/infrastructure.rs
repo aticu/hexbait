@@ -188,7 +188,20 @@ impl<'src> Parser<'src> {
     }
 
     /// Expects a contextual keyword, returning the text of the keyword.
-    pub(crate) fn expect_contextual_kw(&mut self) -> Option<&str> {
+    #[track_caller]
+    pub(crate) fn expect_peek_contextual_kw(&mut self) -> Option<&str> {
+        if self.at(TokenKind::Identifier) {
+            let span = self.tokens[self.pos].span;
+
+            Some(&self.src[span.start..span.end])
+        } else {
+            todo!("better error message here")
+        }
+    }
+
+    /// Expects a contextual keyword, returning the text of the keyword.
+    #[track_caller]
+    pub(crate) fn expect_and_bump_contextual_kw(&mut self) -> Option<&str> {
         if self.at(TokenKind::Identifier) {
             let span = self.tokens[self.pos].span;
 

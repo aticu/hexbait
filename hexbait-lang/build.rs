@@ -54,7 +54,19 @@ fn main() {
 
                 ImplKind::Struct
             }
-            Rule::Node(_) => panic!("top level nodes not supported"),
+            Rule::Node(node) => {
+                let name = &grammar[*node].name;
+                let method_name = method_name(name);
+                impl_body.push_str(&format!(
+                    r#"
+    /// Returns the child node.
+    pub fn {method_name}(&self) -> Option<{name}> {{
+        children(self.syntax()).next()
+    }}"#,
+                ));
+
+                ImplKind::Struct
+            }
             Rule::Token(_) => {
                 impl_body.push_str(
                     r#"

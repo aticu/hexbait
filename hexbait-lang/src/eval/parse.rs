@@ -6,8 +6,8 @@ use crate::{
     Int, Span,
     eval::parse::diagnostics::ParseErrWithMaybePartialResult,
     ir::{
-        BinOp, Declaration, Expr, ExprKind, File, LetStatement, Lit, ParseType, ParseTypeKind,
-        RepeatKind, StructContent, StructField, Symbol, UnOp,
+        BinOp, Declaration, ElsePart, Expr, ExprKind, File, IfChain, LetStatement, Lit, ParseType,
+        ParseTypeKind, RepeatKind, StructContent, StructField, Symbol, UnOp,
     },
 };
 
@@ -529,6 +529,9 @@ impl<'src> Scope<'src> {
                     scope.eval_single_struct_content(single_content, struct_ctx, parse_ctx)?;
                 }
             }
+            Declaration::If(if_chain) => {
+                self.eval_if_chain(if_chain, struct_ctx, parse_ctx)?;
+            }
             Declaration::Assert { condition, message } => {
                 let condition_value =
                     self.eval_expr(condition, struct_ctx, parse_ctx, Default::default())?;
@@ -597,6 +600,40 @@ impl<'src> Scope<'src> {
                             span: at.span,
                         })
                         .into());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Evaluates the given `if` chain.
+    fn eval_if_chain(
+        &mut self,
+        if_chain: &IfChain,
+        struct_ctx: &mut StructContext,
+        parse_ctx: &mut ParseContext,
+    ) -> Result<(), ParseErrWithMaybePartialResult> {
+        let condition = self.eval_expr(
+            &if_chain.condition,
+            struct_ctx,
+            parse_ctx,
+            Default::default(),
+        )?;
+
+        if condition.kind.expect_bool() {
+            for single_content in &if_chain.then_block {
+                self.eval_single_struct_content(single_content, struct_ctx, parse_ctx)?;
+            }
+        } else if let Some(else_part) = &if_chain.else_part {
+            match else_part {
+                ElsePart::IfChain(if_chain) => {
+                    self.eval_if_chain(if_chain, struct_ctx, parse_ctx)?;
+                }
+                ElsePart::ElseBlock(else_block) => {
+                    for single_content in else_block {
+                        self.eval_single_struct_content(single_content, struct_ctx, parse_ctx)?;
+                    }
                 }
             }
         }

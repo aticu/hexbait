@@ -115,8 +115,12 @@ attributes [{
                 allocated_data_size u64;
                 data_size u64;
                 valid_data_size u64;
-                total_allocated_size u64;
-                content bytes len $parent.size - 72;
+                !if compression_unit_size > 0 {
+                    total_allocated_size u64;
+                }
+
+                !seek to data_runs_offset;
+                content bytes len $parent.size - data_runs_offset;
             },
         };
     }

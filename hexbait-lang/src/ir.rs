@@ -125,6 +125,7 @@ pub enum Declaration {
         /// The content of the scope.
         content: Vec<StructContent>,
     },
+    If(IfChain),
     /// Asserts that the given expression is true.
     Assert {
         /// The condition that needs to hold.
@@ -144,6 +145,26 @@ pub enum Declaration {
         /// The offset at which to recover.
         at: Expr,
     },
+}
+
+/// A chain of `if` statements.
+#[derive(Debug)]
+pub struct IfChain {
+    /// The condition that decides which branch to take.
+    pub condition: Expr,
+    /// The content to parse if the condition is true.
+    pub then_block: Vec<StructContent>,
+    /// The else part of the if chain.
+    pub else_part: Option<ElsePart>,
+}
+
+/// The `else` part of an if chain.
+#[derive(Debug)]
+pub enum ElsePart {
+    /// An else block that is the end of the chain.
+    ElseBlock(Vec<StructContent>),
+    /// Another nested if chain.
+    IfChain(Box<IfChain>),
 }
 
 /// A description of a parsing type.

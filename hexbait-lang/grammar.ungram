@@ -10,12 +10,16 @@ StructContent =
 | Struct
 | LetStatement
 
+StructBlock =
+  '{' StructContent* '}'
+
 Declaration =
   EndiannessDeclaration
 | AlignDeclaration
 | SeekByDeclaration
 | SeekToDeclaration
 | ScopeAtDeclaration
+| IfDeclaration
 | AssertDeclaration
 | WarnIfDeclaration
 | RecoveryDeclaration
@@ -33,7 +37,20 @@ SeekToDeclaration =
   '!' 'seek' 'to' amount:Expr ';'
 
 ScopeAtDeclaration =
-  '!' 'scope' 'at' start:Expr ('until' end:Expr)? '{' StructContent* '}'
+  '!' 'scope' 'at' start:Expr ('until' end:Expr)? StructBlock
+
+IfDeclaration = 
+  '!' IfChain
+
+IfChain =
+  'if' condition:Expr then_block:StructBlock ('else' ElsePart)?
+
+ElsePart =
+  IfChain
+| ElseBlock
+
+ElseBlock =
+  StructBlock
 
 AssertDeclaration =
   '!' 'assert' Expr (':' message:Expr)? ';'
@@ -64,7 +81,7 @@ RepeatParseType =
   '[' ty:ParseType ']' repetition:RepeatDecl
 
 AnonymousStructParseType =
-  '{' StructContent* '}'
+  StructBlock
 
 SwitchParseType =
   'switch' scrutinee:Expr '{' SwitchParseTypeArm* '_' '=' '>' default:ParseType ','? '}'
@@ -83,7 +100,7 @@ RepeatWhileDecl =
   'while' condition:Expr
 
 Struct =
-  'struct' name:'ident' '{' StructContent* '}'
+  'struct' name:'ident' StructBlock
 
 LetStatement =
   'let' name:'ident' '=' Expr ';'

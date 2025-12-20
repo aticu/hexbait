@@ -36,19 +36,26 @@ fn struct_content<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
     }
 }
 
-/// Parses a `struct`.
-fn r#struct<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
+/// Parses a struct block (`{` StructContent* `}`).
+fn struct_block<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
     let m = p.start();
-
-    p.expect(TokenKind::StructKw);
-    p.expect(TokenKind::Identifier);
     p.expect(TokenKind::LBrace);
 
     while p.cur().is_some_and(|t| t != TokenKind::RBrace) {
         struct_content(p);
     }
 
-    p.complete_after(m, NodeKind::Struct, TokenKind::RBrace)
+    p.complete_after(m, NodeKind::StructBlock, TokenKind::RBrace)
+}
+
+/// Parses a `struct`.
+fn r#struct<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
+    let m = p.start();
+
+    p.expect(TokenKind::StructKw);
+    p.expect(TokenKind::Identifier);
+
+    struct_block(p).and_complete(m, NodeKind::Struct)
 }
 
 /// Parses a `let` statement.
@@ -64,33 +71,79 @@ fn r#let<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
     p.complete_after(m, NodeKind::LetStatement, TokenKind::Semicolon)
 }
 
+/// Parses an `if` chain.
+fn if_chain<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
+    let m = p.start();
+
+    if p.expect_and_bump_contextual_kw() != Some("if") {
+        todo!()
+    }
+
+    expr(p);
+
+    // handle trivia manually here to satisfy the borrow checker (we may or may not need to parse
+    // further things before finishing)
+    struct_block(p).handle_trivia_manually();
+
+    let else_is_next_token = p
+        .peek()
+        .next()
+        .map(|(index, _)| p.text_at(index) == Some("else"))
+        .unwrap_or(false);
+
+    if else_is_next_token {
+        // bump trivia first
+        p.trivia_bumper().bump();
+
+        p.bump();
+
+        let m_else_part = p.start();
+
+        if p.at_contextual_kw("if") {
+            if_chain(p)
+        } else {
+            struct_block(p).and_complete(m_else_part, NodeKind::ElseBlock)
+        }
+        .and_complete(m_else_part, NodeKind::ElsePart)
+        .and_complete(m, NodeKind::IfChain)
+    } else {
+        // complete the chain without bumping trivia
+        let completed = p.complete(m, NodeKind::IfChain);
+
+        // then use the finished marker to create a trivia bumper again
+        p.completed_from_marker(completed)
+    }
+}
+
 /// Parses a declaration.
 fn decl<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
     let m = p.start();
     p.expect(TokenKind::ExclamationMark);
 
-    // The final token after which the declaration is done parsing.
-    let mut final_token = TokenKind::Semicolon;
-
-    let kind = match p.expect_contextual_kw() {
+    match p.expect_peek_contextual_kw() {
         Some("endian") => {
-            match p.expect_contextual_kw() {
+            p.bump();
+            match p.expect_and_bump_contextual_kw() {
                 Some("le") | Some("be") => (),
                 _ => todo!("error"),
             }
-            NodeKind::EndiannessDeclaration
+
+            p.complete_after(m, NodeKind::EndiannessDeclaration, TokenKind::Semicolon)
         }
         Some("seek") => {
-            let kind = match p.expect_contextual_kw() {
+            p.bump();
+            let kind = match p.expect_and_bump_contextual_kw() {
                 Some("by") => NodeKind::SeekByDeclaration,
                 Some("to") => NodeKind::SeekToDeclaration,
                 _ => todo!("error"),
             };
             expr(p);
-            kind
+
+            p.complete_after(m, kind, TokenKind::Semicolon)
         }
         Some("scope") => {
-            let kind = match p.expect_contextual_kw() {
+            p.bump();
+            let kind = match p.expect_and_bump_contextual_kw() {
                 Some("at") => NodeKind::ScopeAtDeclaration,
                 _ => todo!("error"),
             };
@@ -102,31 +155,27 @@ fn decl<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
                 expr(p);
             }
 
-            p.expect(TokenKind::LBrace);
-            while let Some(kind) = p.cur()
-                && kind != TokenKind::RBrace
-            {
-                struct_content(p);
-            }
-
-            final_token = TokenKind::RBrace;
-
-            kind
+            struct_block(p).and_complete(m, kind)
         }
+        Some("if") => if_chain(p).and_complete(m, NodeKind::IfDeclaration),
         Some("align") => {
+            p.bump();
             expr(p);
-            NodeKind::AlignDeclaration
+
+            p.complete_after(m, NodeKind::AlignDeclaration, TokenKind::Semicolon)
         }
         Some("assert") => {
+            p.bump();
             expr(p);
             if p.at(TokenKind::Colon) {
                 p.expect(TokenKind::Colon);
                 expr(p);
             }
 
-            NodeKind::AssertDeclaration
+            p.complete_after(m, NodeKind::AssertDeclaration, TokenKind::Semicolon)
         }
         Some("warn") => {
+            p.bump();
             if p.at_contextual_kw("if") {
                 p.bump();
             } else {
@@ -139,9 +188,10 @@ fn decl<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
                 expr(p);
             }
 
-            NodeKind::WarnIfDeclaration
+            p.complete_after(m, NodeKind::WarnIfDeclaration, TokenKind::Semicolon)
         }
         Some("recover") => {
+            p.bump();
             if p.at_contextual_kw("at") {
                 p.bump();
             } else {
@@ -150,12 +200,10 @@ fn decl<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
 
             expr(p);
 
-            NodeKind::RecoveryDeclaration
+            p.complete_after(m, NodeKind::RecoveryDeclaration, TokenKind::Semicolon)
         }
-        _ => todo!(),
-    };
-
-    p.complete_after(m, kind, final_token)
+        _ => todo!("error"),
+    }
 }
 
 /// Parses a struct field.
@@ -196,11 +244,7 @@ fn parse_type_raw<'p, 'src>(p: &'p mut Parser<'src>, nested: bool) -> Completed<
             }
         }
         Some(TokenKind::LBrace) => {
-            p.expect(TokenKind::LBrace);
-            while p.cur().is_some_and(|t| t != TokenKind::RBrace) {
-                struct_content(p);
-            }
-            p.complete_after(m, NodeKind::AnonymousStructParseType, TokenKind::RBrace)
+            struct_block(p).and_complete(m, NodeKind::AnonymousStructParseType)
         }
         Some(TokenKind::Identifier) => {
             p.complete_after(m, NodeKind::NamedParseType, TokenKind::Identifier)
@@ -250,7 +294,7 @@ fn parse_type_raw<'p, 'src>(p: &'p mut Parser<'src>, nested: bool) -> Completed<
 fn repeat_decl<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
     let m = p.start();
 
-    match p.expect_contextual_kw() {
+    match p.expect_and_bump_contextual_kw() {
         Some("len") => expr(p).and_complete(m, NodeKind::RepeatLenDecl),
         Some("while") => expr(p).and_complete(m, NodeKind::RepeatWhileDecl),
         _ => todo!("error"),

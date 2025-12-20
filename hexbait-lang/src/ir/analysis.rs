@@ -26,5 +26,6 @@ pub fn check_ir(_file: &File) -> Result<ResolvedNames, AnalysisError> {
     // TODO: ensure assertion and warning messages are utf8
     // TODO: ensure that $last is only used if $len > 0
     // TODO: ensure that $parent, $last and $len are only used in correct contexts
+    // TODO: ensure sensible behavior about struct nested in scopes and if declarations
     Ok(ResolvedNames {})
 }

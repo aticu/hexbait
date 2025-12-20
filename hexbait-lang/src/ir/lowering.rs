@@ -4,7 +4,7 @@ use crate::{
     Int,
     ast::{self, AstNode as _},
     int_from_str,
-    ir::ParseTypeKind,
+    ir::{ElsePart, IfChain, ParseTypeKind},
     lexer::TokenKind,
     span::Span,
 };
@@ -167,10 +167,9 @@ impl LoweringCtx {
                 }
             }
             ast::ParseType::AnonymousStructParseType(struct_parse_type) => {
-                let content = struct_parse_type.struct_content().map(|content| self.lower_struct_content(content)).collect();
-
                 ParseTypeKind::Struct {
-                    content,
+                    content: required_field!(struct_parse_type => struct_block ? self: "expected struct block" => ParseTypeKind::Error)
+                        .struct_content().map(|content| self.lower_struct_content(content)).collect(),
                 }
             }
             ast::ParseType::SwitchParseType(switch_parse_type) => {
@@ -451,6 +450,7 @@ impl LoweringCtx {
             ast::Declaration::ScopeAtDeclaration(scope_at) => {
                 self.lower_scope_at_declaration(scope_at)
             }
+            ast::Declaration::IfDeclaration(if_decl) => self.lower_if_declaration(if_decl),
             ast::Declaration::AssertDeclaration(assert) => self.lower_assert_declaration(assert),
             ast::Declaration::WarnIfDeclaration(warn_if) => self.lower_warn_if_declaration(warn_if),
             ast::Declaration::RecoveryDeclaration(recovery) => {
@@ -520,7 +520,11 @@ impl LoweringCtx {
         let end = scope_at.end().map(|expr| self.lower_expr(expr));
         let mut content = Vec::new();
 
-        for single_content in scope_at.struct_content() {
+        for single_content in scope_at
+            .struct_block()
+            .iter()
+            .flat_map(|block| block.struct_content())
+        {
             content.push(self.lower_struct_content(single_content));
         }
 
@@ -528,6 +532,44 @@ impl LoweringCtx {
             start,
             end,
             content,
+        })
+    }
+
+    /// Lowers the given AST `if` declaration to IR.
+    fn lower_if_declaration(&mut self, if_decl: ast::IfDeclaration) -> Option<Declaration> {
+        Some(Declaration::If(self.lower_if_chain(
+            required_field!(if_decl => if_chain ? self: "expected if chain" => None),
+        )?))
+    }
+
+    /// Lowers the given AST `if` chain to IR.
+    fn lower_if_chain(&mut self, if_chain: ast::IfChain) -> Option<IfChain> {
+        let condition = self.lower_expr(
+            required_field!(if_chain => condition ? self: "expected if condition" => None),
+        );
+        let then_block = required_field!(if_chain => then_block ? self: "expected block" => None)
+            .struct_content()
+            .map(|content| self.lower_struct_content(content))
+            .collect();
+
+        let else_part = if_chain.else_part().and_then(|else_part| {
+            Some(match else_part {
+                ast::ElsePart::IfChain(if_chain) => {
+                    ElsePart::IfChain(Box::new(self.lower_if_chain(if_chain)?))
+                }
+                ast::ElsePart::ElseBlock(else_block) => ElsePart::ElseBlock(
+                    required_field!(else_block => struct_block ? self: "expected block" => None)
+                        .struct_content()
+                        .map(|content| self.lower_struct_content(content))
+                        .collect(),
+                ),
+            })
+        });
+
+        Some(IfChain {
+            condition,
+            then_block,
+            else_part,
         })
     }
 

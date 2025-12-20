@@ -89,6 +89,8 @@ pub enum NodeKind {
     StructField,
     /// Defines a new computed value.
     LetStatement,
+    /// A block of struct contents.
+    StructBlock,
 
     // Parse types
     /// A parse type that is a single identifier.
@@ -110,6 +112,14 @@ pub enum NodeKind {
     /// A repetition until a condition is met.
     RepeatWhileDecl,
 
+    // Conditional parsing
+    /// A chain of one or more if statements.
+    IfChain,
+    /// An `else` block or an `else if` chain continuation.
+    ElsePart,
+    /// An `else` block.
+    ElseBlock,
+
     // Declarations
     /// A declaration of endianness like `!endian le`.
     EndiannessDeclaration,
@@ -121,6 +131,8 @@ pub enum NodeKind {
     SeekByDeclaration,
     /// A declaration that parsing should continue in another scope that starts at a given offset.
     ScopeAtDeclaration,
+    /// A declaration to parse contained fields only if a condition is true.
+    IfDeclaration,
     /// A declaration asserting that an expression is true like `!assert size > 4`.
     AssertDeclaration,
     /// A declaration warns if the expression is true like `!warn if size > 4: "expected small size"`.
