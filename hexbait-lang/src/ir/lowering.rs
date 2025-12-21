@@ -398,6 +398,8 @@ impl LoweringCtx {
             "&" => BinOp::BitAnd,
             "|" => BinOp::BitOr,
             "^" => BinOp::BitXor,
+            "<<" => BinOp::ShiftLeft,
+            ">>" => BinOp::ShiftRight,
             _ => parser_unreachable!(),
         };
 

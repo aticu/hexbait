@@ -188,7 +188,7 @@ impl PrefixOp {
     /// Returns the binding powers of this operator.
     fn binding_power(&self) -> ((), u8) {
         match self {
-            PrefixOp::Neg | PrefixOp::Plus | PrefixOp::Not => ((), 17),
+            PrefixOp::Neg | PrefixOp::Plus | PrefixOp::Not => ((), 19),
         }
     }
 }
@@ -226,6 +226,10 @@ enum InfixOp {
     BitOr,
     /// `^`
     BitXor,
+    /// `<<`
+    ShiftLeft,
+    /// `>>`
+    ShiftRight,
 }
 
 impl InfixOp {
@@ -258,6 +262,12 @@ impl InfixOp {
                 if i1 + 1 == i2 =>
             {
                 Some(InfixOp::LogicalOr)
+            }
+            (Some((i1, TokenKind::LAngle)), Some((i2, TokenKind::LAngle))) if i1 + 1 == i2 => {
+                Some(InfixOp::ShiftLeft)
+            }
+            (Some((i1, TokenKind::RAngle)), Some((i2, TokenKind::RAngle))) if i1 + 1 == i2 => {
+                Some(InfixOp::ShiftRight)
             }
 
             // single character operators
@@ -312,6 +322,14 @@ impl InfixOp {
             InfixOp::BitAnd => TokenKind::Ampersand,
             InfixOp::BitOr => TokenKind::VerticalLine,
             InfixOp::BitXor => TokenKind::Caret,
+            InfixOp::ShiftLeft => {
+                p.expect(TokenKind::LAngle);
+                TokenKind::LAngle
+            }
+            InfixOp::ShiftRight => {
+                p.expect(TokenKind::RAngle);
+                TokenKind::RAngle
+            }
         };
 
         p.complete_after(m, NodeKind::Op, final_token);
@@ -320,8 +338,8 @@ impl InfixOp {
     /// Returns the binding powers of this operator.
     fn binding_power(&self) -> (u8, u8) {
         match self {
-            InfixOp::Add | InfixOp::Sub => (13, 14),
-            InfixOp::Mul | InfixOp::Div => (15, 16),
+            InfixOp::Add | InfixOp::Sub => (15, 16),
+            InfixOp::Mul | InfixOp::Div => (17, 18),
             InfixOp::Eq
             | InfixOp::Neq
             | InfixOp::Gt
@@ -333,6 +351,7 @@ impl InfixOp {
             InfixOp::BitOr => (7, 8),
             InfixOp::BitXor => (9, 10),
             InfixOp::BitAnd => (11, 12),
+            InfixOp::ShiftLeft | InfixOp::ShiftRight => (13, 14),
         }
     }
 }

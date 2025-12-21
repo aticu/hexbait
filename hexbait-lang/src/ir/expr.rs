@@ -61,6 +61,10 @@ pub enum BinOp {
     BitOr,
     /// The bitwise xor operator: `^`.
     BitXor,
+    /// The shift left operator: `<<`.
+    ShiftLeft,
+    /// The shift right operator: `>>`.
+    ShiftRight,
 }
 
 /// An expression.

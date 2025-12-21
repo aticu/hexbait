@@ -11,6 +11,8 @@ pub enum ParseErrKind {
     InputTooShort,
     /// A value that is meant as an offset was too large.
     OffsetTooLarge,
+    /// An arithmetic error occurred while evaluating an expression.
+    ArithmeticError,
     /// An assertion failed.
     AssertionFailure,
     /// An assertion failed.

@@ -120,7 +120,14 @@ attributes [{
                 }
 
                 !seek to data_runs_offset;
-                content bytes len $parent.size - data_runs_offset;
+                data_runs [{
+                    let num_blocks_bytes = peek(u8) & 0xf;
+                    let block_num_bytes = (peek(u8) >> 4) & 0xf;
+                    !seek by 1;
+
+                    num_blocks bytes len num_blocks_bytes;
+                    block_num bytes len block_num_bytes;
+                }] while peek(u8) != 0;
             },
         };
     }

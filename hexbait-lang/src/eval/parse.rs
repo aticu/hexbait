@@ -334,6 +334,7 @@ impl<'src> Scope<'src> {
 
                 enum OpKind {
                     IntOp(fn(&Int, &Int) -> Int),
+                    FallibleIntOp(fn(&Int, &Int) -> Result<Int, String>),
                     CmpOp(fn(&Int, &Int) -> bool),
                     Eq,
                     Neq,
@@ -354,6 +355,16 @@ impl<'src> Scope<'src> {
                     BinOp::BitAnd => OpKind::IntOp(|x, y| x & y),
                     BinOp::BitOr => OpKind::IntOp(|x, y| x | y),
                     BinOp::BitXor => OpKind::IntOp(|x, y| x ^ y),
+                    BinOp::ShiftLeft => OpKind::FallibleIntOp(|x, y| {
+                        u32::try_from(y)
+                            .map_err(|_| "shift offset too large".to_string())
+                            .map(|y| x << y)
+                    }),
+                    BinOp::ShiftRight => OpKind::FallibleIntOp(|x, y| {
+                        u32::try_from(y)
+                            .map_err(|_| "shift offset too large".to_string())
+                            .map(|y| x >> y)
+                    }),
                     BinOp::LogicalAnd | BinOp::LogicalOr => OpKind::BoolRhsIdentity,
                 };
 
@@ -362,6 +373,22 @@ impl<'src> Scope<'src> {
                         kind: ValueKind::Integer(func(lhs.expect_int(), rhs.expect_int())),
                         provenance,
                     },
+                    OpKind::FallibleIntOp(func) => {
+                        let value =
+                            func(lhs.expect_int(), rhs.expect_int()).map_err(|message| {
+                                parse_ctx.new_err(ParseErr {
+                                    message,
+                                    kind: ParseErrKind::ArithmeticError,
+                                    provenance: provenance.clone(),
+                                    span: expr.span,
+                                })
+                            })?;
+
+                        Value {
+                            kind: ValueKind::Integer(value),
+                            provenance,
+                        }
+                    }
                     OpKind::CmpOp(func) => Value {
                         kind: ValueKind::Boolean(func(lhs.expect_int(), rhs.expect_int())),
                         provenance,
