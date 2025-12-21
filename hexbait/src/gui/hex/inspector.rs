@@ -291,5 +291,16 @@ pub(crate) fn render_inspector(
                     });
                 });
             }
+
+            if let Some(ty) = infer::get(buf) {
+                body.row(row_height, |mut row| {
+                    row.col(|ui| {
+                        ui.label("mime type");
+                    });
+                    row.col(|ui| {
+                        ui.label(ty.mime_type());
+                    });
+                });
+            }
         });
 }
