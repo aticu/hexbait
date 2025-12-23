@@ -1,18 +1,36 @@
 // NOTE: the way the code generator is currently implemented is a little wonky, especially around contextual keywords and matching specific tokens.
 // The current implementation works well enough for its purpose, but if you make changes, be sure to carefully check if the generated code does what you expect it to do.
 
+// Trivia tokens between other tokens are ignored. This includes:
+// - White space
+// - Line comments
+// - Block comments (nesting is supported: `/* /* hi */ */` is parsed as a single block comment)
+
+// The hexbait language is organized mostly around `struct`s.
+// A file counts as the body of an unnamed `struct`.
+// Different statements in the body of a `struct` can add fields to the `struct` or trigger other actions such as changing the parsing context.
+// Fields of a `struct` that start with `_` are not propagated to the final output and can thus be used as intermediate values during parsing.
+// In general it is recommended to use this feature sparingly in order to faithfully represent the original structure.
+// It can however be useful in certain situations, for example when the size of a sub-structure is not the first field and needed for parsing but the order of fields should be preserved.
+// In this case the size can be parsed as such: `let _size = peek($offset + offset_of_size)`.
+// Then `_size` can be used internally, but later when the actual field is encountered, the field can be parsed and named as usual.
+
+// The content of an hbl file.
 File =
   StructContent*
 
+// Anything that can be written inside a `struct` (a file is counted as a large `struct` body).
 StructContent =
   Declaration
 | StructField
 | Struct
 | LetStatement
 
+// The block body of a `struct`.
 StructBlock =
   '{' StructContent* '}'
 
+// A declaration does not directly add fields to a struct (but may do so by nesting), but changes other aspects of parsing.
 Declaration =
   EndiannessDeclaration
 | AlignDeclaration
@@ -24,46 +42,73 @@ Declaration =
 | WarnIfDeclaration
 | RecoveryDeclaration
 
+// Declare the endianness that is used for parsing multi-byte values.
 EndiannessDeclaration =
   '!' 'endian' kind:'ident' ';'
 
+// Moves the parsing offset forward until it is aligned with the given alignment.
+// The alignment must be a power of two.
 AlignDeclaration =
   '!' 'align' amount:Expr ';'
 
+// Moves the offset forward by the given amount.
 SeekByDeclaration =
   '!' 'seek' 'by' amount:Expr ';'
 
+// Moves the offset to the given offset.
 SeekToDeclaration =
   '!' 'seek' 'to' amount:Expr ';'
 
+// Declares a new scope in the parser.
+// The scope starts at the offset `start` in the current scope and optionally ends at the offset `end` in the current scope.
+// The parser continues parsing in the sub-scope at the offset `0` (which corresponds to `start` in the current scope).
+// Reading past the offset of the scope from within it will result in an error.
 ScopeAtDeclaration =
   '!' 'scope' 'at' start:Expr ('until' end:Expr)? StructBlock
 
+// Parses the contained fields only if a condition is true.
 IfDeclaration = 
   '!' IfChain
 
+// If the `condition` is true, `then_block` is parsed.
+// Otherwise the optional `else` part is parsed (if present).
 IfChain =
   'if' condition:Expr then_block:StructBlock ('else' ElsePart)?
 
+// An `if`-`else` chain may continue with another `if` or end with an `else` block.
 ElsePart =
   IfChain
 | ElseBlock
 
+// The `else` block is parsed only if all `if` conditions before it evaluated to false.
 ElseBlock =
   StructBlock
 
+// Asserts that the expression evaluates to true.
+// If this is not the case, an error is raised with the optional `message` as an error message.
+// WARNING: Error messages are currently not displayed.
 AssertDeclaration =
   '!' 'assert' Expr (':' message:Expr)? ';'
 
+// Displays a warning if the expression evaluates to true.
+// `message` is used as a warning message if present.
+// WARNING: Warnings are currently not displayed.
 WarnIfDeclaration =
   '!' 'warn' 'if' Expr (':' message:Expr)? ';'
 
+// Instructs the parser where to recover in case an error is encountered.
+// If an error is encountered the unparsed fields of the current `struct` are skipped and the parser will continue at the given offset as if the `struct` finished parsing.
 RecoveryDeclaration =
   '!' 'recover' 'at' Expr ';'
 
+// Describes a field in a struct.
+// The parse type specifies how the field is parsed.
+// The optional expected value is checked against the parsed value if present.
+// If the values differ an error is raised.
 StructField =
   name:'ident' ParseType ( '=' expected:Expr )?
 
+// Describes how a value can be parsed.
 ParseType =
   NamedParseType
 | BytesParseType
@@ -71,40 +116,62 @@ ParseType =
 | AnonymousStructParseType
 | SwitchParseType
 
+// Refers by name to a different parse type by name.
+// This includes signed and unsigned integer types (`uN` and `iN` where `N` is a number respectively).
+// For example `u32` will parse four bytes with the current endianness as a 32-bit unsigned number.
+// WARNING: Currently unimplemented for types other than integers.
 NamedParseType =
   name:'ident'
 
+// Parses a number of bytes.
+// The repeat declaration is only optional if used directly in a `struct` field with an expected value (e.g. `magic bytes = "%PDF"`).
+// In this case it is inferred to be the length of the expected value (the example is equivalent to `magic bytes len 4 = "%PDF"`).
 BytesParseType =
   'bytes' RepeatDecl?
 
+// Parses the type `ty` for a number of times specified by the `repetition` declaration.
 RepeatParseType =
   '[' ty:ParseType ']' repetition:RepeatDecl
 
+// Parses a sub-`struct`.
 AnonymousStructParseType =
   StructBlock
 
+// Parse a different parse type depending on the value of `scrutinee`.
+// The arms of the `switch` are traversed in order in checked for equality with `scrutinee`.
+// If they are found to be equal, the corresponding parse type is chosen.
+// If none of the arms match, the default parse type (specified as `_ => ParseType`) is chosen instead.
 SwitchParseType =
-  'switch' scrutinee:Expr '{' SwitchParseTypeArm* '_' '=' '>' default:ParseType ','? '}'
+  'switch' scrutinee:Expr '{' SwitchParseTypeArm* '_' '=>' default:ParseType ','? '}'
 
+// A single arm of a switch.
 SwitchParseTypeArm =
-  val:Expr '=' '>' ParseType ','
+  val:Expr '=>' ParseType ','
 
+// Declares how a parse type is repeating.
 RepeatDecl =
   RepeatLenDecl
 | RepeatWhileDecl
 
+// Repeats for a fixed number of elements.
 RepeatLenDecl =
   'len' count:Expr
 
+// Repeats while the condition is true.
 RepeatWhileDecl =
   'while' condition:Expr
 
+// Declares a named `struct`.
+// This can be referred to by the `NamedParseType`.
+// WARNING: Currently unimplemented.
 Struct =
   'struct' name:'ident' StructBlock
 
+// Creates a new field in the current `struct` with the name `name` and the value that the expression evaluates to.
 LetStatement =
   'let' name:'ident' '=' Expr ';'
 
+// An expression that evaluates to a value.
 Expr =
   Atom
 | Metavar
@@ -115,6 +182,8 @@ Expr =
 | FieldAccess
 | PeekExpr
 
+// An atomic expression.
+// This includes literals (such as `42`, `true` and `"hi"`) and field names of the currently parsed `struct`.
 Atom =
   'bin_lit'
 | 'oct_lit'
@@ -125,27 +194,68 @@ Atom =
 | 'false'
 | 'ident'
 
+// A meta-variable that refers to a value in the current parsing context.
+// The following meta-variables are defined. Some of them are only valid in some contexts.
+// - `$offset`: the current parsing offset in the current scope
+// - `$parent`: refers to the parent `struct` (can be used to read values from there such as `$parent.size`)
+// - `$last`: the last parsed element in a repetition (only valid in a `while` repetition condition and only if at least one element has been parsed (can be checked with `$len`))
+// - `$len`: the number of already parsed elements in a repetition (only valid in a `while` repetition condition)
 Metavar =
   '$' name:'ident'
 
+// Concatenates constant byte values and string literals together.
+// For example `<"test" 7a 00>` is equivalent to `"test\x7a\x00"`.
+// Decimal literals and identifiers are only accepted here for technical reasons (because `10` lexes as a decimal literal and `a0` as an identifier, but they are still valid hex values).
+// Only hex values between `00` and `ff` and string literals are accepted here.
 ByteConcat =
-  '<' ( 'byte_lit' | 'dec_lit' | 'str_lit' )* '>'
+  '<' ( 'byte_lit' | 'dec_lit' | 'ident' | 'str_lit')* '>'
 
+// An expression that is surrounded by parenthesis.
 ParenExpr =
   '(' Expr ')'
 
+// An expression that applies a prefix operator to the result of the inner expression.
+// The set of valid prefix operators is as follows:
+// - `+` (a no-op operator to show that integers are positive)
+// - `-` (integer negation)
+// - `!` (boolean negation and integer bit-flip)
+// Operator precedence is defined as it is in [Rust](https://doc.rust-lang.org/reference/expressions.html#r-expr.precedence).
 PrefixExpr =
   Op Expr
 
+// An expression that applies an infix operator to the result of `lhs` and `rhs`.
+// The set of valid infix operators is as follows:
+// - '+' (integer addition)
+// - '-' (integer subtraction)
+// - '*' (integer multiplication)
+// - '/' (integer division)
+// - '==' (equality comparison)
+// - '!=' (inequality comparison)
+// - '>' (greater than comparison)
+// - '>=' (greater than or equal comparison)
+// - '<' (less than comparison)
+// - '<=' (less than or equal comparison)
+// - '&&' (logical short-circuiting "and")
+// - '||' (logical short-circuiting "or")
+// - '&' (bitwise "and" for integers)
+// - '|' (bitwise "or" for integers)
+// - '^' (bitwise "xor" for integers)
+// - '<<' (bit-shift left)
+// - '>>' (bit-shift right)
+// Operator precedence is defined as it is in [Rust](https://doc.rust-lang.org/reference/expressions.html#r-expr.precedence).
 InfixExpr =
   lhs:Expr Op rhs:Expr
 
+// An expression that accesses a field of a `struct` value.
 FieldAccess =
   Expr '.' field:'ident'
 
+// Parses a value of the parse type at `offset` (or the current offset) without updating the offset.
 PeekExpr =
   'peek' '(' ParseType ('at' offset:Expr)? ')'
 
+// An operator used for expressions with operators.
+// Operator precedence is defined as it is in [Rust](https://doc.rust-lang.org/reference/expressions.html#r-expr.precedence).
 Op =
   '+'
 | '-'
@@ -162,3 +272,5 @@ Op =
 | '&'
 | '|'
 | '^'
+| '<<'
+| '>>'
