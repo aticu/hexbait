@@ -126,8 +126,8 @@ attributes [{
                     let num_blocks_bytes = _counts_byte & 0xf;
                     let block_num_bytes = (_counts_byte >> 4) & 0xf;
 
-                    num_blocks bytes len num_blocks_bytes;
-                    block_num bytes len block_num_bytes;
+                    num_blocks u(num_blocks_bytes * 8);
+                    block_num i(block_num_bytes * 8);
                 }] while peek(u8) != 0;
             },
         };

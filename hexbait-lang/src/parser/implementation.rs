@@ -243,6 +243,21 @@ fn parse_type_raw<'p, 'src>(p: &'p mut Parser<'src>, nested: bool) -> Completed<
                 repeat_decl(p).and_complete(m, NodeKind::BytesParseType)
             }
         }
+        Some(TokenKind::Identifier)
+            if matches!(p.cur_text(), Some("u" | "i"))
+                && matches!(p.peek().nth(1), Some((_, TokenKind::LParen))) =>
+        {
+            let kind = match p.expect_and_bump_contextual_kw() {
+                Some("i") => NodeKind::DynamicSizeIntParseType,
+                Some("u") => NodeKind::DynamicSizeUIntParseType,
+                _ => unreachable!(),
+            };
+            p.expect(TokenKind::LParen);
+
+            expr(p);
+
+            p.complete_after(m, kind, TokenKind::RParen)
+        }
         Some(TokenKind::LBrace) => {
             struct_block(p).and_complete(m, NodeKind::AnonymousStructParseType)
         }

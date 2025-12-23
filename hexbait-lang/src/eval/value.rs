@@ -73,7 +73,13 @@ impl fmt::Debug for ValueKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Boolean(val) => write!(f, "{val:?}"),
-            Self::Integer(int) => write!(f, "{int} (0x{int:x})"),
+            Self::Integer(int) => {
+                if int.sign() == num_bigint::Sign::Minus {
+                    write!(f, "{int} (-0x{:x})", -int)
+                } else {
+                    write!(f, "{int} (0x{int:x})")
+                }
+            }
             Self::Float(float) => float.fmt(f),
             Self::Bytes(bytes) => match bytes.len() {
                 0 => write!(f, "[]"),

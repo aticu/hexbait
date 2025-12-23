@@ -95,6 +95,10 @@ pub enum NodeKind {
     // Parse types
     /// A parse type that is a single identifier.
     NamedParseType,
+    /// A parse type that parses a dynamically sized signed integer.
+    DynamicSizeIntParseType,
+    /// A parse type that parses a dynamically sized unsigned integer.
+    DynamicSizeUIntParseType,
     /// A parse type that parses bytes until a condition is met.
     BytesParseType,
     /// A parse type that is a repetition of a fixed element.

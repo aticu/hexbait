@@ -111,6 +111,8 @@ StructField =
 // Describes how a value can be parsed.
 ParseType =
   NamedParseType
+| DynamicSizeIntParseType
+| DynamicSizeUIntParseType
 | BytesParseType
 | RepeatParseType
 | AnonymousStructParseType
@@ -122,6 +124,14 @@ ParseType =
 // WARNING: Currently unimplemented for types other than integers.
 NamedParseType =
   name:'ident'
+
+// Parses a dynamically sized signed integer where the size (in bits) is specified by the expression.
+DynamicSizeIntParseType =
+  'i' '(' Expr ')'
+
+// Parses a dynamically sized unsigned integer where the size (in bits) is specified by the expression.
+DynamicSizeUIntParseType =
+  'u' '(' Expr ')'
 
 // Parses a number of bytes.
 // The repeat declaration is only optional if used directly in a `struct` field with an expected value (e.g. `magic bytes = "%PDF"`).

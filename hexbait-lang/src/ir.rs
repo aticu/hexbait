@@ -191,6 +191,13 @@ pub enum ParseTypeKind {
         /// Whether the integer is signed.
         signed: bool,
     },
+    /// Parses an integer of dynamic size.
+    DynamicInteger {
+        /// The bit width to use.
+        bit_width: Expr,
+        /// Whether the integer is signed.
+        signed: bool,
+    },
     /// Parses an array of contiguous bytes.
     Bytes {
         /// The repetition that determines the number of bytes to parse.

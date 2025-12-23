@@ -715,8 +715,25 @@ impl<'src> Scope<'src> {
                 }
                 RepeatKind::Error => impossible!(),
             },
-            ParseTypeKind::Integer { bit_width, signed } => {
-                let bit_width = *bit_width;
+            ParseTypeKind::Integer { signed, .. }
+            | ParseTypeKind::DynamicInteger { signed, .. } => {
+                let bit_width = match &parse_type.kind {
+                    ParseTypeKind::Integer { bit_width, .. } => *bit_width,
+                    ParseTypeKind::DynamicInteger { bit_width, .. } => {
+                        let val =
+                            self.eval_expr(bit_width, struct_ctx, parse_ctx, Default::default())?;
+
+                        u32::try_from(val.kind.expect_int()).map_err(|_| {
+                            parse_ctx.new_err(ParseErr {
+                                message: "bit width is too large".to_string(),
+                                kind: ParseErrKind::ArithmeticError,
+                                provenance: val.provenance,
+                                span: bit_width.span,
+                            })
+                        })?
+                    }
+                    _ => unreachable!(),
+                };
                 let signed = *signed;
 
                 assert!(

@@ -137,6 +137,18 @@ impl LoweringCtx {
                     }
                 }
             }
+            ast::ParseType::DynamicSizeIntParseType(dynamic_int_parse_type) => {
+                ParseTypeKind::DynamicInteger {
+                    bit_width: self.lower_expr(required_field!(dynamic_int_parse_type => expr ? self : "expected expression" => ParseTypeKind::Error)),
+                    signed: true,
+                }
+            }
+            ast::ParseType::DynamicSizeUIntParseType(dynamic_uint_parse_type) => {
+                ParseTypeKind::DynamicInteger {
+                    bit_width: self.lower_expr(required_field!(dynamic_uint_parse_type => expr ? self : "expected expression" => ParseTypeKind::Error)),
+                    signed: false,
+                }
+            }
             ast::ParseType::BytesParseType(bytes_parse_type) => {
                 let repetition_kind = if let Some(repeat_decl) = bytes_parse_type.repeat_decl() {
                     self.lower_repetition(repeat_decl)
