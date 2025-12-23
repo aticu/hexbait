@@ -167,7 +167,11 @@ impl<'parent> StructContext<'parent> {
 
         Value {
             kind: ValueKind::Struct {
-                fields: self.parsed_fields,
+                fields: self
+                    .parsed_fields
+                    .into_iter()
+                    .filter(|(name, _)| !name.as_str().starts_with('_'))
+                    .collect(),
                 error: self.error,
             },
             provenance,

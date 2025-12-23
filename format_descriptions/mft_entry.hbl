@@ -40,12 +40,12 @@ attributes [{
     !align 8;
 
     // parse the size first, so the scope and recovery can be defined
-    let size = peek(u32 at $offset + 4);
-    !recover at size;
+    let _size = peek(u32 at $offset + 4);
+    !recover at _size;
 
-    !scope at $offset until $offset + size {
+    !scope at $offset until $offset + _size {
         type u32;
-        !seek by 4; // skip the already parsed size
+        size u32;
         nonresident u8;
         name_size u8;
         name_offset u16;
@@ -121,9 +121,10 @@ attributes [{
 
                 !seek to data_runs_offset;
                 data_runs [{
-                    let num_blocks_bytes = peek(u8) & 0xf;
-                    let block_num_bytes = (peek(u8) >> 4) & 0xf;
-                    !seek by 1;
+                    _counts_byte u8;
+
+                    let num_blocks_bytes = _counts_byte & 0xf;
+                    let block_num_bytes = (_counts_byte >> 4) & 0xf;
 
                     num_blocks bytes len num_blocks_bytes;
                     block_num bytes len block_num_bytes;
