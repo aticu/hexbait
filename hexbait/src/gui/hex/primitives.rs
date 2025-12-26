@@ -1,6 +1,6 @@
 //! Implements the primitives for showing hex views.
 
-use egui::{Align2, Color32, FontId, Response, Sense, Ui, vec2};
+use egui::{Align2, Color32, Response, Sense, Ui, vec2};
 use hexbait_common::AbsoluteOffset;
 
 use crate::state::Settings;
@@ -29,13 +29,9 @@ pub fn render_offset(
 }
 
 /// Show the given byte in hex.
-pub fn render_hex(
-    ui: &mut Ui,
-    settings: &Settings,
-    sense: Sense,
-    byte: u8,
-    font: FontId,
-) -> Response {
+pub fn render_hex(ui: &mut Ui, settings: &Settings, sense: Sense, byte: u8) -> Response {
+    let font = settings.hex_font();
+
     // TODO: replace this with a better calculation
     let char_width = font.size * 0.6;
     let mut rect = ui.cursor();

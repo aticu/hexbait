@@ -1,6 +1,6 @@
 //! Implements display logic for parsing results.
 
-use egui::{FontId, RichText, Sense, TextStyle};
+use egui::{FontId, RichText, TextStyle};
 use hexbait_lang::{
     Value, ValueKind,
     ir::{
@@ -9,7 +9,7 @@ use hexbait_lang::{
     },
 };
 
-use crate::{gui::hex::render_hex, state::Settings};
+use crate::state::Settings;
 
 /// Displays the given [`Value`] in the GUI.
 ///
@@ -46,32 +46,42 @@ pub fn show_value(
                 let font_size = TextStyle::Body.resolve(ui.style()).size;
                 let hex_font = FontId::monospace(font_size);
 
-                let space = settings.small_space() * 0.6;
-
                 this_hovered |= ui.label(format!("{name_prefix}<")).hovered();
                 if bytes.len() > 16 {
                     for byte in &bytes[..8] {
-                        this_hovered |=
-                            render_hex(ui, settings, Sense::hover(), *byte, hex_font.clone())
-                                .hovered();
-                        ui.add_space(space);
+                        this_hovered |= ui
+                            .label(
+                                RichText::new(format!("{byte:02x} "))
+                                    .font(hex_font.clone())
+                                    .color(settings.byte_color(*byte)),
+                            )
+                            .hovered();
                     }
 
                     this_hovered |= ui.label("...").hovered();
 
                     for byte in &bytes[bytes.len() - 8..] {
-                        ui.add_space(space);
-                        this_hovered |=
-                            render_hex(ui, settings, Sense::hover(), *byte, hex_font.clone())
-                                .hovered();
+                        this_hovered |= ui
+                            .label(
+                                RichText::new(format!(" {byte:02x}"))
+                                    .font(hex_font.clone())
+                                    .color(settings.byte_color(*byte)),
+                            )
+                            .hovered();
                     }
                 } else {
                     for (i, byte) in bytes.iter().enumerate() {
-                        this_hovered |=
-                            render_hex(ui, settings, Sense::hover(), *byte, hex_font.clone())
-                                .hovered();
+                        this_hovered |= ui
+                            .label(
+                                RichText::new(format!("{byte:02x}"))
+                                    .font(hex_font.clone())
+                                    .color(settings.byte_color(*byte)),
+                            )
+                            .hovered();
                         if i != bytes.len() - 1 {
-                            ui.add_space(space);
+                            this_hovered |= ui
+                                .label(RichText::new(" ").font(hex_font.clone()))
+                                .hovered();
                         }
                     }
                 }

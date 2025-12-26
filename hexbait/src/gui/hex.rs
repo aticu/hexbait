@@ -350,7 +350,7 @@ fn render_row(
 
             let byte_offset = offset + Len::from(i as u64);
 
-            let response = render_hex(ui, settings, Sense::hover(), byte, settings.hex_font());
+            let response = render_hex(ui, settings, Sense::hover(), byte);
             interact_with_offset(ui, byte_offset, &response, selection_state);
 
             response.on_hover_ui(|ui| {
@@ -393,7 +393,7 @@ fn render_row(
             interact_with_offset(ui, byte_offset, &response, selection_state);
 
             response.on_hover_ui(|ui| {
-                render_hex(ui, settings, Sense::hover(), byte, settings.hex_font());
+                render_hex(ui, settings, Sense::hover(), byte);
                 render_offset_info(ui, byte_offset, selection_state.selected_window());
             });
         }

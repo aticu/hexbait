@@ -125,8 +125,8 @@ pub fn render(
         .show(|ui| {
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
-                    render_hex(ui, settings, Sense::hover(), first, settings.hex_font());
-                    render_hex(ui, settings, Sense::hover(), second, settings.hex_font());
+                    render_hex(ui, settings, Sense::hover(), first);
+                    render_hex(ui, settings, Sense::hover(), second);
 
                     ui.spacing_mut().item_spacing = Vec2::ZERO;
                     ui.add_space(settings.large_space());
