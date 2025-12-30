@@ -740,46 +740,54 @@ impl<'src> Scope<'src> {
                     bit_width <= 64,
                     "larger than 64-bit integers currently unimplemented"
                 );
-                assert!(bit_width > 0, "zero-width integers unsupported");
                 assert!(
                     bit_width % 8 == 0,
                     "non byte aligned integers currently unimplemented"
                 );
                 let size_in_bytes = (bit_width / 8) as usize;
 
-                let (parsed_bytes, provenance) = self.read_bytes(
-                    u64::try_from(size_in_bytes).unwrap(),
-                    parse_type.span,
-                    parse_ctx,
-                )?;
-
-                let mut parse_buf = [0; 8];
-
-                let (copy_start, msb) = match self.endianness {
-                    Endianness::Little => (0, parsed_bytes[size_in_bytes - 1]),
-                    Endianness::Big => (8 - size_in_bytes, parsed_bytes[0]),
-                };
-
-                if signed && msb & 0x80 != 0 {
-                    // sign extend so the result is negative
-                    parse_buf = [0xff; 8];
-                }
-
-                parse_buf[copy_start..copy_start + size_in_bytes].copy_from_slice(&parsed_bytes);
-                let num = match self.endianness {
-                    Endianness::Little => i64::from_le_bytes(parse_buf),
-                    Endianness::Big => i64::from_be_bytes(parse_buf),
-                };
-
-                let as_int = if !signed && num < 0 {
-                    (num as u64).into()
+                if size_in_bytes == 0 {
+                    // zero-sized integers always have value 0
+                    Value {
+                        kind: ValueKind::Integer(0.into()),
+                        provenance: Provenance::empty(),
+                    }
                 } else {
-                    num.into()
-                };
+                    let (parsed_bytes, provenance) = self.read_bytes(
+                        u64::try_from(size_in_bytes).unwrap(),
+                        parse_type.span,
+                        parse_ctx,
+                    )?;
 
-                Value {
-                    kind: ValueKind::Integer(as_int),
-                    provenance,
+                    let mut parse_buf = [0; 8];
+
+                    let (copy_start, msb) = match self.endianness {
+                        Endianness::Little => (0, parsed_bytes[size_in_bytes - 1]),
+                        Endianness::Big => (8 - size_in_bytes, parsed_bytes[0]),
+                    };
+
+                    if signed && msb & 0x80 != 0 {
+                        // sign extend so the result is negative
+                        parse_buf = [0xff; 8];
+                    }
+
+                    parse_buf[copy_start..copy_start + size_in_bytes]
+                        .copy_from_slice(&parsed_bytes);
+                    let num = match self.endianness {
+                        Endianness::Little => i64::from_le_bytes(parse_buf),
+                        Endianness::Big => i64::from_be_bytes(parse_buf),
+                    };
+
+                    let as_int = if !signed && num < 0 {
+                        (num as u64).into()
+                    } else {
+                        num.into()
+                    };
+
+                    Value {
+                        kind: ValueKind::Integer(as_int),
+                        provenance,
+                    }
                 }
             }
             ParseTypeKind::Repeating {
