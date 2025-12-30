@@ -26,13 +26,23 @@ header {
 !assert header.num_fixup_values == (header.total_entry_size / 512) + 1;
 
 // entry sizes larger than 4096 are very uncommon
-!assert header.total_entry_size <= 4096;
+!warn if header.total_entry_size > 4096;
 
 // now that we know the actual entry size, we can recover more precisely
 !recover at header.total_entry_size;
 
 let fixup_value = peek(bytes len 2 at header.fixup_value_offset);
 let fixup_values = peek([bytes len 2] len header.num_fixup_values - 1 at header.fixup_value_offset + 2);
+
+// check that the fixup values are correct
+!scope at 0 until header.total_entry_size {
+    _chunks [{
+        before_fixup bytes len 510;
+        fixup_bytes bytes len 2;
+
+        !warn if fixup_bytes != $parent.fixup_value;
+    }] len header.total_entry_size / 512;
+}
 
 !seek to header.first_attribute;
 attributes [{
