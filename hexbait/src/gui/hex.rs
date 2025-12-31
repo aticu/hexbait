@@ -199,11 +199,11 @@ pub fn render(
                             let result = hexbait_lang::eval_ir(parse_type, view, 0);
                             let hovered = parse_result::show_value(
                                 ui,
+                                state,
                                 hexbait_lang::ir::path::Path::new(),
                                 None,
                                 &result.value,
                                 &result.errors,
-                                &state.settings,
                             );
 
                             match hovered {

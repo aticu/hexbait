@@ -1,6 +1,7 @@
 //! Implements display logic for parsing results.
 
-use egui::{FontId, RichText, TextStyle, Ui};
+use egui::{FontId, Response, RichText, TextStyle, Ui};
+use hexbait_common::AbsoluteOffset;
 use hexbait_lang::{
     ParseErr, ParseErrId, Value, ValueKind,
     ir::{
@@ -9,7 +10,7 @@ use hexbait_lang::{
     },
 };
 
-use crate::state::Settings;
+use crate::state::State;
 
 /// Information about what is hovered.
 #[derive(Debug, PartialEq, Eq)]
@@ -33,11 +34,11 @@ pub enum HoverInfo {
 /// The return value is the path of the hovered value.
 pub fn show_value(
     ui: &mut Ui,
+    state: &mut State,
     path: Path,
     name: Option<&Symbol>,
     value: &Value,
     errors: &[ParseErr],
-    settings: &Settings,
 ) -> HoverInfo {
     let name_prefix = if let Some(name) = name {
         format!("{name:?}: ")
@@ -46,16 +47,22 @@ pub fn show_value(
     };
 
     let mut this_hovered = false;
+    let mut this_clicked = false;
+
+    let mut handle_response = |response: Response| {
+        if response.clicked() {
+            this_clicked = true;
+        } else if response.hovered() {
+            this_hovered = true;
+        }
+    };
+
     let mut child_hovered = HoverInfo::Nothing;
     let mut hovered_err = None;
 
     match &value.kind {
         ValueKind::Boolean(_) | ValueKind::Integer(_) | ValueKind::Float(_) => {
-            let hovered = ui
-                .label(format!("{name_prefix}{:?},", value.kind))
-                .hovered();
-
-            this_hovered |= hovered;
+            handle_response(ui.label(format!("{name_prefix}{:?},", value.kind)));
         }
         ValueKind::Bytes(bytes) => {
             ui.horizontal(|ui| {
@@ -65,58 +72,54 @@ pub fn show_value(
                 let font_size = TextStyle::Body.resolve(ui.style()).size;
                 let hex_font = FontId::monospace(font_size);
 
-                this_hovered |= ui.label(format!("{name_prefix}<")).hovered();
+                handle_response(ui.label(format!("{name_prefix}<")));
                 if bytes.len() > 16 {
                     for byte in &bytes[..8] {
-                        this_hovered |= ui
-                            .label(
+                        handle_response(
+                            ui.label(
                                 RichText::new(format!("{byte:02x} "))
                                     .font(hex_font.clone())
-                                    .color(settings.byte_color(*byte)),
-                            )
-                            .hovered();
+                                    .color(state.settings.byte_color(*byte)),
+                            ),
+                        );
                     }
 
-                    this_hovered |= ui.label("...").hovered();
+                    handle_response(ui.label("..."));
 
                     for byte in &bytes[bytes.len() - 8..] {
-                        this_hovered |= ui
-                            .label(
+                        handle_response(
+                            ui.label(
                                 RichText::new(format!(" {byte:02x}"))
                                     .font(hex_font.clone())
-                                    .color(settings.byte_color(*byte)),
-                            )
-                            .hovered();
+                                    .color(state.settings.byte_color(*byte)),
+                            ),
+                        );
                     }
                 } else {
                     for (i, byte) in bytes.iter().enumerate() {
-                        this_hovered |= ui
-                            .label(
+                        handle_response(
+                            ui.label(
                                 RichText::new(format!("{byte:02x}"))
                                     .font(hex_font.clone())
-                                    .color(settings.byte_color(*byte)),
-                            )
-                            .hovered();
+                                    .color(state.settings.byte_color(*byte)),
+                            ),
+                        );
                         if i != bytes.len() - 1 {
-                            this_hovered |= ui
-                                .label(RichText::new(" ").font(hex_font.clone()))
-                                .hovered();
+                            handle_response(ui.label(RichText::new(" ").font(hex_font.clone())));
                         }
                     }
                 }
-                this_hovered |= ui.label(">,").hovered();
+                handle_response(ui.label(">,"));
 
                 ui.spacing_mut().item_spacing = old_spacing;
             });
         }
         ValueKind::Struct { fields, error } => {
             ui.vertical(|ui| {
-                let hovered = ui.label(format!("{name_prefix}{{")).hovered();
-
-                this_hovered |= hovered;
+                handle_response(ui.label(format!("{name_prefix}{{")));
 
                 let mut child_rect = ui.cursor().intersect(ui.max_rect());
-                child_rect.min.x += settings.font_size();
+                child_rect.min.x += state.settings.font_size();
                 ui.scope_builder(
                     egui::UiBuilder::new()
                         .max_rect(child_rect)
@@ -126,7 +129,7 @@ pub fn show_value(
                             let mut path = path.clone();
                             path.push(PathComponent::FieldAccess(name.clone()));
 
-                            let hovered = show_value(ui, path, Some(name), value, errors, settings);
+                            let hovered = show_value(ui, state, path, Some(name), value, errors);
                             if hovered != HoverInfo::Nothing {
                                 child_hovered = hovered;
                             }
@@ -136,19 +139,15 @@ pub fn show_value(
                     },
                 );
 
-                let hovered = ui.label("},").hovered();
-
-                this_hovered |= hovered;
+                handle_response(ui.label("},"));
             });
         }
         ValueKind::Array { items, error } => {
             ui.vertical(|ui| {
-                let hovered = ui.label(format!("{name_prefix}[")).hovered();
-
-                this_hovered |= hovered;
+                handle_response(ui.label(format!("{name_prefix}[")));
 
                 let mut child_rect = ui.cursor().intersect(ui.max_rect());
-                child_rect.min.x += settings.font_size();
+                child_rect.min.x += state.settings.font_size();
                 ui.scope_builder(
                     egui::UiBuilder::new()
                         .max_rect(child_rect)
@@ -158,7 +157,7 @@ pub fn show_value(
                             let mut path = path.clone();
                             path.push(PathComponent::Indexing(i));
 
-                            let hovered = show_value(ui, path, None, value, errors, settings);
+                            let hovered = show_value(ui, state, path, None, value, errors);
                             if hovered != HoverInfo::Nothing {
                                 child_hovered = hovered;
                             }
@@ -168,11 +167,15 @@ pub fn show_value(
                     },
                 );
 
-                let hovered = ui.label("],").hovered();
-
-                this_hovered |= hovered;
+                handle_response(ui.label("],"));
             });
         }
+    }
+
+    if this_clicked && let Some(byte_range) = value.provenance.byte_ranges().next() {
+        state
+            .scroll_state
+            .rearrange_bars_for_point(0, AbsoluteOffset::from(*byte_range.start()));
     }
 
     if child_hovered != HoverInfo::Nothing {
