@@ -112,6 +112,7 @@ impl MarkedLocation {
         match self.kind() {
             MarkingKind::Selection => Color32::WHITE,
             MarkingKind::HoveredParsed => Color32::DARK_RED,
+            MarkingKind::HoveredParseErr => Color32::WHITE,
             MarkingKind::SearchResult => Color32::BLUE,
         }
     }
@@ -121,6 +122,7 @@ impl MarkedLocation {
         match self.kind() {
             MarkingKind::Selection => Color32::WHITE,
             MarkingKind::HoveredParsed => Color32::GOLD,
+            MarkingKind::HoveredParseErr => Color32::LIGHT_RED,
             MarkingKind::SearchResult => Color32::from_rgb(252, 15, 192),
         }
     }
@@ -133,6 +135,8 @@ pub enum MarkingKind {
     Selection,
     /// The location is marked, because the user hovered the parsed value.
     HoveredParsed,
+    /// The location is marked, because the user hovered a parsing error.
+    HoveredParseErr,
     /// The location is marked, because it was found by a search.
     SearchResult,
 }

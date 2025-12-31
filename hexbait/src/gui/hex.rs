@@ -187,6 +187,7 @@ pub fn render(
                         .show(ui, |ui| {
                             marked_locations.remove_where(|location| {
                                 location.kind() == MarkingKind::HoveredParsed
+                                    || location.kind() == MarkingKind::HoveredParseErr
                             });
 
                             let current_parse_offset = *parse_offset;
@@ -212,19 +213,35 @@ pub fn render(
                                 hexbait_lang::ir::path::Path::new(),
                                 None,
                                 &result.value,
+                                &result.errors,
                                 settings,
                             );
 
-                            if let Some(hovered) = hovered
-                                && let Some(value) = result.value.subvalue_at_path(&hovered)
-                            {
-                                for range in value.provenance.byte_ranges() {
-                                    marked_locations.add(MarkedLocation::new(
-                                        (AbsoluteOffset::from(*range.start())
-                                            ..=AbsoluteOffset::from(*range.end()))
-                                            .into(),
-                                        MarkingKind::HoveredParsed,
-                                    ));
+                            match hovered {
+                                parse_result::HoverInfo::Nothing => (),
+                                parse_result::HoverInfo::Value { path } => {
+                                    if let Some(value) = result.value.subvalue_at_path(&path) {
+                                        for range in value.provenance.byte_ranges() {
+                                            marked_locations.add(MarkedLocation::new(
+                                                (AbsoluteOffset::from(*range.start())
+                                                    ..=AbsoluteOffset::from(*range.end()))
+                                                    .into(),
+                                                MarkingKind::HoveredParsed,
+                                            ));
+                                        }
+                                    }
+                                }
+                                parse_result::HoverInfo::Error { id } => {
+                                    for range in
+                                        result.errors[id.raw_idx()].provenance.byte_ranges()
+                                    {
+                                        marked_locations.add(MarkedLocation::new(
+                                            (AbsoluteOffset::from(*range.start())
+                                                ..=AbsoluteOffset::from(*range.end()))
+                                                .into(),
+                                            MarkingKind::HoveredParseErr,
+                                        ));
+                                    }
                                 }
                             }
                         });

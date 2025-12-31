@@ -1,8 +1,8 @@
 //! Implements display logic for parsing results.
 
-use egui::{FontId, RichText, TextStyle};
+use egui::{FontId, RichText, TextStyle, Ui};
 use hexbait_lang::{
-    Value, ValueKind,
+    ParseErr, ParseErrId, Value, ValueKind,
     ir::{
         Symbol,
         path::{Path, PathComponent},
@@ -11,16 +11,34 @@ use hexbait_lang::{
 
 use crate::state::Settings;
 
+/// Information about what is hovered.
+#[derive(Debug, PartialEq, Eq)]
+pub enum HoverInfo {
+    /// Nothing is hovered.
+    Nothing,
+    /// A value is hovered.
+    Value {
+        /// The path to the hovered value.
+        path: Path,
+    },
+    /// An error is hovered.
+    Error {
+        /// The ID of the hovered error.
+        id: ParseErrId,
+    },
+}
+
 /// Displays the given [`Value`] in the GUI.
 ///
 /// The return value is the path of the hovered value.
 pub fn show_value(
-    ui: &mut egui::Ui,
+    ui: &mut Ui,
     path: Path,
     name: Option<&Symbol>,
     value: &Value,
+    errors: &[ParseErr],
     settings: &Settings,
-) -> Option<Path> {
+) -> HoverInfo {
     let name_prefix = if let Some(name) = name {
         format!("{name:?}: ")
     } else {
@@ -28,7 +46,8 @@ pub fn show_value(
     };
 
     let mut this_hovered = false;
-    let mut child_hovered = None;
+    let mut child_hovered = HoverInfo::Nothing;
+    let mut hovered_err = None;
 
     match &value.kind {
         ValueKind::Boolean(_) | ValueKind::Integer(_) | ValueKind::Float(_) => {
@@ -107,19 +126,13 @@ pub fn show_value(
                             let mut path = path.clone();
                             path.push(PathComponent::FieldAccess(name.clone()));
 
-                            let hovered = show_value(ui, path, Some(name), value, settings);
-                            if hovered.is_some() {
+                            let hovered = show_value(ui, path, Some(name), value, errors, settings);
+                            if hovered != HoverInfo::Nothing {
                                 child_hovered = hovered;
                             }
                         }
-                        if let Some(err) = error {
-                            // TODO: highlight the error when this is hovered
-                            ui.label(
-                                RichText::new(format!("... parsing error {err:?},"))
-                                    .color(ui.visuals().error_fg_color),
-                            )
-                            .hovered();
-                        }
+                        hovered_err =
+                            hovered_err.or(render_error_and_return_hovered(ui, error, errors));
                     },
                 );
 
@@ -145,19 +158,13 @@ pub fn show_value(
                             let mut path = path.clone();
                             path.push(PathComponent::Indexing(i));
 
-                            let hovered = show_value(ui, path, None, value, settings);
-                            if hovered.is_some() {
+                            let hovered = show_value(ui, path, None, value, errors, settings);
+                            if hovered != HoverInfo::Nothing {
                                 child_hovered = hovered;
                             }
                         }
-                        if let Some(err) = error {
-                            // TODO: highlight the error when this is hovered
-                            ui.label(
-                                RichText::new(format!("... parsing error {err:?},"))
-                                    .color(ui.visuals().error_fg_color),
-                            )
-                            .hovered();
-                        }
+                        hovered_err =
+                            hovered_err.or(render_error_and_return_hovered(ui, error, errors));
                     },
                 );
 
@@ -168,10 +175,41 @@ pub fn show_value(
         }
     }
 
-    if child_hovered.is_some() {
+    if child_hovered != HoverInfo::Nothing {
         child_hovered
     } else if this_hovered {
-        Some(path.clone())
+        HoverInfo::Value { path: path.clone() }
+    } else if let Some(err) = hovered_err {
+        HoverInfo::Error { id: err }
+    } else {
+        HoverInfo::Nothing
+    }
+}
+
+/// Renders the given error to the UI if it is present.
+///
+/// Returns the hovered error if it is hovered.
+fn render_error_and_return_hovered(
+    ui: &mut Ui,
+    error: &Option<ParseErrId>,
+    errors: &[ParseErr],
+) -> Option<ParseErrId> {
+    if let Some(err_id) = error {
+        let err = &errors[err_id.raw_idx()];
+
+        // TODO: use the error span to highlight it in a possible future editor
+
+        if ui
+            .label(
+                RichText::new(format!("... parsing error: {},", err.message))
+                    .color(ui.visuals().error_fg_color),
+            )
+            .hovered()
+        {
+            Some(*err_id)
+        } else {
+            None
+        }
     } else {
         None
     }

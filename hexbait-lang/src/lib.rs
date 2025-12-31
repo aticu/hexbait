@@ -11,7 +11,7 @@ mod span;
 mod syntax;
 
 pub use {
-    eval::{Value, ValueKind, parse::eval_ir, view::View},
+    eval::*,
     ir::check_ir,
     parser::parse,
     span::Span,

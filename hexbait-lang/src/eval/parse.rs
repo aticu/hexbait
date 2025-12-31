@@ -934,7 +934,7 @@ impl<'src> Scope<'src> {
                             &expected.kind, &value.kind
                         ),
                         kind: ParseErrKind::ExpectationFailure,
-                        provenance: expected.provenance.clone(),
+                        provenance: &value.provenance + &expected.provenance,
                         span,
                     }),
                     partial_result: Some(value),

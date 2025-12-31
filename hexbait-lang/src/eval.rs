@@ -5,4 +5,6 @@ mod provenance;
 mod value;
 pub(crate) mod view;
 
+pub use parse::{ParseErr, ParseErrId, ParseResult, ParseWarning, eval_ir};
 pub use value::{Value, ValueKind};
+pub use view::View;

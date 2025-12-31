@@ -81,10 +81,14 @@ attributes [{
                             maximum_number_of_versions u32;
                             version_number u32;
                             class_identifier u32;
-                            owner_identifier u32;
-                            security_descriptor_identifier u32;
-                            quota_charged u64;
-                            update_sequence_number u64;
+
+                            // some $STANDARD_INFORMATION attributes are 48 bytes and some 72 bytes
+                            !if $parent.data_size > 48 {
+                                owner_identifier u32;
+                                security_descriptor_identifier u32;
+                                quota_charged u64;
+                                update_sequence_number u64;
+                            }
                         },
                         0x30 => {
                             parent_file_reference u64;

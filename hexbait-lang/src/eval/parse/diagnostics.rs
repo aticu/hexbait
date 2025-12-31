@@ -54,6 +54,11 @@ impl ParseErrId {
         vec.push(err);
         ParseErrId { idx }
     }
+
+    /// Returns the raw index into the errors.
+    pub fn raw_idx(self) -> usize {
+        self.idx
+    }
 }
 
 /// A parse error that may or may not contain partial results.

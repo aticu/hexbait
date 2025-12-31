@@ -3,7 +3,7 @@
 use super::Symbol;
 
 /// A path to a value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Path {
     /// The components that make up this path.
     components: Vec<PathComponent>,
@@ -35,7 +35,7 @@ impl Default for Path {
 }
 
 /// A single path component.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PathComponent {
     /// Access to a field in a struct.
     FieldAccess(Symbol),
