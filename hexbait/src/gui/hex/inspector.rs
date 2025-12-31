@@ -3,24 +3,19 @@
 use egui::{Color32, Rect, RichText, Sense, Ui, vec2};
 use hexbait_common::Endianness;
 
-use crate::state::Settings;
+use crate::state::State;
 
 /// Renders a data inspector, showing different views on the selected data.
-pub(crate) fn render_inspector(
-    ui: &mut Ui,
-    selected: Option<&[u8]>,
-    endianness: &mut Endianness,
-    settings: &Settings,
-) {
-    let row_height = settings.font_size() * 1.1;
+pub(crate) fn render_inspector(ui: &mut Ui, state: &mut State, selected: Option<&[u8]>) {
+    let row_height = state.settings.font_size() * 1.1;
 
     ui.horizontal(|ui| {
-        ui.selectable_value(endianness, Endianness::Little, "Little Endian");
-        ui.selectable_value(endianness, Endianness::Big, "Big Endian");
+        ui.selectable_value(&mut state.endianness, Endianness::Little, "Little Endian");
+        ui.selectable_value(&mut state.endianness, Endianness::Big, "Big Endian");
     });
 
     let buf = selected.unwrap_or(&[]);
-    let endianness = *endianness;
+    let endianness = state.endianness;
 
     macro_rules! read_int {
         ($type:ident) => {
@@ -199,7 +194,7 @@ pub(crate) fn render_inspector(
     TableBuilder::new(ui)
         .striped(true)
         .id_salt("inspector")
-        .column(Column::exact(settings.font_size() * 11.0))
+        .column(Column::exact(state.settings.font_size() * 11.0))
         .column(Column::remainder())
         .drag_to_scroll(false)
         .header(row_height * 1.5, |mut header| {
@@ -236,7 +231,7 @@ pub(crate) fn render_inspector(
                         let color = Color32::from_rgba_premultiplied(r, g, b, 255);
                         let rect = Rect::from_min_size(
                             ui.cursor().min,
-                            vec2(settings.font_size() * 8.0, settings.font_size()),
+                            vec2(state.settings.font_size() * 8.0, state.settings.font_size()),
                         );
                         ui.painter().rect_filled(rect, 0.0, color);
                         ui.allocate_rect(rect, Sense::hover())
@@ -272,7 +267,7 @@ pub(crate) fn render_inspector(
                         let color = Color32::from_rgba_premultiplied(r, g, b, 255);
                         let rect = Rect::from_min_size(
                             ui.cursor().min,
-                            vec2(settings.font_size() * 8.0, settings.font_size()),
+                            vec2(state.settings.font_size() * 8.0, state.settings.font_size()),
                         );
                         ui.painter().rect_filled(rect, 0.0, color);
                         ui.allocate_rect(rect, Sense::hover())

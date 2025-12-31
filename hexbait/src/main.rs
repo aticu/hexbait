@@ -328,14 +328,10 @@ impl eframe::App for MyApp {
 
                             hexbait::gui::hex::render(
                                 ui,
-                                &self.state.settings,
-                                &mut self.state.scroll_state,
-                                &mut self.state.selection_state,
+                                &mut self.state,
                                 &mut self.input,
-                                &mut self.state.endianness,
                                 parse_type,
                                 &mut parse_offset,
-                                &mut self.state.marked_locations,
                             );
                         }
                     }

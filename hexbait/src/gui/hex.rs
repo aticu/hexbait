@@ -1,14 +1,14 @@
 //! Renders hexdumps in the GUI.
 
 use egui::{Align, Color32, Layout, Rect, ScrollArea, Sense, Ui, UiBuilder, Vec2, vec2};
-use hexbait_common::{AbsoluteOffset, Endianness, Len};
+use hexbait_common::{AbsoluteOffset, Len};
 use hexbait_lang::{View, ir::File};
 use highlighting::highlight;
 
 use crate::{
     data::Input,
     gui::color,
-    state::{ScrollState, SelectionState, Settings},
+    state::{ScrollState, SelectionState, State},
     window::Window,
 };
 
@@ -21,28 +21,23 @@ use inspector::render_inspector;
 
 pub use primitives::{render_glyph, render_hex, render_offset};
 
-use super::marking::{MarkedLocation, MarkedLocations, MarkingKind, render_locations_on_bar};
+use super::marking::{MarkedLocation, MarkingKind, render_locations_on_bar};
 
 /// Renders a hexdump to the GUI.
-#[expect(clippy::too_many_arguments)]
 pub fn render(
     ui: &mut Ui,
-    settings: &Settings,
-    scroll_state: &mut ScrollState,
-    selection_state: &mut SelectionState,
+    state: &mut State,
     input: &mut Input,
-    endianness: &mut Endianness,
     parse_type: Option<&File>,
     parse_offset: &mut Option<AbsoluteOffset>,
-    marked_locations: &mut MarkedLocations,
 ) {
-    let start = scroll_state.hex_start();
+    let start = state.scroll_state.hex_start();
     let start_row = start.as_u64() / 16;
 
     let rect = ui.max_rect().intersect(ui.cursor());
     let height = ui.available_height();
     let window_size = height.trunc() as u64 * 16;
-    let rows_onscreen = (height / settings.char_height()).trunc() as u64;
+    let rows_onscreen = (height / state.settings.char_height()).trunc() as u64;
 
     // add 16 more to show one row "beyond the screen"
     let mut buf = vec![0; window_size as usize + 16];
@@ -59,14 +54,14 @@ pub fn render(
         }
     };
 
-    let bar_width = (16 * settings.bar_width_multiplier()) as f32;
+    let bar_width = (16 * state.settings.bar_width_multiplier()) as f32;
     let offset_chars = 16;
     let hex_chars = 16;
     let hex_rect_width = bar_width
         + ui.spacing().item_spacing.x
-        + ((offset_chars + hex_chars * 3) as f32 * settings.char_width())
-        + (2.0 * settings.large_space())
-        + (17.0 * settings.small_space());
+        + ((offset_chars + hex_chars * 3) as f32 * state.settings.char_width())
+        + (2.0 * state.settings.large_space())
+        + (17.0 * state.settings.small_space());
 
     let scroll_rect = rect.with_max_x(rect.min.x + hex_rect_width);
 
@@ -74,10 +69,16 @@ pub fn render(
     let max_height = (window.len() as u64).min(window_size).div_ceil(16);
     let max_scroll = max_height.saturating_sub(rows_onscreen);
 
-    handle_scrolling(ui, scroll_state, scroll_rect, max_scroll, rows_onscreen);
+    handle_scrolling(
+        ui,
+        &mut state.scroll_state,
+        scroll_rect,
+        max_scroll,
+        rows_onscreen,
+    );
 
     if ui.ctx().input(|input| !input.pointer.primary_down()) {
-        selection_state.handle_mouse_release();
+        state.selection_state.handle_mouse_release();
     }
 
     ui.scope_builder(
@@ -87,26 +88,21 @@ pub fn render(
         |ui| {
             let max_rect = ui.max_rect();
 
-            render_sidebar(
-                ui,
-                scroll_state,
-                window,
-                rows_onscreen,
-                max_scroll,
-                start_row,
-                marked_locations,
-                settings,
-            );
+            render_sidebar(ui, state, window, rows_onscreen, max_scroll, start_row);
 
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing = Vec2::ZERO;
 
-                marked_locations.remove_where(|location| location.kind() == MarkingKind::Selection);
-                if let Some(selection) = selection_state.selected_window() {
-                    marked_locations.add(MarkedLocation::new(selection, MarkingKind::Selection));
+                state
+                    .marked_locations
+                    .remove_where(|location| location.kind() == MarkingKind::Selection);
+                if let Some(selection) = state.selection_state.selected_window() {
+                    state
+                        .marked_locations
+                        .add(MarkedLocation::new(selection, MarkingKind::Selection));
                 }
 
-                for location in marked_locations.iter_window(Window::from_start_len(
+                for location in state.marked_locations.iter_window(Window::from_start_len(
                     start,
                     Len::from(window.len() as u64),
                 )) {
@@ -119,30 +115,23 @@ pub fn render(
                         location.inner_color(),
                         location.border_color(),
                         file_size,
-                        start_row + scroll_state.hex_scroll_offset,
+                        start_row + state.scroll_state.hex_scroll_offset,
                         rows_onscreen,
-                        settings,
+                        &state.settings,
                     );
                 }
 
                 for (i, row) in window
                     .chunks(16)
                     .enumerate()
-                    .skip(scroll_state.hex_scroll_offset as usize)
+                    .skip(state.scroll_state.hex_scroll_offset as usize)
                     .take(rows_onscreen as usize + 1)
                 {
-                    render_row(
-                        ui,
-                        selection_state,
-                        start + Len::from(i as u64 * 16),
-                        row,
-                        file_size,
-                        settings,
-                    );
+                    render_row(ui, state, start + Len::from(i as u64 * 16), row, file_size);
                 }
             });
             let mut selected_buf;
-            let selected_buf = if let Some(selection) = selection_state.selected_window() {
+            let selected_buf = if let Some(selection) = state.selection_state.selected_window() {
                 selected_buf = vec![0; selection.size().as_u64() as usize];
                 input.window_at(selection.start(), &mut selected_buf).ok()
             } else {
@@ -170,7 +159,7 @@ pub fn render(
                         .max_height(half_height)
                         .show(ui, |ui| {
                             ui.vertical(|ui| {
-                                render_inspector(ui, selected_buf, endianness, settings);
+                                render_inspector(ui, state, selected_buf);
                             });
                         });
                 },
@@ -185,13 +174,13 @@ pub fn render(
                         .id_salt("parser_scroll")
                         .max_height(half_height)
                         .show(ui, |ui| {
-                            marked_locations.remove_where(|location| {
+                            state.marked_locations.remove_where(|location| {
                                 location.kind() == MarkingKind::HoveredParsed
                                     || location.kind() == MarkingKind::HoveredParseErr
                             });
 
                             let current_parse_offset = *parse_offset;
-                            if let Some(window) = selection_state.selected_window() {
+                            if let Some(window) = state.selection_state.selected_window() {
                                 *parse_offset = Some(window.start());
                             }
                             let Some(parse_offset) = current_parse_offset else {
@@ -214,7 +203,7 @@ pub fn render(
                                 None,
                                 &result.value,
                                 &result.errors,
-                                settings,
+                                &state.settings,
                             );
 
                             match hovered {
@@ -222,7 +211,7 @@ pub fn render(
                                 parse_result::HoverInfo::Value { path } => {
                                     if let Some(value) = result.value.subvalue_at_path(&path) {
                                         for range in value.provenance.byte_ranges() {
-                                            marked_locations.add(MarkedLocation::new(
+                                            state.marked_locations.add(MarkedLocation::new(
                                                 (AbsoluteOffset::from(*range.start())
                                                     ..=AbsoluteOffset::from(*range.end()))
                                                     .into(),
@@ -235,7 +224,7 @@ pub fn render(
                                     for range in
                                         result.errors[id.raw_idx()].provenance.byte_ranges()
                                     {
-                                        marked_locations.add(MarkedLocation::new(
+                                        state.marked_locations.add(MarkedLocation::new(
                                             (AbsoluteOffset::from(*range.start())
                                                 ..=AbsoluteOffset::from(*range.end()))
                                                 .into(),
@@ -253,7 +242,7 @@ pub fn render(
     let copy_event = ui.input(|input| input.events.contains(&egui::Event::Copy));
 
     if copy_event
-        && let Some(selection) = selection_state.selected_window()
+        && let Some(selection) = state.selection_state.selected_window()
         && let Ok(size) = usize::try_from(selection.size().as_u64())
     {
         let mut buf = vec![0; size];
@@ -314,14 +303,7 @@ fn handle_scrolling(
 }
 
 /// Renders a single row in a hexdump.
-fn render_row(
-    ui: &mut Ui,
-    selection_state: &mut SelectionState,
-    offset: AbsoluteOffset,
-    row: &[u8],
-    file_size: Len,
-    settings: &Settings,
-) {
+fn render_row(ui: &mut Ui, state: &mut State, offset: AbsoluteOffset, row: &[u8], file_size: Len) {
     let interact_with_offset =
         |ui: &Ui, offset, response: &egui::Response, selection_state: &mut SelectionState| {
             if let Some(origin) = ui.input(|input| input.pointer.latest_pos())
@@ -353,30 +335,30 @@ fn render_row(
             };
 
         // offset
-        render_offset(ui, settings, Sense::hover(), offset).on_hover_ui(|ui| {
+        render_offset(ui, &state.settings, Sense::hover(), offset).on_hover_ui(|ui| {
             let percentage = offset.as_u64() as f64 / file_size.as_u64() as f64 * 100.0;
             ui.label(format!("{percentage:.02}% of file"));
         });
-        ui.add_space(settings.large_space());
+        ui.add_space(state.settings.large_space());
 
         // hex values
         for (i, &byte) in row.iter().enumerate() {
             if i == 8 {
-                ui.add_space(settings.small_space());
+                ui.add_space(state.settings.small_space());
             }
 
             let byte_offset = offset + Len::from(i as u64);
 
-            let response = render_hex(ui, settings, Sense::hover(), byte);
-            interact_with_offset(ui, byte_offset, &response, selection_state);
+            let response = render_hex(ui, &state.settings, Sense::hover(), byte);
+            interact_with_offset(ui, byte_offset, &response, &mut state.selection_state);
 
             response.on_hover_ui(|ui| {
-                render_glyph(ui, settings, Sense::hover(), byte);
-                render_offset_info(ui, byte_offset, selection_state.selected_window());
+                render_glyph(ui, &state.settings, Sense::hover(), byte);
+                render_offset_info(ui, byte_offset, state.selection_state.selected_window());
             });
 
             if i < 15 {
-                ui.add_space(settings.small_space());
+                ui.add_space(state.settings.small_space());
             }
         }
 
@@ -385,51 +367,48 @@ fn render_row(
             let mut space = 0.0;
             // add the separator in the middle
             if row.len() < 9 {
-                space += settings.small_space();
+                space += state.settings.small_space();
             }
 
             // add space for the characters
-            space += (16 - row.len()) as f32 * settings.char_width() * 2.0;
+            space += (16 - row.len()) as f32 * state.settings.char_width() * 2.0;
 
             // add space between the characters
-            space += (15 - row.len()) as f32 * settings.small_space();
+            space += (15 - row.len()) as f32 * state.settings.small_space();
 
             ui.add_space(space);
         }
 
-        ui.add_space(settings.large_space());
+        ui.add_space(state.settings.large_space());
 
         for (i, &byte) in row.iter().enumerate() {
             if i == 8 {
-                ui.add_space(settings.small_space());
+                ui.add_space(state.settings.small_space());
             }
 
             let byte_offset = offset + Len::from(i as u64);
 
-            let response = render_glyph(ui, settings, Sense::click(), byte);
-            interact_with_offset(ui, byte_offset, &response, selection_state);
+            let response = render_glyph(ui, &state.settings, Sense::click(), byte);
+            interact_with_offset(ui, byte_offset, &response, &mut state.selection_state);
 
             response.on_hover_ui(|ui| {
-                render_hex(ui, settings, Sense::hover(), byte);
-                render_offset_info(ui, byte_offset, selection_state.selected_window());
+                render_hex(ui, &state.settings, Sense::hover(), byte);
+                render_offset_info(ui, byte_offset, state.selection_state.selected_window());
             });
         }
     });
 }
 
 /// Shows a "minimap" of the hexview to show the context around it.
-#[expect(clippy::too_many_arguments)]
 fn render_sidebar(
     ui: &mut Ui,
-    scroll_state: &mut ScrollState,
+    state: &mut State,
     window: &[u8],
     rows_onscreen: u64,
     max_scroll: u64,
     start: u64,
-    marked_locations: &mut MarkedLocations,
-    settings: &Settings,
 ) {
-    let bar_width_multiplier = settings.bar_width_multiplier();
+    let bar_width_multiplier = state.settings.bar_width_multiplier();
 
     let mut rect = ui.max_rect().intersect(ui.cursor());
     rect.set_width(16.0 * bar_width_multiplier as f32);
@@ -440,32 +419,32 @@ fn render_sidebar(
     let response = ui.allocate_rect(rect, Sense::click_and_drag());
 
     if let Some(pos) = response.interact_pointer_pos() {
-        scroll_state.hex_scroll_offset =
+        state.scroll_state.hex_scroll_offset =
             ((pos.y - rect.min.y).round() as u64).saturating_sub(rows_onscreen / 2);
 
-        if scroll_state.hex_scroll_offset > max_scroll {
-            scroll_state.hex_scroll_offset = max_scroll;
+        if state.scroll_state.hex_scroll_offset > max_scroll {
+            state.scroll_state.hex_scroll_offset = max_scroll;
         }
     }
 
     let highlight_row_range =
-        scroll_state.hex_scroll_offset..scroll_state.hex_scroll_offset + rows_onscreen;
+        state.scroll_state.hex_scroll_offset..state.scroll_state.hex_scroll_offset + rows_onscreen;
 
-    scroll_state.hex_sidebar_cached_image.paint_at(
+    state.scroll_state.hex_sidebar_cached_image.paint_at(
         ui,
         rect,
         (
             start,
-            scroll_state.hex_scroll_offset,
-            settings.linear_byte_colors(),
+            state.scroll_state.hex_scroll_offset,
+            state.settings.linear_byte_colors(),
         ),
         |x, y| {
             let x = x / bar_width_multiplier;
             if let Some(&byte) = window.get(y * 16 + x) {
                 if highlight_row_range.contains(&(y as u64)) {
-                    settings.byte_color(byte)
+                    state.settings.byte_color(byte)
                 } else {
-                    color::lerp(settings.byte_color(byte), Color32::BLACK, 0.5)
+                    color::lerp(state.settings.byte_color(byte), Color32::BLACK, 0.5)
                 }
             } else {
                 Color32::TRANSPARENT
@@ -480,6 +459,6 @@ fn render_sidebar(
             AbsoluteOffset::from(start * 16),
             Len::from(window.len() as u64),
         ),
-        marked_locations,
+        &mut state.marked_locations,
     );
 }
