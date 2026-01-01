@@ -5,11 +5,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::{
-    collections::BTreeMap,
-    io::{Read, Seek as _, SeekFrom},
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, path::PathBuf};
 
 use clap::Parser;
 use egui::{Align, Layout, RichText, TextStyle, UiBuilder};
@@ -55,20 +51,11 @@ fn main() -> eframe::Result {
     let config = Config::parse();
 
     let input = if let Some(file_name) = &config.file {
-        let mut file = std::fs::File::open(file_name).unwrap();
-
-        let len = file.seek(SeekFrom::End(0)).unwrap();
-
-        Input::File {
-            path: PathBuf::from(&file_name),
-            file,
-            len,
-        }
+        Input::from_path(file_name)
     } else {
-        let mut buf = Vec::new();
-        std::io::stdin().read_to_end(&mut buf).unwrap();
-        Input::Stdin(buf.into())
-    };
+        Input::from_stdin()
+    }
+    .expect("TODO: implement proper error handling in main");
 
     let file_name = if let Some(file) = &config.file {
         file.display().to_string()
@@ -87,7 +74,7 @@ fn main() -> eframe::Result {
             Ok(Box::new(MyApp {
                 frame_time: std::time::Duration::ZERO,
                 state: State::new(&input),
-                statistics_handler: StatisticsHandler::new(input.try_clone().unwrap()),
+                statistics_handler: StatisticsHandler::new(input.clone()),
                 input,
                 parse_type: "none",
                 parse_offset: String::from("0"),

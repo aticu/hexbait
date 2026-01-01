@@ -4,7 +4,7 @@
 
 use std::{
     char,
-    io::{Read, Seek, SeekFrom},
+    io::{self, Read},
     path::PathBuf,
     str::FromStr,
 };
@@ -12,6 +12,7 @@ use std::{
 use clap::Parser;
 use hexbait_builtin_parsers::built_in_format_descriptions;
 use hexbait_lang::{Value, View, eval_ir, ir::lower_file, parse};
+use positioned_io::{RandomAccessFile, Size as _};
 use serde_json::Number;
 
 /// hexbait-parser - parses bytes to json according to .hbl-definitions
@@ -76,11 +77,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file;
     let view = match config.file {
         Some(path) => {
-            file = std::fs::File::open(path)?;
-            let mut file = &file;
-            let len = file.seek(SeekFrom::End(0))?;
+            file = RandomAccessFile::open(path)?;
+            let len = file
+                .size()?
+                .ok_or_else(|| io::Error::other("cannot get file size"))?;
 
-            View::File { file, len }
+            View::File { file: &file, len }
         }
         None => {
             let mut buf = Vec::new();

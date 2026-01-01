@@ -1,24 +1,24 @@
 //! Models how the raw data is accessed in hexamine.
 
 use std::{
-    fs::File,
-    io::{self, Read as _, Seek as _, SeekFrom},
-    path::PathBuf,
+    io,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
 use hexbait_common::{AbsoluteOffset, Len};
 use hexbait_lang::View;
+use positioned_io::{RandomAccessFile, ReadAt as _, Size as _};
 
 /// The input file to examine.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Input {
     /// The input is the given file.
     File {
         /// The path of the file.
-        path: PathBuf,
+        path: Arc<Path>,
         /// The open file handle.
-        file: File,
+        file: Arc<RandomAccessFile>,
         /// The length of the file in bytes.
         len: u64,
     },
@@ -27,16 +27,30 @@ pub enum Input {
 }
 
 impl Input {
-    /// Clones the given input.
-    pub fn try_clone(&self) -> io::Result<Input> {
-        match self {
-            Input::File { path, len, .. } => File::open(path).map(|file| Input::File {
-                path: path.clone(),
-                file,
-                len: *len,
-            }),
-            Input::Stdin(buf) => Ok(Input::Stdin(Arc::clone(buf))),
-        }
+    /// Creates an input from the given path.
+    pub fn from_path(path: impl Into<PathBuf>) -> io::Result<Input> {
+        let path = path.into();
+
+        let file = positioned_io::RandomAccessFile::open(&path).unwrap();
+        let len = file
+            .size()?
+            .ok_or_else(|| io::Error::other("cannot get file size"))?;
+
+        Ok(Input::File {
+            path: path.into(),
+            file: Arc::new(file),
+            len,
+        })
+    }
+
+    /// Creates an input from stdin.
+    ///
+    /// This should only be called once since it consumes stdin.
+    pub fn from_stdin() -> io::Result<Input> {
+        let mut buf = Vec::new();
+        io::Read::read_to_end(&mut io::stdin(), &mut buf)?;
+
+        Ok(Input::Stdin(buf.into()))
     }
 
     /// The length of the data.
@@ -73,8 +87,7 @@ impl Input {
                     .try_into()
                     .expect("we used min above, so this must fit into `buf`")];
 
-                file.seek(SeekFrom::Start(offset.as_u64()))?;
-                file.read_exact(truncated_buf)?;
+                file.read_exact_at(offset.as_u64(), truncated_buf)?;
 
                 Ok(truncated_buf)
             }
@@ -110,7 +123,7 @@ impl<'input> TryFrom<&'input Input> for View<'input> {
 
     fn try_from(value: &'input Input) -> Result<View<'input>, Self::Error> {
         match value {
-            Input::File { file, .. } => View::try_from(file),
+            Input::File { file, .. } => View::try_from(&**file),
             Input::Stdin(bytes) => Ok(View::from(&**bytes)),
         }
     }

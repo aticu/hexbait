@@ -1,10 +1,8 @@
 //! Defines the views that are the source of the parsing.
 
-use std::{
-    fs,
-    io::{self, Read as _, Seek as _, SeekFrom},
-    ops::Range,
-};
+use std::{io, ops::Range};
+
+use positioned_io::{RandomAccessFile, ReadAt as _, Size as _};
 
 use super::provenance::Provenance;
 
@@ -14,7 +12,7 @@ pub enum View<'src> {
     /// Parses directly from the given file.
     File {
         /// The file to read from.
-        file: &'src fs::File,
+        file: &'src RandomAccessFile,
         /// The length of the file.
         ///
         /// This assumes that this will never change.
@@ -65,16 +63,13 @@ impl View<'_> {
 
         let out_buf = match self {
             View::File { file, len } => {
-                let mut file = &**file;
-
                 let len_left = len - offset;
                 let output_size = std::cmp::min(len_left, buf.len().try_into().unwrap_or(u64::MAX));
                 let truncated_buf = &mut buf[..output_size
                     .try_into()
                     .expect("we used min above, so this must fit into `buf`")];
 
-                file.seek(SeekFrom::Start(offset))?;
-                file.read_exact(truncated_buf)?;
+                file.read_exact_at(offset, truncated_buf)?;
 
                 truncated_buf
             }
@@ -117,11 +112,13 @@ impl View<'_> {
     }
 }
 
-impl<'src> TryFrom<&'src fs::File> for View<'src> {
+impl<'src> TryFrom<&'src RandomAccessFile> for View<'src> {
     type Error = io::Error;
 
-    fn try_from(file: &'src fs::File) -> Result<Self, Self::Error> {
-        let len = (&*file).seek(SeekFrom::End(0))?;
+    fn try_from(file: &'src RandomAccessFile) -> Result<Self, Self::Error> {
+        let len = file
+            .size()?
+            .ok_or_else(|| io::Error::other("cannot get file size"))?;
 
         Ok(View::File { file, len })
     }

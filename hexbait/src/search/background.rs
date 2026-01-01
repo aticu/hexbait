@@ -58,7 +58,7 @@ impl BackgroundSearcher {
         let results = Arc::new(RwLock::new(BTreeSet::new()));
         let (sender, receiver) = mpsc::channel();
 
-        let source = input.try_clone().unwrap();
+        let source = input.clone();
 
         let searcher = BackgroundSearcher {
             progress: Arc::clone(&progress),
