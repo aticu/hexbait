@@ -1,9 +1,11 @@
 //! Defines common types and functions used by all hexbait `crate`s.
 
 pub use endianness::Endianness;
+pub use input::Input;
 pub use quantities::{AbsoluteOffset, Len, RelativeOffset};
 
 mod endianness;
+mod input;
 mod quantities;
 
 /// Indicates whether something changed or remained the same between frames.

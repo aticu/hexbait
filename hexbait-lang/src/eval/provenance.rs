@@ -2,6 +2,7 @@
 
 use std::ops::{Add, AddAssign, Range, RangeInclusive};
 
+use hexbait_common::AbsoluteOffset;
 use range_set_blaze::RangeSetBlaze;
 
 /// Tracks where parsed values originated.
@@ -20,10 +21,10 @@ impl Provenance {
     }
 
     /// Creates a new provenance from the give window.
-    pub fn from_range(range: Range<u64>) -> Provenance {
+    pub fn from_range(range: Range<AbsoluteOffset>) -> Provenance {
         let mut byte_ranges = RangeSetBlaze::new();
         if !range.is_empty() {
-            byte_ranges.ranges_insert(range.start..=range.end - 1);
+            byte_ranges.ranges_insert(range.start.as_u64()..=range.end.as_u64() - 1);
         }
 
         Provenance { byte_ranges }
@@ -44,8 +45,8 @@ impl Provenance {
     }
 }
 
-impl From<Range<u64>> for Provenance {
-    fn from(value: Range<u64>) -> Self {
+impl From<Range<AbsoluteOffset>> for Provenance {
+    fn from(value: Range<AbsoluteOffset>) -> Self {
         Provenance::from_range(value)
     }
 }

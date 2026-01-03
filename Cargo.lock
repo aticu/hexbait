@@ -1549,7 +1549,6 @@ dependencies = [
  "hexbait-common",
  "hexbait-lang",
  "infer",
- "positioned-io",
  "quick_cache",
  "size_format",
  "unicode_names2",
@@ -1565,6 +1564,9 @@ dependencies = [
 [[package]]
 name = "hexbait-common"
 version = "0.1.0"
+dependencies = [
+ "positioned-io",
+]
 
 [[package]]
 name = "hexbait-lang"
@@ -1576,7 +1578,6 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "num_enum",
- "positioned-io",
  "range-set-blaze",
  "rowan",
  "smol_str 0.3.4",
@@ -1589,8 +1590,8 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "hexbait-builtin-parsers",
+ "hexbait-common",
  "hexbait-lang",
- "positioned-io",
  "serde_json",
 ]
 

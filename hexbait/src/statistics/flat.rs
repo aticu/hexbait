@@ -6,11 +6,10 @@ use std::{
     ops::{AddAssign, SubAssign},
 };
 
-use hexbait_common::Len;
+use hexbait_common::{Input, Len};
 use size_format::SizeFormatterBinary;
 
 use crate::{
-    data::Input,
     statistics::{Statistics, StatisticsKind},
     window::Window,
 };

@@ -9,9 +9,9 @@ use std::{
 };
 
 use aho_corasick::AhoCorasick;
-use hexbait_common::{AbsoluteOffset, Len};
+use hexbait_common::{AbsoluteOffset, Input, Len};
 
-use crate::{data::Input, window::Window};
+use crate::window::Window;
 
 /// Contains shared state between background and foreground searcher.
 pub(crate) struct BackgroundSearcherStartResult {

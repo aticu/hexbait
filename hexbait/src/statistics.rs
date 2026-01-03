@@ -2,10 +2,11 @@
 
 use std::{fmt, io, ops::AddAssign};
 
+use hexbait_common::Input;
 use raw_bigrams::{RawBigrams, SmallRawBigrams};
 use size_format::SizeFormatterBinary;
 
-use crate::{data::Input, window::Window};
+use crate::window::Window;
 
 mod flat;
 mod handler;

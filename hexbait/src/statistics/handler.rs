@@ -10,10 +10,10 @@ use std::{
 };
 
 use background_thread::{BackgroundThread, Request, RequestKind};
-use hexbait_common::{AbsoluteOffset, Len, StateChangeFlag};
+use hexbait_common::{AbsoluteOffset, Input, Len, StateChangeFlag};
 use quick_cache::sync::Cache;
 
-use crate::{data::Input, window::Window};
+use crate::window::Window;
 
 use super::Statistics;
 

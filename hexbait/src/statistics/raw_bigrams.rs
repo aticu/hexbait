@@ -7,9 +7,9 @@ use std::{
     ops::{AddAssign, SubAssign},
 };
 
-use hexbait_common::Len;
+use hexbait_common::{Input, Len};
 
-use crate::{data::Input, window::Window};
+use crate::window::Window;
 
 /// Computed statistics about bigrams in a window of data.
 #[derive(Eq, PartialEq)]

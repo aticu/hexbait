@@ -2,17 +2,12 @@
 //!
 //! This also serves as a testing ground for an eventual integration into hexbait itself.
 
-use std::{
-    char,
-    io::{self, Read},
-    path::PathBuf,
-    str::FromStr,
-};
+use std::{char, path::PathBuf, str::FromStr};
 
 use clap::Parser;
 use hexbait_builtin_parsers::built_in_format_descriptions;
+use hexbait_common::{Input, RelativeOffset};
 use hexbait_lang::{Value, View, eval_ir, ir::lower_file, parse};
-use positioned_io::{RandomAccessFile, Size as _};
 use serde_json::Number;
 
 /// hexbait-parser - parses bytes to json according to .hbl-definitions
@@ -73,27 +68,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let stdin_buf;
-    let file;
-    let view = match config.file {
-        Some(path) => {
-            file = RandomAccessFile::open(path)?;
-            let len = file
-                .size()?
-                .ok_or_else(|| io::Error::other("cannot get file size"))?;
-
-            View::File { file: &file, len }
-        }
-        None => {
-            let mut buf = Vec::new();
-            let len = std::io::stdin().read_to_end(&mut buf)?;
-            stdin_buf = buf;
-
-            View::Bytes(&stdin_buf[..len])
-        }
+    let input = match config.file {
+        Some(path) => Input::from_path(path)?,
+        None => Input::from_stdin()?,
     };
+    let view = View::Input(input);
 
-    let result = eval_ir(&parser, view, 0).value;
+    let result = eval_ir(&parser, view, RelativeOffset::ZERO).value;
     let as_json = value_to_json(&result);
 
     println!("{}", as_json);

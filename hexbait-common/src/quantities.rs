@@ -57,6 +57,11 @@ impl AbsoluteOffset {
     pub const fn as_u64(self) -> u64 {
         self.0
     }
+
+    /// Returns this offset as a relative offset to the start of the input.
+    pub const fn to_relative(self) -> RelativeOffset {
+        RelativeOffset(self.0)
+    }
 }
 
 impl fmt::Debug for AbsoluteOffset {
@@ -137,9 +142,36 @@ impl RelativeOffset {
         RelativeOffset(offset)
     }
 
+    /// Aligns this offset up towards the given alignment.
+    ///
+    /// The alignment must be a power of two.
+    ///
+    /// # Panics
+    /// This function MAY panic if the alignment is not a power of two.
+    pub const fn align_up(self, align: u64) -> Self {
+        Self(align_up(self.0, align))
+    }
+
+    /// Aligns this offset down towards the given alignment.
+    ///
+    /// The alignment must be a power of two.
+    ///
+    /// # Panics
+    /// This function MAY panic if the alignment is not a power of two.
+    pub const fn align_down(self, align: u64) -> Self {
+        Self(align_down(self.0, align))
+    }
+
     /// Returns this offset as a `u64`.
     pub const fn as_u64(self) -> u64 {
         self.0
+    }
+
+    /// Returns this offset as an absolute offset.
+    ///
+    /// This is valid if the base that the offset is relative to is the beginning of the input.
+    pub const fn to_absolute(self) -> AbsoluteOffset {
+        AbsoluteOffset(self.0)
     }
 }
 

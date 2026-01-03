@@ -2,10 +2,9 @@
 
 use std::hash::{Hash as _, Hasher as _};
 
-use hexbait_common::{AbsoluteOffset, Len, RelativeOffset, StateChangeFlag};
+use hexbait_common::{AbsoluteOffset, Input, Len, RelativeOffset, StateChangeFlag};
 
 use crate::{
-    data::Input,
     gui::cached_image::CachedImage,
     state::{DisplayType, Settings},
     window::Window,

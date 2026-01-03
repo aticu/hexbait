@@ -1,29 +1,26 @@
 //! Models how the raw data is accessed in hexamine.
 
-use std::{
-    io,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{io, path::PathBuf, sync::Arc};
 
-use hexbait_common::{AbsoluteOffset, Len};
-use hexbait_lang::View;
 use positioned_io::{RandomAccessFile, ReadAt as _, Size as _};
 
-/// The input file to examine.
+use crate::{AbsoluteOffset, Len};
+
 #[derive(Debug, Clone)]
-pub enum Input {
+pub struct Input(Arc<InputType>);
+
+/// The input file to examine.
+#[derive(Debug)]
+enum InputType {
     /// The input is the given file.
     File {
-        /// The path of the file.
-        path: Arc<Path>,
         /// The open file handle.
-        file: Arc<RandomAccessFile>,
+        file: RandomAccessFile,
         /// The length of the file in bytes.
         len: u64,
     },
     /// The input was read from stdin.
-    Stdin(Arc<[u8]>),
+    Stdin(Box<[u8]>),
 }
 
 impl Input {
@@ -36,11 +33,7 @@ impl Input {
             .size()?
             .ok_or_else(|| io::Error::other("cannot get file size"))?;
 
-        Ok(Input::File {
-            path: path.into(),
-            file: Arc::new(file),
-            len,
-        })
+        Ok(Input(Arc::new(InputType::File { file, len })))
     }
 
     /// Creates an input from stdin.
@@ -50,14 +43,14 @@ impl Input {
         let mut buf = Vec::new();
         io::Read::read_to_end(&mut io::stdin(), &mut buf)?;
 
-        Ok(Input::Stdin(buf.into()))
+        Ok(Input(Arc::new(InputType::Stdin(buf.into()))))
     }
 
     /// The length of the data.
     pub fn len(&self) -> Len {
-        match self {
-            Input::File { len, .. } => Len::from(*len),
-            Input::Stdin(stdin) => Len::from(
+        match &*self.0 {
+            InputType::File { len, .. } => Len::from(*len),
+            InputType::Stdin(stdin) => Len::from(
                 u64::try_from(stdin.len())
                     .expect("non `u64`-fitting length would not fit into memory"),
             ),
@@ -71,12 +64,12 @@ impl Input {
 
     /// Fills the buffer with the data at the given offset in the input, returning the filled slice.
     pub fn window_at<'buf>(
-        &mut self,
+        &self,
         offset: AbsoluteOffset,
         buf: &'buf mut [u8],
     ) -> Result<&'buf [u8], io::Error> {
-        match self {
-            Input::File { file, len, .. } => {
+        match &*self.0 {
+            InputType::File { file, len, .. } => {
                 if offset.as_u64() > *len {
                     return Err(io::Error::other("offset is beyond input"));
                 }
@@ -91,7 +84,7 @@ impl Input {
 
                 Ok(truncated_buf)
             }
-            Input::Stdin(stdin) => {
+            InputType::Stdin(stdin) => {
                 let offset_usize: usize = offset
                     .as_u64()
                     .try_into()
@@ -109,22 +102,6 @@ impl Input {
 
                 Ok(&buf[..output_size])
             }
-        }
-    }
-
-    /// Returns the input as a parsing view.
-    pub fn as_view<'this>(&'this self) -> Result<View<'this>, io::Error> {
-        View::try_from(self)
-    }
-}
-
-impl<'input> TryFrom<&'input Input> for View<'input> {
-    type Error = io::Error;
-
-    fn try_from(value: &'input Input) -> Result<View<'input>, Self::Error> {
-        match value {
-            Input::File { file, .. } => View::try_from(&**file),
-            Input::Stdin(bytes) => Ok(View::from(&**bytes)),
         }
     }
 }

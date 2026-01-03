@@ -1,13 +1,13 @@
 //! Implements the structures storing the state of the hexbait application.
 
-use hexbait_common::Endianness;
+use hexbait_common::{Endianness, Input};
 pub use scroll_state::{InteractionState, ScrollState, Scrollbar};
 pub use search_state::SearchState;
 pub use selection_state::SelectionState;
 pub use settings::{Settings, ViewKind};
 pub use statistics_display_state::StatisticsDisplayState;
 
-use crate::{data::Input, gui::marking::MarkedLocations};
+use crate::gui::marking::MarkedLocations;
 
 mod scroll_state;
 mod search_state;

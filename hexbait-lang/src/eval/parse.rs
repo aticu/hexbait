@@ -18,19 +18,20 @@ use super::{
 };
 
 pub use diagnostics::{ParseErr, ParseErrId, ParseErrKind, ParseWarning};
-use hexbait_common::Endianness;
+use hexbait_common::{Endianness, Len, RelativeOffset};
 
 mod diagnostics;
 
 /// An offset in bytes to parse from.
 #[derive(Debug, Clone, Copy)]
-struct ByteOffset(u64);
+struct ByteOffset(RelativeOffset);
 
 impl TryFrom<&Value> for ByteOffset {
     type Error = ParseErrKind;
 
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         u64::try_from(value.kind.expect_int())
+            .map(RelativeOffset::from)
             .map(ByteOffset)
             .map_err(|_| ParseErrKind::OffsetTooLarge)
     }
@@ -47,7 +48,7 @@ pub struct ParseResult {
 }
 
 /// Evaluates the given IR on the given input.
-pub fn eval_ir(file: &File, view: View<'_>, start_offset: u64) -> ParseResult {
+pub fn eval_ir(file: &File, view: View<'_>, start_offset: RelativeOffset) -> ParseResult {
     let mut struct_ctx = StructContext::new();
     let mut scope = Scope::new(&view);
     scope.offset = ByteOffset(start_offset);
@@ -126,7 +127,7 @@ impl<'parent> StructContext<'parent> {
             recovery_strategy: RecoveryStrategy::Fallback,
             error: None,
             // will be set to the correct value when the parsing starts
-            start_offset: ByteOffset(0),
+            start_offset: ByteOffset(RelativeOffset::ZERO),
         }
     }
 
@@ -138,7 +139,7 @@ impl<'parent> StructContext<'parent> {
             recovery_strategy: RecoveryStrategy::Fallback,
             error: None,
             // will be set to the correct value when the parsing starts
-            start_offset: ByteOffset(0),
+            start_offset: ByteOffset(RelativeOffset::ZERO),
         }
     }
 
@@ -196,7 +197,7 @@ impl<'src> Scope<'src> {
         Scope {
             // static analysis makes sure that this is set to the correct value before parsing
             endianness: Endianness::Little,
-            offset: ByteOffset(0),
+            offset: ByteOffset(RelativeOffset::ZERO),
             view,
         }
     }
@@ -217,29 +218,29 @@ impl<'src> Scope<'src> {
     /// Reads the specified number of bytes.
     fn read_bytes(
         &mut self,
-        count: u64,
+        count: Len,
         span: Span,
         parse_ctx: &mut ParseContext,
     ) -> Result<(Vec<u8>, Provenance), ParseErrId> {
         let start = self.offset.0;
 
         let view_len = self.view.len();
-        if view_len < start.saturating_add(count) {
+        if RelativeOffset::from(view_len.as_u64()) < start + count {
             return Err(parse_ctx.new_err(ParseErr {
                 message: "view is too short".into(),
                 kind: ParseErrKind::InputTooShort,
-                provenance: self.view.provenance_from_range(start..start + 1),
+                provenance: self.view.provenance_from_range(start..start + Len::from(1)),
                 span,
             }));
         }
 
-        let count_as_usize = usize::try_from(count).unwrap();
+        let count_as_usize = usize::try_from(count.as_u64()).unwrap();
         let mut buf = vec![0; count_as_usize];
         let window = self.view.read_at(start, &mut buf).map_err(|err| {
             parse_ctx.new_err(ParseErr {
                 message: format!("io error: {err}"),
                 kind: ParseErrKind::Io(err),
-                provenance: self.view.provenance_from_range(start..start + 1),
+                provenance: self.view.provenance_from_range(start..start + Len::from(1)),
                 span,
             })
         })?;
@@ -247,7 +248,7 @@ impl<'src> Scope<'src> {
             return Err(parse_ctx.new_err(ParseErr {
                 message: "view is too short".into(),
                 kind: ParseErrKind::InputTooShort,
-                provenance: self.view.provenance_from_range(start..start + 1),
+                provenance: self.view.provenance_from_range(start..start + Len::from(1)),
                 span,
             }));
         }
@@ -284,7 +285,7 @@ impl<'src> Scope<'src> {
                 impossible!()
             }
             ExprKind::Offset => Ok(Value {
-                kind: ValueKind::Integer(Int::from(self.offset.0)),
+                kind: ValueKind::Integer(Int::from(self.offset.0.as_u64())),
                 provenance: Provenance::empty(),
             }),
             ExprKind::Parent => Ok(struct_ctx.parent.static_analysis_expect().as_value()),
@@ -427,9 +428,9 @@ impl<'src> Scope<'src> {
                         self.eval_expr(offset_expr, struct_ctx, parse_ctx, additional_ctx)?;
 
                     if let Ok(offset) = u64::try_from(offset.kind.expect_int())
-                        && offset <= self.view.len()
+                        && Len::from(offset) <= self.view.len()
                     {
-                        ByteOffset(offset)
+                        ByteOffset(RelativeOffset::from(offset))
                     } else {
                         return Err(parse_ctx.new_err(ParseErr {
                             message: "new offset did not fit in available space".into(),
@@ -465,16 +466,16 @@ impl<'src> Scope<'src> {
                 let align = value.kind.expect_int();
                 let align = u64::try_from(align).static_analysis_expect();
 
-                self.offset.0 = align_up(self.offset.0, align);
+                self.offset.0 = self.offset.0.align_up(align);
             }
             Declaration::SeekBy(expr) => {
                 let value = self.eval_expr(expr, struct_ctx, parse_ctx, Default::default())?;
                 let offset = value.kind.expect_int();
 
-                if let Ok(new_offset) = u64::try_from(offset + Int::from(self.offset.0))
-                    && new_offset <= self.view.len()
+                if let Ok(new_offset) = u64::try_from(offset + Int::from(self.offset.0.as_u64()))
+                    && Len::from(new_offset) <= self.view.len()
                 {
-                    self.offset.0 = new_offset;
+                    self.offset.0 = RelativeOffset::from(new_offset);
                 } else {
                     return Err(parse_ctx
                         .new_err(ParseErr {
@@ -491,9 +492,9 @@ impl<'src> Scope<'src> {
                 let offset = value.kind.expect_int();
 
                 if let Ok(new_offset) = u64::try_from(offset)
-                    && new_offset <= self.view.len()
+                    && Len::from(new_offset) <= self.view.len()
                 {
-                    self.offset.0 = new_offset;
+                    self.offset.0 = RelativeOffset::from(new_offset);
                 } else {
                     return Err(parse_ctx
                         .new_err(ParseErr {
@@ -514,9 +515,9 @@ impl<'src> Scope<'src> {
                     self.eval_expr(start, struct_ctx, parse_ctx, Default::default())?;
 
                 let start = if let Ok(start) = u64::try_from(start_expr.kind.expect_int())
-                    && start <= self.view.len()
+                    && Len::from(start) <= self.view.len()
                 {
-                    start
+                    RelativeOffset::from(start)
                 } else {
                     return Err(parse_ctx
                         .new_err(ParseErr {
@@ -533,9 +534,9 @@ impl<'src> Scope<'src> {
                         self.eval_expr(end, struct_ctx, parse_ctx, Default::default())?;
 
                     if let Ok(end) = u64::try_from(end_expr.kind.expect_int())
-                        && end <= self.view.len()
+                        && Len::from(end) <= self.view.len()
                     {
-                        end
+                        RelativeOffset::from(end)
                     } else {
                         return Err(parse_ctx
                             .new_err(ParseErr {
@@ -547,14 +548,15 @@ impl<'src> Scope<'src> {
                             .into());
                     }
                 } else {
-                    self.view.len()
+                    RelativeOffset::from(self.view.len().as_u64())
                 };
 
                 let view = View::Subview {
                     view: self.view,
                     valid_range: start..end,
                 };
-                let mut scope = self.child_with_view_and_offset(&view, ByteOffset(0));
+                let mut scope =
+                    self.child_with_view_and_offset(&view, ByteOffset(RelativeOffset::ZERO));
 
                 for single_content in content {
                     scope.eval_single_struct_content(single_content, struct_ctx, parse_ctx)?;
@@ -616,11 +618,11 @@ impl<'src> Scope<'src> {
             Declaration::Recover { at } => {
                 let offset = self.eval_expr(at, struct_ctx, parse_ctx, Default::default())?;
                 if let Ok(offset) = u64::try_from(offset.kind.expect_int())
-                    && let Some(offset) = offset.checked_add(struct_ctx.start_offset.0)
-                    && offset <= self.view.len()
+                    && let Some(offset) = offset.checked_add(struct_ctx.start_offset.0.as_u64())
+                    && Len::from(offset) <= self.view.len()
                 {
                     struct_ctx.recovery_strategy = RecoveryStrategy::SkipTo {
-                        offset: ByteOffset(offset),
+                        offset: ByteOffset(RelativeOffset::from(offset)),
                     };
                 } else {
                     return Err(parse_ctx
@@ -690,7 +692,7 @@ impl<'src> Scope<'src> {
 
                     if let Ok(count) = u64::try_from(count_val.kind.expect_int()) {
                         let (bytes, provenance) =
-                            self.read_bytes(count, count_expr.span, parse_ctx)?;
+                            self.read_bytes(Len::from(count), count_expr.span, parse_ctx)?;
 
                         Value {
                             kind: ValueKind::Bytes(bytes),
@@ -743,7 +745,7 @@ impl<'src> Scope<'src> {
                 let size_in_bytes = (bit_width / 8) as usize;
 
                 let (parsed_bytes, provenance) = self.read_bytes(
-                    u64::try_from(size_in_bytes).unwrap(),
+                    Len::from(u64::try_from(size_in_bytes).unwrap()),
                     parse_type.span,
                     parse_ctx,
                 )?;
@@ -1044,20 +1046,6 @@ struct AdditionalExprContext<'parent> {
     last: Option<&'parent Value>,
     /// The length of the current repeat expression.
     len: Option<&'parent Value>,
-}
-
-/// Aligns the given number towards the maximum value.
-///
-/// `align` must be a power of two.
-const fn align_up(num: u64, align: u64) -> u64 {
-    align_down(num + (align - 1), align)
-}
-
-/// Aligns the given number towards zero.
-///
-/// `align` must be a power of two.
-const fn align_down(num: u64, align: u64) -> u64 {
-    num & !(align - 1)
 }
 
 /// An extension trait to unwrap with a message that a situation should be impossible because of

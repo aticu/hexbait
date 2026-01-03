@@ -1,12 +1,11 @@
 //! Renders hexdumps in the GUI.
 
 use egui::{Align, Color32, Layout, Rect, ScrollArea, Sense, Ui, UiBuilder, Vec2, vec2};
-use hexbait_common::{AbsoluteOffset, Len};
+use hexbait_common::{AbsoluteOffset, Input, Len, RelativeOffset};
 use hexbait_lang::{View, ir::File};
 use highlighting::highlight;
 
 use crate::{
-    data::Input,
     gui::color,
     state::{ScrollState, SelectionState, State},
     window::Window,
@@ -188,15 +187,14 @@ pub fn render(
                             };
 
                             let Some(parse_type) = parse_type else { return };
-                            let Ok(view) = input.as_view() else {
-                                eprintln!("TODO: implement better error handling");
-                                return;
-                            };
+                            let view = View::Input(input.clone());
                             let view = View::Subview {
                                 view: &view,
-                                valid_range: parse_offset.as_u64()..view.len(),
+                                valid_range: parse_offset.to_relative()
+                                    ..RelativeOffset::from(view.len().as_u64()),
                             };
-                            let result = hexbait_lang::eval_ir(parse_type, view, 0);
+                            let result =
+                                hexbait_lang::eval_ir(parse_type, view, RelativeOffset::ZERO);
                             let hovered = parse_result::show_value(
                                 ui,
                                 state,

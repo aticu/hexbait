@@ -5,8 +5,9 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard, mpsc},
 };
 
+use hexbait_common::Input;
+
 use crate::{
-    data::Input,
     search::background::{BackgroundSearcher, SearchRequest},
     window::Window,
 };

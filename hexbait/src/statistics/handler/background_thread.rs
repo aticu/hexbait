@@ -9,11 +9,10 @@ use std::{
     },
 };
 
-use hexbait_common::{AbsoluteOffset, Len};
+use hexbait_common::{AbsoluteOffset, Input, Len};
 use quick_cache::sync::Cache;
 
 use crate::{
-    data::Input,
     statistics::{FlatStatistics, Statistics},
     window::Window,
 };

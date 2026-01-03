@@ -6,6 +6,6 @@ edition = "2024"
 [dependencies]
 clap = { version = "4.5.51", features = ["derive"] }
 serde_json = { version = "1.0.145", default-features = false, features = ["std", "arbitrary_precision"] }
-positioned-io = { version = "0.3.5", default-features = false }
+hexbait-common = { path = "../hexbait-common" }
 hexbait-lang = { path = "../hexbait-lang" }
 hexbait-builtin-parsers = { path = "../hexbait-builtin-parsers" }

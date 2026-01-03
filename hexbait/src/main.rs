@@ -10,13 +10,12 @@ use std::{collections::BTreeMap, path::PathBuf};
 use clap::Parser;
 use egui::{Align, Layout, RichText, TextStyle, UiBuilder};
 use hexbait::{
-    data::Input,
     gui::marking::{MarkedLocation, MarkingKind},
     state::{DisplayType, State, ViewKind},
     statistics::{Statistics, StatisticsHandler},
 };
 use hexbait_builtin_parsers::built_in_format_descriptions;
-use hexbait_common::AbsoluteOffset;
+use hexbait_common::{AbsoluteOffset, Input};
 
 // TODO: change font to render more characters
 // TODO: change default font-size and refactor around that
