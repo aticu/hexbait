@@ -1,9 +1,9 @@
 //! Implements the parsing evaluation logic.
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use crate::{
-    Int, Span,
+    BytesValue, Int, Span,
     eval::parse::diagnostics::ParseErrWithMaybePartialResult,
     ir::{
         BinOp, Declaration, ElsePart, Expr, ExprKind, File, IfChain, LetStatement, Lit, ParseType,
@@ -48,9 +48,9 @@ pub struct ParseResult {
 }
 
 /// Evaluates the given IR on the given input.
-pub fn eval_ir(file: &File, view: View<'_>, start_offset: RelativeOffset) -> ParseResult {
+pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseResult {
     let mut struct_ctx = StructContext::new();
-    let mut scope = Scope::new(&view);
+    let mut scope = Scope::new(view);
     scope.offset = ByteOffset(start_offset);
 
     let mut parse_ctx = ParseContext {
@@ -182,18 +182,18 @@ impl<'parent> StructContext<'parent> {
 
 /// The parsing context for a `scope`.
 #[derive(Debug)]
-struct Scope<'src> {
+struct Scope {
     /// The endianness used for parsing.
     endianness: Endianness,
     /// The current offset used for parsing.
     offset: ByteOffset,
     /// The view that this scope parses from.
-    view: &'src View<'src>,
+    view: View,
 }
 
-impl<'src> Scope<'src> {
+impl Scope {
     /// Creates a new `scope` for the given `struct` context in the given view.
-    fn new(view: &'src View<'src>) -> Scope<'src> {
+    fn new(view: View) -> Scope {
         Scope {
             // static analysis makes sure that this is set to the correct value before parsing
             endianness: Endianness::Little,
@@ -203,11 +203,7 @@ impl<'src> Scope<'src> {
     }
 
     /// Creates a new child scope with the given view and offset.
-    fn child_with_view_and_offset(
-        &self,
-        view: &'src View<'src>,
-        offset: ByteOffset,
-    ) -> Scope<'src> {
+    fn child_with_view_and_offset(&self, view: View, offset: ByteOffset) -> Scope {
         Scope {
             endianness: self.endianness,
             view,
@@ -271,7 +267,7 @@ impl<'src> Scope<'src> {
             ExprKind::Lit(lit) => Ok(Value {
                 kind: match lit {
                     Lit::Int(int) => ValueKind::Integer(int.clone()),
-                    Lit::Bytes(bytes) => ValueKind::Bytes(bytes.clone()),
+                    Lit::Bytes(bytes) => ValueKind::Bytes(BytesValue::Lit(Arc::clone(bytes))),
                     Lit::Bool(val) => ValueKind::Boolean(*val),
                 },
                 provenance: Provenance::empty(),
@@ -443,7 +439,7 @@ impl<'src> Scope<'src> {
                     self.offset
                 };
 
-                let mut scope = self.child_with_view_and_offset(self.view, offset);
+                let mut scope = self.child_with_view_and_offset(self.view.clone(), offset);
                 scope
                     .eval_parse_type(ty, struct_ctx, parse_ctx)
                     .map_err(|err| err.parse_err)
@@ -551,12 +547,9 @@ impl<'src> Scope<'src> {
                     RelativeOffset::from(self.view.len().as_u64())
                 };
 
-                let view = View::Subview {
-                    view: self.view,
-                    valid_range: start..end,
-                };
+                let view = self.view.subview(start..end);
                 let mut scope =
-                    self.child_with_view_and_offset(&view, ByteOffset(RelativeOffset::ZERO));
+                    self.child_with_view_and_offset(view, ByteOffset(RelativeOffset::ZERO));
 
                 for single_content in content {
                     scope.eval_single_struct_content(single_content, struct_ctx, parse_ctx)?;
@@ -575,8 +568,11 @@ impl<'src> Scope<'src> {
 
                         format!(
                             "assertion failed: {}",
-                            std::str::from_utf8(message_val.kind.expect_bytes())
-                                .static_analysis_expect()
+                            match message_val.kind.expect_bytes() {
+                                BytesValue::Lit(lit) =>
+                                    std::str::from_utf8(lit).static_analysis_expect(),
+                                _ => impossible!(),
+                            }
                         )
                     } else {
                         String::from("assertion failed")
@@ -601,8 +597,11 @@ impl<'src> Scope<'src> {
                             self.eval_expr(message, struct_ctx, parse_ctx, Default::default())?;
                         format!(
                             "warning triggered: {}",
-                            std::str::from_utf8(message_val.kind.expect_bytes())
-                                .static_analysis_expect()
+                            match message_val.kind.expect_bytes() {
+                                BytesValue::Lit(lit) =>
+                                    std::str::from_utf8(lit).static_analysis_expect(),
+                                _ => impossible!(),
+                            }
                         )
                     } else {
                         String::from("warning triggered")
@@ -691,8 +690,48 @@ impl<'src> Scope<'src> {
                         self.eval_expr(count_expr, struct_ctx, parse_ctx, Default::default())?;
 
                     if let Ok(count) = u64::try_from(count_val.kind.expect_int()) {
-                        let (bytes, provenance) =
-                            self.read_bytes(Len::from(count), count_expr.span, parse_ctx)?;
+                        let (bytes, provenance) = if count > BytesValue::INLINE_LEN as u64 {
+                            let start = self.offset.0;
+                            let (prefix, _) =
+                                self.read_bytes(Len::from(8), count_expr.span, parse_ctx)?;
+                            self.offset.0 += Len::from(count - (8 + 8));
+                            let (suffix, _) =
+                                self.read_bytes(Len::from(8), count_expr.span, parse_ctx)?;
+
+                            let provenance = self
+                                .view
+                                .provenance_from_range(start..start + Len::from(count));
+
+                            let convert_vec = |vec: Vec<u8>| {
+                                let mut buf = [0; 8];
+                                buf.copy_from_slice(&vec);
+                                buf
+                            };
+
+                            (
+                                BytesValue::FromView {
+                                    view: self.view.clone(),
+                                    start,
+                                    len: Len::from(count),
+                                    prefix: convert_vec(prefix),
+                                    suffix: convert_vec(suffix),
+                                },
+                                provenance,
+                            )
+                        } else {
+                            let (bytes, provenance) =
+                                self.read_bytes(Len::from(count), count_expr.span, parse_ctx)?;
+                            let mut buf = [0; BytesValue::INLINE_LEN];
+                            buf[..bytes.len()].copy_from_slice(&bytes);
+
+                            (
+                                BytesValue::Inline {
+                                    buf,
+                                    len: bytes.len() as u8,
+                                },
+                                provenance,
+                            )
+                        };
 
                         Value {
                             kind: ValueKind::Bytes(bytes),

@@ -73,39 +73,44 @@ pub fn show_value(
                 let hex_font = FontId::monospace(font_size);
 
                 handle_response(ui.label(format!("{name_prefix}<")));
-                if bytes.len() > 16 {
-                    for byte in &bytes[..8] {
-                        handle_response(
-                            ui.label(
-                                RichText::new(format!("{byte:02x} "))
-                                    .font(hex_font.clone())
-                                    .color(state.settings.byte_color(*byte)),
-                            ),
-                        );
+                match bytes.preview_slice() {
+                    Ok(slice) => {
+                        for (i, byte) in slice.iter().enumerate() {
+                            handle_response(
+                                ui.label(
+                                    RichText::new(format!("{byte:02x}"))
+                                        .font(hex_font.clone())
+                                        .color(state.settings.byte_color(*byte)),
+                                ),
+                            );
+                            if i != bytes.len() - 1 {
+                                handle_response(
+                                    ui.label(RichText::new(" ").font(hex_font.clone())),
+                                );
+                            }
+                        }
                     }
+                    Err((prefix, suffix)) => {
+                        for byte in prefix {
+                            handle_response(
+                                ui.label(
+                                    RichText::new(format!("{byte:02x} "))
+                                        .font(hex_font.clone())
+                                        .color(state.settings.byte_color(*byte)),
+                                ),
+                            );
+                        }
 
-                    handle_response(ui.label("..."));
+                        handle_response(ui.label("..."));
 
-                    for byte in &bytes[bytes.len() - 8..] {
-                        handle_response(
-                            ui.label(
-                                RichText::new(format!(" {byte:02x}"))
-                                    .font(hex_font.clone())
-                                    .color(state.settings.byte_color(*byte)),
-                            ),
-                        );
-                    }
-                } else {
-                    for (i, byte) in bytes.iter().enumerate() {
-                        handle_response(
-                            ui.label(
-                                RichText::new(format!("{byte:02x}"))
-                                    .font(hex_font.clone())
-                                    .color(state.settings.byte_color(*byte)),
-                            ),
-                        );
-                        if i != bytes.len() - 1 {
-                            handle_response(ui.label(RichText::new(" ").font(hex_font.clone())));
+                        for byte in suffix {
+                            handle_response(
+                                ui.label(
+                                    RichText::new(format!(" {byte:02x}"))
+                                        .font(hex_font.clone())
+                                        .color(state.settings.byte_color(*byte)),
+                                ),
+                            );
                         }
                     }
                 }

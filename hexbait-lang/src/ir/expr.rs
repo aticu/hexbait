@@ -1,5 +1,7 @@
 //! Implements expressions in the IR.
 
+use std::sync::Arc;
+
 use crate::{Int, span::Span};
 
 use super::{ParseType, Spanned, Symbol};
@@ -10,7 +12,7 @@ pub enum Lit {
     /// An integer literal.
     Int(Int),
     /// A bytes literal.
-    Bytes(Vec<u8>),
+    Bytes(Arc<[u8]>),
     /// A boolean literal.
     Bool(bool),
 }

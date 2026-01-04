@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(path) => Input::from_path(path)?,
         None => Input::from_stdin()?,
     };
-    let view = View::Input(input);
+    let view = View::from_input(input);
 
     let result = eval_ir(&parser, view, RelativeOffset::ZERO).value;
     let as_json = value_to_json(&result);
@@ -102,7 +102,7 @@ fn value_to_json(value: &Value) -> serde_json::Value {
             .unwrap_or(serde_json::Value::Null),
         hexbait_lang::ValueKind::Bytes(val) => {
             let mut as_str = String::new();
-            for &byte in val {
+            for byte in &val.as_vec().unwrap() {
                 for bit in (0..8).step_by(4).rev() {
                     let nibble = (byte >> bit) & 0xf;
                     let c = char::from_digit(nibble as u32, 16).unwrap();

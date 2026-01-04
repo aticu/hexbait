@@ -1,30 +1,48 @@
 //! Defines the views that are the source of the parsing.
 
-use std::{io, ops::Range};
+use std::{io, ops::Range, sync::Arc};
 
 use hexbait_common::{Input, Len, RelativeOffset};
 
 use super::provenance::Provenance;
 
+#[derive(Debug, Clone)]
+pub struct View(Arc<ViewType>);
+
 /// A view describes a source that can be parsed from.
-#[derive(Debug)]
-pub enum View<'src> {
+#[derive(Debug, Clone)]
+enum ViewType {
     Input(Input),
     /// Parses out of a subview of a larger view.
     Subview {
         /// The view to parse from.
-        view: &'src View<'src>,
+        view: View,
         /// The range of the parent view that is valid.
         valid_range: Range<RelativeOffset>,
     },
 }
 
-impl View<'_> {
+impl View {
+    /// Creates a view of the input.
+    pub fn from_input(input: Input) -> View {
+        View(Arc::new(ViewType::Input(input)))
+    }
+
+    /// Creates a subview with the given range in the current view.
+    ///
+    /// This function does not check any bounds, so the view may be invalid.
+    pub fn subview(&self, range: Range<RelativeOffset>) -> View {
+        View(Arc::new(ViewType::Subview {
+            view: self.clone(),
+            valid_range: range,
+        }))
+    }
+
     /// Returns the length of the view in bytes.
     pub fn len(&self) -> Len {
-        match self {
-            View::Input(input) => input.len(),
-            View::Subview { view, valid_range } => {
+        match &*self.0 {
+            ViewType::Input(input) => input.len(),
+            ViewType::Subview { view, valid_range } => {
                 assert!(valid_range.end >= valid_range.start);
 
                 let len = view.len();
@@ -55,9 +73,9 @@ impl View<'_> {
             return Err(io::Error::other("offset is beyond input"));
         }
 
-        let out_buf = match self {
-            View::Input(input) => input.window_at(offset.to_absolute(), buf)?,
-            View::Subview { view, valid_range } => {
+        let out_buf = match &*self.0 {
+            ViewType::Input(input) => input.window_at(offset.to_absolute(), buf)?,
+            ViewType::Subview { view, valid_range } => {
                 let buf_len = buf.len();
                 view.read_at(
                     valid_range.start + Len::from(offset.as_u64()),
@@ -74,11 +92,11 @@ impl View<'_> {
 
     /// Creates a provenance for the view from the given range.
     pub(crate) fn provenance_from_range(&self, range: Range<RelativeOffset>) -> Provenance {
-        match self {
-            View::Input(_) => {
+        match &*self.0 {
+            ViewType::Input(_) => {
                 Provenance::from_range(range.start.to_absolute()..range.end.to_absolute())
             }
-            View::Subview { view, valid_range } => view.provenance_from_range(
+            ViewType::Subview { view, valid_range } => view.provenance_from_range(
                 range.start + Len::from(valid_range.start.as_u64())
                     ..range.end + Len::from(valid_range.start.as_u64()),
             ),

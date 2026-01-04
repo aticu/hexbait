@@ -187,12 +187,11 @@ pub fn render(
                             };
 
                             let Some(parse_type) = parse_type else { return };
-                            let view = View::Input(input.clone());
-                            let view = View::Subview {
-                                view: &view,
-                                valid_range: parse_offset.to_relative()
+                            let view = View::from_input(input.clone());
+                            let view = view.subview(
+                                parse_offset.to_relative()
                                     ..RelativeOffset::from(view.len().as_u64()),
-                            };
+                            );
                             let result =
                                 hexbait_lang::eval_ir(parse_type, view, RelativeOffset::ZERO);
                             let hovered = parse_result::show_value(

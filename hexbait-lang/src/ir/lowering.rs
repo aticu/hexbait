@@ -312,7 +312,7 @@ impl LoweringCtx {
                     }
                 }
 
-                ExprKind::Lit(Lit::Bytes(out))
+                ExprKind::Lit(Lit::Bytes(out.into()))
             }
             ast::Expr::ParenExpr(paren_expr) => paren_expr
                 .expr()
@@ -361,7 +361,7 @@ impl LoweringCtx {
                     return ExprKind::Error;
                 }
 
-                ExprKind::Lit(Lit::Bytes(bytes))
+                ExprKind::Lit(Lit::Bytes(bytes.into()))
             }
             TokenKind::TrueKw => ExprKind::Lit(Lit::Bool(true)),
             TokenKind::FalseKw => ExprKind::Lit(Lit::Bool(false)),
