@@ -198,24 +198,25 @@ fn raw_compute<T>(
         None
     } else {
         input
-            .window_at(window.start() - Len::from(1), &mut [0])?
+            .read_at(window.start() - Len::from(1), Len::from(1), None)?
             .first()
             .copied()
     };
 
     const DEFAULT_PREV_BYTE: u8 = 0;
 
+    let mut buf = Vec::new();
+
     // TODO: this can probably be optimized using SIMD, since this is completely independent of
     // any data but the previous byte (which is only required between subwindows)
     let mut prev_byte = byte_before_window.unwrap_or(DEFAULT_PREV_BYTE);
     let mut start = window.start();
     while start < window.end() {
-        let mut buf = [0; WINDOW_SIZE];
         let max_size = std::cmp::min((window.end() - start).as_u64() as usize, WINDOW_SIZE);
 
-        let subwindow = input.window_at(start, &mut buf[..max_size])?;
+        let subwindow = input.read_at(start, Len::from(max_size as u64), Some(&mut buf))?;
 
-        for &byte in subwindow {
+        for &byte in &*subwindow {
             increase_count(this, prev_byte, byte);
             prev_byte = byte;
         }
@@ -232,7 +233,7 @@ fn raw_compute<T>(
     let first_byte = 'first_byte: {
         if byte_before_window.is_none() {
             // if there is no byte before this window, we initialize `prev_byte`
-            if let Some(&first_byte) = input.window_at(window.start(), &mut [0])?.first() {
+            if let Some(&first_byte) = input.read_at(window.start(), Len::from(1), None)?.first() {
                 decrease_count(this, DEFAULT_PREV_BYTE, first_byte);
 
                 break 'first_byte Some(first_byte);

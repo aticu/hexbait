@@ -18,7 +18,7 @@ use super::{
 };
 
 pub use diagnostics::{ParseErr, ParseErrId, ParseErrKind, ParseWarning};
-use hexbait_common::{Endianness, Len, RelativeOffset};
+use hexbait_common::{Endianness, Len, ReadBytes, RelativeOffset};
 
 mod diagnostics;
 
@@ -217,7 +217,7 @@ impl Scope {
         count: Len,
         span: Span,
         parse_ctx: &mut ParseContext,
-    ) -> Result<(Vec<u8>, Provenance), ParseErrId> {
+    ) -> Result<(ReadBytes<'_>, Provenance), ParseErrId> {
         let start = self.offset.0;
 
         let view_len = self.view.len();
@@ -230,9 +230,7 @@ impl Scope {
             }));
         }
 
-        let count_as_usize = usize::try_from(count.as_u64()).unwrap();
-        let mut buf = vec![0; count_as_usize];
-        let window = self.view.read_at(start, &mut buf).map_err(|err| {
+        let buf = self.view.read_at(start, count).map_err(|err| {
             parse_ctx.new_err(ParseErr {
                 message: format!("io error: {err}"),
                 kind: ParseErrKind::Io(err),
@@ -240,7 +238,7 @@ impl Scope {
                 span,
             })
         })?;
-        if window.len() < buf.len() {
+        if buf.len() < count.as_u64() as usize {
             return Err(parse_ctx.new_err(ParseErr {
                 message: "view is too short".into(),
                 kind: ParseErrKind::InputTooShort,
@@ -691,30 +689,32 @@ impl Scope {
 
                     if let Ok(count) = u64::try_from(count_val.kind.expect_int()) {
                         let (bytes, provenance) = if count > BytesValue::INLINE_LEN as u64 {
+                            let convert_read_bytes = |read_bytes: ReadBytes| {
+                                let mut buf = [0; 8];
+                                buf.copy_from_slice(&read_bytes);
+                                buf
+                            };
+
                             let start = self.offset.0;
                             let (prefix, _) =
                                 self.read_bytes(Len::from(8), count_expr.span, parse_ctx)?;
+                            let prefix = convert_read_bytes(prefix);
                             self.offset.0 += Len::from(count - (8 + 8));
                             let (suffix, _) =
                                 self.read_bytes(Len::from(8), count_expr.span, parse_ctx)?;
+                            let suffix = convert_read_bytes(suffix);
 
                             let provenance = self
                                 .view
                                 .provenance_from_range(start..start + Len::from(count));
-
-                            let convert_vec = |vec: Vec<u8>| {
-                                let mut buf = [0; 8];
-                                buf.copy_from_slice(&vec);
-                                buf
-                            };
 
                             (
                                 BytesValue::FromView {
                                     view: self.view.clone(),
                                     start,
                                     len: Len::from(count),
-                                    prefix: convert_vec(prefix),
-                                    suffix: convert_vec(suffix),
+                                    prefix,
+                                    suffix,
                                 },
                                 provenance,
                             )
@@ -783,13 +783,14 @@ impl Scope {
                 );
                 let size_in_bytes = (bit_width / 8) as usize;
 
+                let endianness = self.endianness;
                 let (parsed_bytes, provenance) = self.read_bytes(
                     Len::from(u64::try_from(size_in_bytes).unwrap()),
                     parse_type.span,
                     parse_ctx,
                 )?;
 
-                let num = match (self.endianness, signed) {
+                let num = match (endianness, signed) {
                     (Endianness::Little, true) => Int::from_signed_bytes_le(&parsed_bytes),
                     (Endianness::Big, true) => Int::from_signed_bytes_be(&parsed_bytes),
                     (Endianness::Little, false) => {

@@ -18,14 +18,12 @@ use hexbait_builtin_parsers::built_in_format_descriptions;
 use hexbait_common::{AbsoluteOffset, Input};
 
 // TODO: change font to render more characters
-// TODO: change default font-size and refactor around that
 // TODO: implement to-disk caching for some statistic sizes to decrease re-load times
 // TODO: re-use non-flat statistics for flat statistics
 // TODO: fix up main file
 // TODO: join polygons of adjoining marked locations
 // TODO: unify views and input
 // TODO: improve hover text for marked locations
-// TODO: refactor scrollbars.rs
 // TODO: refactor hex.rs
 // TODO: implement more convenient escaping of byte arrays for search
 // TODO: rearrange UI in a more useful way
@@ -34,6 +32,9 @@ use hexbait_common::{AbsoluteOffset, Input};
 // TODO: add relative search (from here backwards/forwards)
 // TODO: add screenshots to README
 // TODO: add some user documentation
+// TODO: make handling of usize <-> u64 conversions more consistent
+// TODO: add more useful conversions between Len, AbsoluteOffset and RelativeOffset and use them
+// where it makes sense
 
 /// hexbait - Hierarchical EXploration Binary Analysis & Inspection Tool
 #[derive(Parser, Debug)]

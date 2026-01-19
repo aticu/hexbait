@@ -2,7 +2,7 @@
 
 use std::{io, ops::Range, sync::Arc};
 
-use hexbait_common::{Input, Len, RelativeOffset};
+use hexbait_common::{Input, Len, ReadBytes, RelativeOffset};
 
 use super::provenance::Provenance;
 
@@ -64,26 +64,15 @@ impl View {
     }
 
     /// Reads data into the buffer at the given offset.
-    pub(crate) fn read_at<'buf>(
-        &self,
-        offset: RelativeOffset,
-        buf: &'buf mut [u8],
-    ) -> io::Result<&'buf [u8]> {
+    pub(crate) fn read_at(&self, offset: RelativeOffset, len: Len) -> io::Result<ReadBytes<'_>> {
         if offset.as_u64() > self.len().as_u64() {
             return Err(io::Error::other("offset is beyond input"));
         }
 
         let out_buf = match &*self.0 {
-            ViewType::Input(input) => input.window_at(offset.to_absolute(), buf)?,
+            ViewType::Input(input) => input.read_at(offset.to_absolute(), len, None)?,
             ViewType::Subview { view, valid_range } => {
-                let buf_len = buf.len();
-                view.read_at(
-                    valid_range.start + Len::from(offset.as_u64()),
-                    &mut buf[..std::cmp::min(
-                        usize::try_from((valid_range.end - offset).as_u64()).unwrap_or(usize::MAX),
-                        buf_len,
-                    )],
-                )?
+                view.read_at(valid_range.start + Len::from(offset.as_u64()), len)?
             }
         };
 

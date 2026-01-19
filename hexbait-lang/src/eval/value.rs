@@ -307,12 +307,7 @@ impl BytesValue {
             BytesValue::Lit(lit) => Ok(lit.to_vec()),
             BytesValue::FromView {
                 view, start, len, ..
-            } => {
-                let mut buf = vec![0; len.as_u64() as usize];
-                view.read_at(*start, &mut buf)?;
-
-                Ok(buf)
-            }
+            } => Ok(view.read_at(*start, *len)?.into()),
         }
     }
 
@@ -379,21 +374,17 @@ impl PartialEq for BytesValue {
             ) => {
                 l_len == r_len && l_prefix == r_prefix && l_suffix == r_suffix && {
                     let prefix_len = Len::from(l_prefix.len() as u64);
-                    let len = (*l_len
-                        - (Len::from(l_prefix.len() as u64) + Len::from(l_suffix.len() as u64)))
-                    .as_u64() as usize;
+                    let len = *l_len
+                        - (Len::from(l_prefix.len() as u64) + Len::from(l_suffix.len() as u64));
 
-                    let mut l_buf = vec![0; len];
-                    let mut r_buf = vec![0; len];
-
-                    let Ok(_) = l_view.read_at(*l_start + prefix_len, &mut l_buf) else {
+                    let Ok(l_buf) = l_view.read_at(*l_start + prefix_len, len) else {
                         return false;
                     };
-                    let Ok(_) = r_view.read_at(*r_start + prefix_len, &mut r_buf) else {
+                    let Ok(r_buf) = r_view.read_at(*r_start + prefix_len, len) else {
                         return false;
                     };
 
-                    l_buf == r_buf
+                    *l_buf == *r_buf
                 }
             }
             (Self::Lit(l_lit), Self::Lit(r_lit)) => l_lit == r_lit,
@@ -411,12 +402,11 @@ impl PartialEq for BytesValue {
                 },
                 Self::Lit(lit),
             ) => {
-                let mut buf = vec![0; len.as_u64() as usize];
-                let Ok(_) = view.read_at(*start, &mut buf) else {
+                let Ok(buf) = view.read_at(*start, *len) else {
                     return false;
                 };
 
-                buf == **lit
+                *buf == **lit
             }
             _ => false,
         }

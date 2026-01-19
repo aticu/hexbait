@@ -271,17 +271,17 @@ where
     /// Computes raw statistics for the given window.
     fn compute(&mut self, input: &mut Input, window: Window) -> Result<Window, io::Error> {
         const WINDOW_SIZE: usize = 4096;
+        let mut buf = Vec::new();
 
         // TODO: this can probably be optimized using SIMD, since this is completely independent of
         // any data but the previous byte (which is only required between subwindows)
         let mut start = window.start();
         while start < window.end() {
-            let mut buf = [0; WINDOW_SIZE];
             let max_size = std::cmp::min((window.end() - start).as_u64() as usize, WINDOW_SIZE);
 
-            let subwindow = input.window_at(start, &mut buf[..max_size])?;
+            let subwindow = input.read_at(start, Len::from(max_size as u64), Some(&mut buf))?;
 
-            for &byte in subwindow {
+            for &byte in &*subwindow {
                 self.counts[byte as usize] += Count::from(1u8);
             }
 

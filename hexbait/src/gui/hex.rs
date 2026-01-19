@@ -39,11 +39,11 @@ pub fn render(
     let rows_onscreen = (height / state.settings.char_height()).trunc() as u64;
 
     // add 16 more to show one row "beyond the screen"
-    let mut buf = vec![0; window_size as usize + 16];
+    let read_len = Len::from(window_size + 16);
 
     let file_size = input.len();
 
-    let window = match input.window_at(start, &mut buf) {
+    let window = match input.read_at(start, read_len, None) {
         Ok(window) => window,
         Err(err) => {
             ui.label("hex display is experiencing issues:");
@@ -87,7 +87,7 @@ pub fn render(
         |ui| {
             let max_rect = ui.max_rect();
 
-            render_sidebar(ui, state, window, rows_onscreen, max_scroll, start_row);
+            render_sidebar(ui, state, &window, rows_onscreen, max_scroll, start_row);
 
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing = Vec2::ZERO;
@@ -129,10 +129,10 @@ pub fn render(
                     render_row(ui, state, start + Len::from(i as u64 * 16), row, file_size);
                 }
             });
-            let mut selected_buf;
             let selected_buf = if let Some(selection) = state.selection_state.selected_window() {
-                selected_buf = vec![0; selection.size().as_u64() as usize];
-                input.window_at(selection.start(), &mut selected_buf).ok()
+                input
+                    .read_at(selection.start(), selection.size(), None)
+                    .ok()
             } else {
                 None
             };
@@ -158,7 +158,7 @@ pub fn render(
                         .max_height(half_height)
                         .show(ui, |ui| {
                             ui.vertical(|ui| {
-                                render_inspector(ui, state, selected_buf);
+                                render_inspector(ui, state, selected_buf.as_deref());
                             });
                         });
                 },
@@ -236,18 +236,12 @@ pub fn render(
         },
     );
 
-    let copy_event = ui.input(|input| input.events.contains(&egui::Event::Copy));
-
-    if copy_event
+    if ui.input(|input| input.events.contains(&egui::Event::Copy))
         && let Some(selection) = state.selection_state.selected_window()
-        && let Ok(size) = usize::try_from(selection.size().as_u64())
+        && let Ok(window) = input.read_at(selection.start(), selection.size(), None)
+        && let Ok(as_text) = std::str::from_utf8(&window)
     {
-        let mut buf = vec![0; size];
-        if let Ok(window) = input.window_at(selection.start(), &mut buf)
-            && let Ok(as_text) = std::str::from_utf8(window)
-        {
-            ui.ctx().copy_text(as_text.to_string());
-        }
+        ui.ctx().copy_text(as_text.to_string());
     }
 }
 

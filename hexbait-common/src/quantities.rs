@@ -229,8 +229,13 @@ impl Len {
     pub const ZERO: Len = Len::from(0);
 
     /// Creates a length from a `u64`.
-    pub const fn from(offset: u64) -> Len {
-        Len(offset)
+    pub const fn from(len: u64) -> Len {
+        Len(len)
+    }
+
+    /// Creates the given length in MiB.
+    pub const fn mib(len_in_mib: u64) -> Len {
+        Len(len_in_mib * 1024 * 1024)
     }
 
     /// Whether the length is `0`.

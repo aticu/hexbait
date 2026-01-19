@@ -1,7 +1,7 @@
 //! Defines common types and functions used by all hexbait `crate`s.
 
 pub use endianness::Endianness;
-pub use input::Input;
+pub use input::{Input, ReadBytes};
 pub use quantities::{AbsoluteOffset, Len, RelativeOffset};
 
 mod endianness;

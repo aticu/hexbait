@@ -73,7 +73,7 @@ impl ScrollState {
     /// Returns the window selected by the scroll state.
     pub fn selected_window(&self) -> Window {
         let mut window = self.first_window();
-        let total_hexdump_bytes = self.total_hexdump_bytes();
+        let total_hexdump_bytes = self.total_hexdump_bytes().min(window.size());
 
         for bar in &self.scrollbars {
             window = bar.window(window, total_hexdump_bytes);

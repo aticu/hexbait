@@ -1,6 +1,6 @@
 //! Models how the raw data is accessed in hexamine.
 
-use std::{io, path::PathBuf, sync::Arc};
+use std::{io, ops::Deref, path::PathBuf, sync::Arc};
 
 use positioned_io::{RandomAccessFile, ReadAt as _, Size as _};
 
@@ -62,27 +62,58 @@ impl Input {
         self.len().is_zero()
     }
 
-    /// Fills the buffer with the data at the given offset in the input, returning the filled slice.
-    pub fn window_at<'buf>(
-        &self,
+    /// Reads from the input at the given offset.
+    ///
+    /// If the requested start offset is beyond the end of the input an error is returned.
+    /// If more input is requested than available, then the remaining input is returned.
+    ///
+    /// The `preallocated_buf` may be used in hot loops to avoid having to allocate a new buffer
+    /// for every read.
+    /// The buffer will be reused between iterations, if it is allocated outside the loop.
+    pub fn read_at<'this_or_buf>(
+        &'this_or_buf self,
         offset: AbsoluteOffset,
-        buf: &'buf mut [u8],
-    ) -> Result<&'buf [u8], io::Error> {
+        len: Len,
+        preallocated_buf: Option<&'this_or_buf mut Vec<u8>>,
+    ) -> io::Result<ReadBytes<'this_or_buf>> {
         match &*self.0 {
-            InputType::File { file, len, .. } => {
-                if offset.as_u64() > *len {
+            InputType::File {
+                file,
+                len: file_len,
+                ..
+            } => {
+                if offset.as_u64() > *file_len {
                     return Err(io::Error::other("offset is beyond input"));
                 }
 
-                let len_left = *len - offset.as_u64();
-                let output_size = std::cmp::min(len_left, buf.len().try_into().unwrap_or(u64::MAX));
-                let truncated_buf = &mut buf[..output_size
+                let len_left = *file_len - offset.as_u64();
+                let output_size = std::cmp::min(len_left, len.as_u64())
                     .try_into()
-                    .expect("we used min above, so this must fit into `buf`")];
+                    .expect("we used min above, so this must fit into `buf`");
 
-                file.read_exact_at(offset.as_u64(), truncated_buf)?;
+                Ok(if let Some(preallocated_buf) = preallocated_buf {
+                    preallocated_buf.resize(output_size, 0);
+                    file.read_exact_at(offset.as_u64(), &mut preallocated_buf[..output_size])?;
 
-                Ok(truncated_buf)
+                    ReadBytes(ReadBytesInner::ByRef {
+                        buf: &preallocated_buf[..output_size],
+                    })
+                } else {
+                    if output_size <= READ_BYTES_INLINE_LEN {
+                        let mut buf = [0u8; READ_BYTES_INLINE_LEN];
+                        file.read_exact_at(offset.as_u64(), &mut buf)?;
+
+                        ReadBytes(ReadBytesInner::Inline {
+                            buf,
+                            len: output_size as u8,
+                        })
+                    } else {
+                        let mut buf = vec![0u8; output_size].into_boxed_slice();
+                        file.read_exact_at(offset.as_u64(), &mut buf)?;
+
+                        ReadBytes(ReadBytesInner::Owned { buf })
+                    }
+                })
             }
             InputType::Stdin(stdin) => {
                 let offset_usize: usize = offset
@@ -95,13 +126,78 @@ impl Input {
                 }
 
                 let len_left = stdin.len() - offset_usize;
-                let output_size = std::cmp::min(len_left, buf.len());
+                let output_size = std::cmp::min(
+                    len_left,
+                    len.as_u64()
+                        .try_into()
+                        .expect("len does not fit into `usize`"),
+                );
 
-                buf[..output_size]
-                    .copy_from_slice(&stdin[offset_usize..offset_usize + output_size]);
-
-                Ok(&buf[..output_size])
+                Ok(ReadBytes(ReadBytesInner::ByRef {
+                    buf: &stdin[offset_usize..offset_usize + output_size],
+                }))
             }
+        }
+    }
+}
+
+/// Represents bytes that have been read from an input.
+///
+/// The bytes can be either owned, referenced or stored inline.
+///
+/// # Note on the pronunciation
+///
+/// Since the "read" in the type name refers to the past tense (as the bytes have already been read
+/// when this type is obtained), it should be pronounced as such.
+pub struct ReadBytes<'buf>(ReadBytesInner<'buf>);
+
+/// The number of bytes that can be stored inline in a `ReadBytes`.
+const READ_BYTES_INLINE_LEN: usize = 22;
+
+/// The inner representation of the [`ReadBytes`] struct.
+enum ReadBytesInner<'buf> {
+    /// The bytes are stored as owned on the heap.
+    Owned {
+        /// The buffer on the heap.
+        buf: Box<[u8]>,
+    },
+    /// The bytes are stored in a small inline slice.
+    Inline {
+        /// The buffer where the data is stored.
+        buf: [u8; READ_BYTES_INLINE_LEN],
+        /// The length of the buffer that is filled.
+        len: u8,
+    },
+    /// The bytes are referenced from a different buffer.
+    ByRef {
+        /// The buffer that is referenced.
+        buf: &'buf [u8],
+    },
+}
+
+// Make sure that we don't grow larger than the already necessary 24 bytes.
+const _: () = {
+    assert!(std::mem::size_of::<ReadBytes<'static>>() == 24);
+};
+
+impl<'buf> Deref for ReadBytes<'buf> {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        match &self.0 {
+            ReadBytesInner::Owned { buf } => buf,
+            ReadBytesInner::Inline { buf, len } => &buf[..*len as usize],
+            ReadBytesInner::ByRef { buf } => buf,
+        }
+    }
+}
+
+impl From<ReadBytes<'_>> for Vec<u8> {
+    fn from(value: ReadBytes<'_>) -> Self {
+        match value.0 {
+            ReadBytesInner::Owned { buf } => buf.into(),
+            ReadBytesInner::Inline { buf, len } => buf[..len as usize].into(),
+            ReadBytesInner::ByRef { buf } => buf.into(),
         }
     }
 }
