@@ -1,7 +1,8 @@
 //! Models how the raw data is accessed in hexamine.
 
-use std::{io, ops::Deref, path::PathBuf, sync::Arc};
+use std::{io, ops::Deref, path::Path, sync::Arc};
 
+use memmap2::Mmap;
 use positioned_io::{RandomAccessFile, ReadAt as _, Size as _};
 
 use crate::{AbsoluteOffset, Len};
@@ -19,21 +20,48 @@ enum InputType {
         /// The length of the file in bytes.
         len: u64,
     },
+    /// The input is the given memory map.
+    Memmap(Mmap),
     /// The input was read from stdin.
     Stdin(Box<[u8]>),
 }
 
 impl Input {
     /// Creates an input from the given path.
-    pub fn from_path(path: impl Into<PathBuf>) -> io::Result<Input> {
-        let path = path.into();
+    pub fn from_path(path: impl AsRef<Path>) -> io::Result<Input> {
+        /// Opens the path as an [`Mmap`].
+        fn mmap_from_path(path: &Path) -> io::Result<Mmap> {
+            let file = std::fs::File::open(path)?;
 
-        let file = positioned_io::RandomAccessFile::open(&path).unwrap();
-        let len = file
-            .size()?
-            .ok_or_else(|| io::Error::other("cannot get file size"))?;
+            let mut mmap_options = memmap2::MmapOptions::new();
+            mmap_options.no_reserve_swap();
 
-        Ok(Input(Arc::new(InputType::File { file, len })))
+            Ok(unsafe {
+                // SAFETY:
+                // The file is only ever treated as bytes and most files opened with hexbait are
+                // unlikely to be changed.
+                // However this is no guarantee that this cannot mess up. I just think it's highly
+                // unlikely that it would result in any vulnerability, but working with memmaps is
+                // inherently unsafe.
+                // Still the possible performance benefits are too great to ignore and it will not
+                // cause any problems in 99% of the use cases where the opened files remain
+                // unchanged.
+                mmap_options.map(&file)?
+            })
+        }
+
+        let path = path.as_ref();
+
+        if let Ok(mmap) = mmap_from_path(path) {
+            Ok(Input(Arc::new(InputType::Memmap(mmap))))
+        } else {
+            let file = positioned_io::RandomAccessFile::open(path).unwrap();
+            let len = file
+                .size()?
+                .ok_or_else(|| io::Error::other("cannot get file size"))?;
+
+            Ok(Input(Arc::new(InputType::File { file, len })))
+        }
     }
 
     /// Creates an input from stdin.
@@ -50,6 +78,10 @@ impl Input {
     pub fn len(&self) -> Len {
         match &*self.0 {
             InputType::File { len, .. } => Len::from(*len),
+            InputType::Memmap(mmap) => Len::from(
+                u64::try_from(mmap.len())
+                    .expect("non `u64`-fitting length would not fit into memory"),
+            ),
             InputType::Stdin(stdin) => Len::from(
                 u64::try_from(stdin.len())
                     .expect("non `u64`-fitting length would not fit into memory"),
@@ -98,22 +130,42 @@ impl Input {
                     ReadBytes(ReadBytesInner::ByRef {
                         buf: &preallocated_buf[..output_size],
                     })
+                } else if output_size <= READ_BYTES_INLINE_LEN {
+                    let mut buf = [0u8; READ_BYTES_INLINE_LEN];
+                    file.read_exact_at(offset.as_u64(), &mut buf)?;
+
+                    ReadBytes(ReadBytesInner::Inline {
+                        buf,
+                        len: output_size as u8,
+                    })
                 } else {
-                    if output_size <= READ_BYTES_INLINE_LEN {
-                        let mut buf = [0u8; READ_BYTES_INLINE_LEN];
-                        file.read_exact_at(offset.as_u64(), &mut buf)?;
+                    let mut buf = vec![0u8; output_size].into_boxed_slice();
+                    file.read_exact_at(offset.as_u64(), &mut buf)?;
 
-                        ReadBytes(ReadBytesInner::Inline {
-                            buf,
-                            len: output_size as u8,
-                        })
-                    } else {
-                        let mut buf = vec![0u8; output_size].into_boxed_slice();
-                        file.read_exact_at(offset.as_u64(), &mut buf)?;
-
-                        ReadBytes(ReadBytesInner::Owned { buf })
-                    }
+                    ReadBytes(ReadBytesInner::Owned { buf })
                 })
+            }
+            InputType::Memmap(mmap) => {
+                let offset_usize: usize = offset
+                    .as_u64()
+                    .try_into()
+                    .expect("offset does not fit into `usize`");
+
+                if offset_usize > mmap.len() {
+                    return Err(io::Error::other("offset is beyond input"));
+                }
+
+                let len_left = mmap.len() - offset_usize;
+                let output_size = std::cmp::min(
+                    len_left,
+                    len.as_u64()
+                        .try_into()
+                        .expect("len does not fit into `usize`"),
+                );
+
+                Ok(ReadBytes(ReadBytesInner::ByRef {
+                    buf: &mmap[offset_usize..offset_usize + output_size],
+                }))
             }
             InputType::Stdin(stdin) => {
                 let offset_usize: usize = offset

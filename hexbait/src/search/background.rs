@@ -154,9 +154,7 @@ impl BackgroundSearcher {
         // In practice I expect many searches to be for small patterns, so this is less of an
         // issue. Unfortunately while the new API for reading from `Input` is much nicer for
         // everything else, here it falls short.
-        // But even then, when memory mapped reads will (soon) be implemented, this again makes no
-        // difference.
-        // TODO: adjust the last sentence one memory mapped reads are implemented
+        // But even then, when using memory mapped reads, this makes it actually more efficient.
         let buf = self
             .input
             .read_at(start, self.search_window_size, Some(&mut self.buf))
