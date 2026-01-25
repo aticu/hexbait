@@ -84,28 +84,22 @@ pub fn render(
         let hovered_row_window = render_bar(
             ui,
             &mut scroll_state.scrollbars[i],
+            settings,
             rect,
             window,
-            |row_window| {
+            |window| {
                 if let Some((entropy, quality)) = handler
-                    .get_entropy(row_window)
+                    .get_entropy(window)
                     .into_result_with_quality()
                     .unwrap()
                 {
                     if quality < 1.0 {
                         full_quality = false;
                     }
-                    let color = settings.entropy_color(entropy);
-                    let secondary_color = if quality < 1.0 {
-                        Color32::RED
-                    } else {
-                        Color32::GREEN
-                    };
-                    (color, secondary_color)
+                    (Some(entropy), quality)
                 } else {
                     full_quality = false;
-                    let color = settings.missing_color();
-                    (color, color)
+                    (None, 0.0)
                 }
             },
         );
@@ -322,9 +316,10 @@ fn handle_interactions(
 fn render_bar(
     ui: &mut Ui,
     scrollbar: &mut Scrollbar,
+    settings: &Settings,
     rect: Rect,
     window: Window,
-    mut row_color: impl FnMut(Window) -> (Color32, Color32),
+    mut entropy: impl FnMut(Window) -> (Option<f32>, f32),
 ) -> Option<Window> {
     let total_rows = rect.height().trunc() as u64;
 
@@ -335,34 +330,75 @@ fn render_bar(
 
     let bytes_per_row =
         Len::from((window.size().as_u64() as f64 / total_rows as f64).round() as u64);
+    let bytes_per_square = bytes_per_row / 16;
 
     let side_start = (rect.width() - 2.0) as usize;
+    let row_width = side_start / 16;
+
+    let mut full_quality_row = true;
 
     scrollbar.cached_image.paint_at(
         ui,
         rect,
-        (scrollbar.state_for_cached_image(), window),
+        (
+            scrollbar.state_for_cached_image(),
+            window,
+            settings.fine_grained_scrollbars(),
+        ),
         |x, y| {
-            let relative_offset = y as f64 / total_rows as f64;
-            let offset_within_range =
-                RelativeOffset::from((relative_offset * window.size().as_u64() as f64) as u64);
-
-            let row_window =
-                Window::from_start_len(window.start() + offset_within_range, bytes_per_row);
-
-            let (raw_color, side_color) = row_color(row_window);
-
-            const HIGHLIGHT_STRENGTH: f64 = 0.4;
-
             if x >= side_start {
-                side_color
+                if full_quality_row {
+                    Color32::GREEN
+                } else {
+                    Color32::RED
+                }
             } else if x == side_start - 1 {
                 Color32::BLACK
-            } else if selection_start <= y && y <= selection_end {
-                //color::lerp(raw_color, egui::Color32::WHITE, HIGHLIGHT_STRENGTH)
-                raw_color
             } else {
-                color::lerp(raw_color, egui::Color32::BLACK, HIGHLIGHT_STRENGTH)
+                if x == 0 {
+                    full_quality_row = true;
+                }
+
+                let relative_offset = y as f64 / total_rows as f64;
+                let offset_within_range =
+                    RelativeOffset::from((relative_offset * window.size().as_u64() as f64) as u64);
+
+                let window_size = if settings.fine_grained_scrollbars() {
+                    bytes_per_square
+                } else {
+                    bytes_per_row
+                };
+                let column_offset = if settings.fine_grained_scrollbars() {
+                    (x / row_width) as u64 * bytes_per_square
+                } else {
+                    Len::ZERO
+                };
+
+                let window = Window::from_start_len(
+                    window.start() + offset_within_range + column_offset,
+                    window_size,
+                );
+
+                let (raw_entropy, quality) = entropy(window);
+
+                if quality < 1.0 {
+                    full_quality_row = false;
+                }
+
+                let raw_color = if let Some(entropy) = raw_entropy {
+                    settings.entropy_color(entropy)
+                } else {
+                    settings.missing_color()
+                };
+
+                const HIGHLIGHT_STRENGTH: f64 = 0.4;
+
+                if selection_start <= y && y <= selection_end {
+                    //color::lerp(raw_color, egui::Color32::WHITE, HIGHLIGHT_STRENGTH)
+                    raw_color
+                } else {
+                    color::lerp(raw_color, egui::Color32::BLACK, HIGHLIGHT_STRENGTH)
+                }
             }
         },
     );

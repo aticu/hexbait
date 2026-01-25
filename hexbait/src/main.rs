@@ -155,6 +155,11 @@ impl eframe::App for MyApp {
                     "Use linear byte colors",
                 );
 
+                ui.checkbox(
+                    self.state.settings.fine_grained_scrollbars_mut(),
+                    "Use fine grained scrollbars",
+                );
+
                 ui.label("Show:");
                 egui::ComboBox::new("view_kind", "")
                     .selected_text(self.state.settings.view_kind().display_str())

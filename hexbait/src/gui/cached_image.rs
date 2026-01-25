@@ -66,8 +66,8 @@ impl<T: PartialEq> CachedImage<T> {
 
         let mut bytes = vec![0; width * height * 4];
 
-        for x in 0..width {
-            for y in 0..height {
+        for y in 0..height {
+            for x in 0..width {
                 let start = (width * y + x) * 4;
                 let color = render(x, y);
 

@@ -26,6 +26,8 @@ pub struct ScrollState {
     file_size: Len,
     /// The height of the scrollbars in the current frame.
     height: f32,
+    /// Whether or not fine grained scrollbars are used.
+    fine_grained_scrollbars: bool,
     /// The height of a character in the hex view.
     hex_char_height: f32,
     /// The selection state in the previous frame.
@@ -44,6 +46,8 @@ impl ScrollState {
             file_size: input.len(),
             // the height is irrelevant for the first frame since we draw anyway
             height: 0.0,
+            // start with true, this is updated in the first step
+            fine_grained_scrollbars: true,
             // start with a random non-zero height
             hex_char_height: 20.0,
             // the previous selection state is irrelevant for the first frame since we draw anyway
@@ -56,6 +60,7 @@ impl ScrollState {
         let state = self.selection_state();
         self.prev_selection_state = state;
 
+        self.fine_grained_scrollbars = settings.fine_grained_scrollbars();
         self.hex_char_height = settings.char_height();
         self.height = height;
     }
@@ -124,6 +129,7 @@ impl ScrollState {
     fn selection_state(&self) -> u64 {
         let mut hasher = std::hash::DefaultHasher::new();
 
+        self.fine_grained_scrollbars.hash(&mut hasher);
         self.height.to_ne_bytes().hash(&mut hasher);
         self.scrollbars.len().hash(&mut hasher);
         for bar in &self.scrollbars {
@@ -281,7 +287,7 @@ pub struct Scrollbar {
     /// The cached image for this scrollbar.
     ///
     /// This depends on the selection of the scrollbar as well as the full window of the bar.
-    pub cached_image: CachedImage<((RelativeOffset, Len), Window)>,
+    pub cached_image: CachedImage<((RelativeOffset, Len), Window, bool)>,
 }
 
 impl Scrollbar {

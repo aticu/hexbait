@@ -37,6 +37,8 @@ pub struct Settings {
     color_map: ColorMap,
     /// Whether to use linear colors for bytes.
     linear_byte_colors: bool,
+    /// Whether to use fine grained displays in scroll bars.
+    fine_grained_scrollbars: bool,
     /// The thing to display in the main screen.
     view_kind: ViewKind,
 }
@@ -48,6 +50,7 @@ impl Settings {
             scale: 20.0,
             color_map: ColorMap::Viridis,
             linear_byte_colors: false,
+            fine_grained_scrollbars: true,
             view_kind: ViewKind::Auto,
         }
     }
@@ -72,6 +75,16 @@ impl Settings {
     /// Whether linear byte colors are used.
     pub fn linear_byte_colors(&self) -> bool {
         self.linear_byte_colors
+    }
+
+    /// Mutable access to the field determining whether fine grained scrollbars are used.
+    pub fn fine_grained_scrollbars_mut(&mut self) -> &mut bool {
+        &mut self.fine_grained_scrollbars
+    }
+
+    /// Whether fine grained scrollbars are used.
+    pub fn fine_grained_scrollbars(&self) -> bool {
+        self.fine_grained_scrollbars
     }
 
     /// The font size of normal text.
