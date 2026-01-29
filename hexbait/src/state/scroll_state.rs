@@ -131,6 +131,7 @@ impl ScrollState {
 
         self.fine_grained_scrollbars.hash(&mut hasher);
         self.height.to_ne_bytes().hash(&mut hasher);
+        self.hex_char_height.to_ne_bytes().hash(&mut hasher);
         self.scrollbars.len().hash(&mut hasher);
         for bar in &self.scrollbars {
             bar.selection_start.hash(&mut hasher);

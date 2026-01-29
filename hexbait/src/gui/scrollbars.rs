@@ -335,6 +335,7 @@ fn render_bar(
     let side_start = (rect.width() - 2.0) as usize;
     let row_width = side_start / 16;
 
+    let mut full_quality_scrollbar = true;
     let mut full_quality_row = true;
 
     scrollbar.cached_image.paint_at(
@@ -382,6 +383,7 @@ fn render_bar(
                 let (raw_entropy, quality) = entropy(window);
 
                 if quality < 1.0 {
+                    full_quality_scrollbar = false;
                     full_quality_row = false;
                 }
 
@@ -402,6 +404,10 @@ fn render_bar(
             }
         },
     );
+
+    if !full_quality_scrollbar {
+        scrollbar.cached_image.require_repaint();
+    }
 
     ui.allocate_rect(rect, Sense::hover())
         .hover_pos()

@@ -243,12 +243,15 @@ impl StatisticsHandler {
             None => {
                 self.request_window(window, RequestKind::Entropy);
                 match self.entropy_smallest.get(&window.start()) {
-                    Some(result) => StatisticsResult::Estimate {
-                        value: result as f32 / 255.0,
-                        quality: (MIN_ENTROPY_WINDOW_SIZE.as_u64() as f64
-                            / window.size().as_u64() as f64)
-                            as f32,
-                    },
+                    Some(result) => {
+                        self.saw_uncompleteness.set(true);
+                        StatisticsResult::Estimate {
+                            value: result as f32 / 255.0,
+                            quality: (MIN_ENTROPY_WINDOW_SIZE.as_u64() as f64
+                                / window.size().as_u64() as f64)
+                                as f32,
+                        }
+                    }
                     None => {
                         self.request_window(window, RequestKind::EntropyEstimate);
                         StatisticsResult::Unknown
