@@ -6,7 +6,7 @@ use hexbait_common::Endianness;
 use crate::state::State;
 
 /// Renders a data inspector, showing different views on the selected data.
-pub(crate) fn render_inspector(ui: &mut Ui, state: &mut State, selected: Option<&[u8]>) {
+pub fn render_inspector(ui: &mut Ui, state: &mut State, selected: Option<&[u8]>) {
     let row_height = state.settings.font_size() * 1.1;
 
     ui.horizontal(|ui| {

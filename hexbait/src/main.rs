@@ -8,26 +8,28 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use clap::Parser;
-use egui::{Align, Layout, RichText, TextStyle, UiBuilder};
+use egui::{Align, Layout, Rect, RichText, ScrollArea, TextStyle, UiBuilder, vec2};
 use hexbait::{
-    gui::marking::{MarkedLocation, MarkingKind},
+    gui::{
+        inspector::render_inspector,
+        marking::{MarkedLocation, MarkingKind},
+        parse_result::HoverInfo,
+    },
     state::{DisplayType, State, ViewKind},
     statistics::{Statistics, StatisticsHandler},
 };
 use hexbait_builtin_parsers::built_in_format_descriptions;
-use hexbait_common::{AbsoluteOffset, Input};
+use hexbait_common::{AbsoluteOffset, Input, RelativeOffset};
+use hexbait_lang::View;
 
 // TODO: change font to render more characters
 // TODO: implement to-disk caching for some statistic sizes to decrease re-load times
 // TODO: re-use non-flat statistics for flat statistics
 // TODO: fix up main file
 // TODO: join polygons of adjoining marked locations
-// TODO: unify views and input
 // TODO: improve hover text for marked locations
-// TODO: refactor hex.rs
 // TODO: implement more convenient escaping of byte arrays for search
 // TODO: rearrange UI in a more useful way
-// TODO: figure out why entropy calculations are sometimes so slow
 // TODO: fix dragging across end during initial scrollbar selection
 // TODO: add relative search (from here backwards/forwards)
 // TODO: add screenshots to README
@@ -318,12 +320,132 @@ impl eframe::App for MyApp {
                                 self.built_in_format_descriptions.get(self.parse_type)
                             };
 
-                            hexbait::gui::hex::render(
-                                ui,
-                                &mut self.state,
-                                &mut self.input,
-                                parse_type,
-                                &mut parse_offset,
+                            let rect = ui.max_rect().intersect(ui.cursor());
+                            ui.scope_builder(
+                                UiBuilder::new()
+                                    .max_rect(rect)
+                                    .layout(Layout::left_to_right(Align::Min)),
+                                |ui| {
+                                    hexbait::gui::hex::render(
+                                        ui,
+                                        &mut self.state,
+                                        &mut self.input,
+                                    );
+
+                                    let rest_rect = ui.max_rect().intersect(ui.cursor());
+                                    let half_height = rest_rect.height() / 2.0;
+
+                                    let top_rect = Rect::from_min_size(
+                                        rest_rect.min,
+                                        vec2(rest_rect.width(), half_height),
+                                    );
+
+                                    let bottom_rect = Rect::from_min_size(
+                                        rest_rect.min + vec2(0.0, half_height),
+                                        vec2(rest_rect.width(), half_height),
+                                    );
+
+                                    ui.scope_builder(
+                                        UiBuilder::new()
+                                            .max_rect(top_rect)
+                                            .layout(Layout::left_to_right(Align::Min)),
+                                        |ui| {
+                                            ScrollArea::vertical()
+                                                .id_salt("inspector_scroll")
+                                                .max_height(half_height)
+                                                .show(ui, |ui| {
+                                                    ui.vertical(|ui| {
+                                                        let selected_buf = if let Some(selection) =
+                                                            self.state
+                                                                .selection_state
+                                                                .selected_window()
+                                                        {
+                                                            self.input
+                                                                .read_at(
+                                                                    selection.start(),
+                                                                    selection.size(),
+                                                                    None,
+                                                                )
+                                                                .ok()
+                                                        } else {
+                                                            None
+                                                        };
+                                                        render_inspector(
+                                                            ui,
+                                                            &mut self.state,
+                                                            selected_buf.as_deref(),
+                                                        );
+                                                    });
+                                                });
+                                        },
+                                    );
+
+                                    ui.scope_builder(
+                                        UiBuilder::new()
+                                            .max_rect(bottom_rect)
+                                            .layout(Layout::left_to_right(Align::Min)),
+                                        |ui| {
+                                            ScrollArea::both()
+                                                .id_salt("parser_scroll")
+                                                .max_height(half_height)
+                                                .show(ui, |ui| {
+                                                    self.state.marked_locations.remove_where(|location| {
+                                                        location.kind() == MarkingKind::HoveredParsed
+                                                            || location.kind() == MarkingKind::HoveredParseErr
+                                                    });
+
+                                                    let Some(parse_type) = parse_type else { return };
+                                                    let current_parse_offset = parse_offset;
+                                                    if let Some(window) = self.state.selection_state.selected_window() {
+                                                        parse_offset = Some(window.start());
+                                                    }
+                                                    let Some(parse_offset) = current_parse_offset else {
+                                                        return;
+                                                    };
+
+                                                    let view = View::from_input(self.input.clone());
+                                                    let view = view.subview(
+                                                        parse_offset.to_relative()..RelativeOffset::from(view.len().as_u64()),
+                                                    );
+                                                    let result = hexbait_lang::eval_ir(parse_type, view, RelativeOffset::ZERO);
+                                                    let hovered = hexbait::gui::parse_result::show_value(
+                                                        ui,
+                                                        &mut self.state,
+                                                        hexbait_lang::ir::path::Path::new(),
+                                                        None,
+                                                        &result.value,
+                                                        &result.errors,
+                                                    );
+
+                                                    match hovered {
+                                                        HoverInfo::Nothing => (),
+                                                        HoverInfo::Value { path } => {
+                                                            if let Some(value) = result.value.subvalue_at_path(&path) {
+                                                                for range in value.provenance.byte_ranges() {
+                                                                    self.state.marked_locations.add(MarkedLocation::new(
+                                                                        (AbsoluteOffset::from(*range.start())
+                                                                            ..=AbsoluteOffset::from(*range.end()))
+                                                                            .into(),
+                                                                        MarkingKind::HoveredParsed,
+                                                                    ));
+                                                                }
+                                                            }
+                                                        }
+                                                        HoverInfo::Error { id } => {
+                                                            for range in result.errors[id.raw_idx()].provenance.byte_ranges() {
+                                                                self.state.marked_locations.add(MarkedLocation::new(
+                                                                    (AbsoluteOffset::from(*range.start())
+                                                                        ..=AbsoluteOffset::from(*range.end()))
+                                                                        .into(),
+                                                                    MarkingKind::HoveredParseErr,
+                                                                ));
+                                                            }
+                                                        }
+                                                    }
+                                                });
+                                        },
+                                    );
+                                },
                             );
                         }
                     }

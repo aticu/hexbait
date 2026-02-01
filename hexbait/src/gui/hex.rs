@@ -1,8 +1,7 @@
 //! Renders hexdumps in the GUI.
 
-use egui::{Align, Color32, Layout, Rect, ScrollArea, Sense, Ui, UiBuilder, Vec2, vec2};
-use hexbait_common::{AbsoluteOffset, Input, Len, RelativeOffset};
-use hexbait_lang::{View, ir::File};
+use egui::{Color32, Rect, Sense, Ui, Vec2};
+use hexbait_common::{AbsoluteOffset, Input, Len};
 use highlighting::highlight;
 
 use crate::{
@@ -12,24 +11,14 @@ use crate::{
 };
 
 pub mod highlighting;
-mod inspector;
-mod parse_result;
 mod primitives;
-
-use inspector::render_inspector;
 
 pub use primitives::{render_glyph, render_hex, render_offset};
 
 use super::marking::{MarkedLocation, MarkingKind, render_locations_on_bar};
 
 /// Renders a hexdump to the GUI.
-pub fn render(
-    ui: &mut Ui,
-    state: &mut State,
-    input: &mut Input,
-    parse_type: Option<&File>,
-    parse_offset: &mut Option<AbsoluteOffset>,
-) {
+pub fn render(ui: &mut Ui, state: &mut State, input: &mut Input) {
     let start = state.scroll_state.hex_start();
     let start_row = start.as_u64() / 16;
 
@@ -80,161 +69,48 @@ pub fn render(
         state.selection_state.handle_mouse_release();
     }
 
-    ui.scope_builder(
-        UiBuilder::new()
-            .max_rect(rect)
-            .layout(Layout::left_to_right(Align::Min)),
-        |ui| {
-            let max_rect = ui.max_rect();
+    render_sidebar(ui, state, &window, rows_onscreen, max_scroll, start_row);
 
-            render_sidebar(ui, state, &window, rows_onscreen, max_scroll, start_row);
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing = Vec2::ZERO;
 
-            ui.vertical(|ui| {
-                ui.spacing_mut().item_spacing = Vec2::ZERO;
+        state
+            .marked_locations
+            .remove_where(|location| location.kind() == MarkingKind::Selection);
+        if let Some(selection) = state.selection_state.selected_window() {
+            state
+                .marked_locations
+                .add(MarkedLocation::new(selection, MarkingKind::Selection));
+        }
 
-                state
-                    .marked_locations
-                    .remove_where(|location| location.kind() == MarkingKind::Selection);
-                if let Some(selection) = state.selection_state.selected_window() {
-                    state
-                        .marked_locations
-                        .add(MarkedLocation::new(selection, MarkingKind::Selection));
-                }
-
-                for location in state.marked_locations.iter_window(Window::from_start_len(
-                    start,
-                    Len::from(window.len() as u64),
-                )) {
-                    let Some(range) = location.window().range_inclusive() else {
-                        continue;
-                    };
-                    highlight(
-                        ui,
-                        range,
-                        location.inner_color(),
-                        location.border_color(),
-                        file_size,
-                        start_row + state.scroll_state.hex_scroll_offset,
-                        rows_onscreen,
-                        &state.settings,
-                    );
-                }
-
-                for (i, row) in window
-                    .chunks(16)
-                    .enumerate()
-                    .skip(state.scroll_state.hex_scroll_offset as usize)
-                    .take(rows_onscreen as usize + 1)
-                {
-                    render_row(ui, state, start + Len::from(i as u64 * 16), row, file_size);
-                }
-            });
-            let selected_buf = if let Some(selection) = state.selection_state.selected_window() {
-                input
-                    .read_at(selection.start(), selection.size(), None)
-                    .ok()
-            } else {
-                None
+        for location in state.marked_locations.iter_window(Window::from_start_len(
+            start,
+            Len::from(window.len() as u64),
+        )) {
+            let Some(range) = location.window().range_inclusive() else {
+                continue;
             };
-
-            // TODO: handle case where this is too small
-            let rest_rect = max_rect.intersect(ui.cursor());
-            let half_height = rest_rect.height() / 2.0;
-
-            let top_rect = Rect::from_min_size(rest_rect.min, vec2(rest_rect.width(), half_height));
-
-            let bottom_rect = Rect::from_min_size(
-                rest_rect.min + vec2(0.0, half_height),
-                vec2(rest_rect.width(), half_height),
+            highlight(
+                ui,
+                range,
+                location.inner_color(),
+                location.border_color(),
+                file_size,
+                start_row + state.scroll_state.hex_scroll_offset,
+                rows_onscreen,
+                &state.settings,
             );
+        }
 
-            ui.scope_builder(
-                UiBuilder::new()
-                    .max_rect(top_rect)
-                    .layout(Layout::left_to_right(Align::Min)),
-                |ui| {
-                    ScrollArea::vertical()
-                        .id_salt("inspector_scroll")
-                        .max_height(half_height)
-                        .show(ui, |ui| {
-                            ui.vertical(|ui| {
-                                render_inspector(ui, state, selected_buf.as_deref());
-                            });
-                        });
-                },
-            );
-
-            ui.scope_builder(
-                UiBuilder::new()
-                    .max_rect(bottom_rect)
-                    .layout(Layout::left_to_right(Align::Min)),
-                |ui| {
-                    ScrollArea::both()
-                        .id_salt("parser_scroll")
-                        .max_height(half_height)
-                        .show(ui, |ui| {
-                            state.marked_locations.remove_where(|location| {
-                                location.kind() == MarkingKind::HoveredParsed
-                                    || location.kind() == MarkingKind::HoveredParseErr
-                            });
-
-                            let current_parse_offset = *parse_offset;
-                            if let Some(window) = state.selection_state.selected_window() {
-                                *parse_offset = Some(window.start());
-                            }
-                            let Some(parse_offset) = current_parse_offset else {
-                                return;
-                            };
-
-                            let Some(parse_type) = parse_type else { return };
-                            let view = View::from_input(input.clone());
-                            let view = view.subview(
-                                parse_offset.to_relative()
-                                    ..RelativeOffset::from(view.len().as_u64()),
-                            );
-                            let result =
-                                hexbait_lang::eval_ir(parse_type, view, RelativeOffset::ZERO);
-                            let hovered = parse_result::show_value(
-                                ui,
-                                state,
-                                hexbait_lang::ir::path::Path::new(),
-                                None,
-                                &result.value,
-                                &result.errors,
-                            );
-
-                            match hovered {
-                                parse_result::HoverInfo::Nothing => (),
-                                parse_result::HoverInfo::Value { path } => {
-                                    if let Some(value) = result.value.subvalue_at_path(&path) {
-                                        for range in value.provenance.byte_ranges() {
-                                            state.marked_locations.add(MarkedLocation::new(
-                                                (AbsoluteOffset::from(*range.start())
-                                                    ..=AbsoluteOffset::from(*range.end()))
-                                                    .into(),
-                                                MarkingKind::HoveredParsed,
-                                            ));
-                                        }
-                                    }
-                                }
-                                parse_result::HoverInfo::Error { id } => {
-                                    for range in
-                                        result.errors[id.raw_idx()].provenance.byte_ranges()
-                                    {
-                                        state.marked_locations.add(MarkedLocation::new(
-                                            (AbsoluteOffset::from(*range.start())
-                                                ..=AbsoluteOffset::from(*range.end()))
-                                                .into(),
-                                            MarkingKind::HoveredParseErr,
-                                        ));
-                                    }
-                                }
-                            }
-                        });
-                },
-            );
-        },
-    );
+        for (i, row) in window
+            .chunks(16)
+            .enumerate()
+            .skip(state.scroll_state.hex_scroll_offset as usize)
+            .take(rows_onscreen as usize + 1)
+        {
+            render_row(ui, state, start + Len::from(i as u64 * 16), row, file_size);
+        }
+    });
 
     if ui.input(|input| input.events.contains(&egui::Event::Copy))
         && let Some(selection) = state.selection_state.selected_window()
