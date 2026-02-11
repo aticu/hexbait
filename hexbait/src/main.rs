@@ -5,22 +5,15 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::{collections::BTreeMap, path::PathBuf};
+use std::path::PathBuf;
 
 use clap::Parser;
 use egui::{Align, Layout, Rect, RichText, ScrollArea, TextStyle, UiBuilder, vec2};
 use hexbait::{
-    gui::{
-        inspector::render_inspector,
-        marking::{MarkedLocation, MarkingKind},
-        parse_result::HoverInfo,
-    },
     state::{DisplayType, State, ViewKind},
-    statistics::{Statistics, StatisticsHandler},
+    statistics::Statistics,
 };
-use hexbait_builtin_parsers::built_in_format_descriptions;
-use hexbait_common::{AbsoluteOffset, Input, RelativeOffset};
-use hexbait_lang::View;
+use hexbait_common::{AbsoluteOffset, Input};
 
 // TODO: change font to render more characters
 // TODO: implement to-disk caching for some statistic sizes to decrease re-load times
@@ -75,14 +68,8 @@ fn main() -> eframe::Result {
         Box::new(|_| {
             Ok(Box::new(MyApp {
                 frame_time: std::time::Duration::ZERO,
-                state: State::new(&input),
-                statistics_handler: StatisticsHandler::new(input.clone()),
+                state: State::new(&input, config.parser_definition),
                 input,
-                parse_type: "none",
-                parse_offset: String::from("0"),
-                sync_parse_offset_to_selection_start: true,
-                built_in_format_descriptions: built_in_format_descriptions(),
-                custom_parser: config.parser_definition,
             }))
         }),
     )
@@ -91,13 +78,7 @@ fn main() -> eframe::Result {
 struct MyApp {
     frame_time: std::time::Duration,
     state: State,
-    statistics_handler: StatisticsHandler,
     input: Input,
-    parse_type: &'static str,
-    parse_offset: String,
-    sync_parse_offset_to_selection_start: bool,
-    built_in_format_descriptions: BTreeMap<&'static str, hexbait_lang::ir::File>,
-    custom_parser: Option<PathBuf>,
 }
 
 impl eframe::App for MyApp {
@@ -121,26 +102,32 @@ impl eframe::App for MyApp {
             ui.horizontal(|ui| {
                 ui.label("Parse as:");
                 egui::ComboBox::new("parse_type", "")
-                    .selected_text(self.parse_type)
+                    .selected_text(self.state.parse_state.parse_type)
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.parse_type, "none", "none");
-                        if self.custom_parser.is_some() {
+                        ui.selectable_value(&mut self.state.parse_state.parse_type, "none", "none");
+                        if self.state.parse_state.custom_parser.is_some() {
                             ui.selectable_value(
-                                &mut self.parse_type,
+                                &mut self.state.parse_state.parse_type,
                                 "custom parser",
                                 "custom parser",
                             );
                         }
-                        for description in self.built_in_format_descriptions.keys() {
-                            ui.selectable_value(&mut self.parse_type, description, *description);
+                        for description in
+                            self.state.parse_state.built_in_format_descriptions.keys()
+                        {
+                            ui.selectable_value(
+                                &mut self.state.parse_state.parse_type,
+                                description,
+                                *description,
+                            );
                         }
                     });
 
                 ui.label("Parse offset:");
-                ui.text_edit_singleline(&mut self.parse_offset);
+                ui.text_edit_singleline(&mut self.state.parse_state.parse_offset);
                 if ui
                     .add_enabled(
-                        self.parse_offset.parse::<u64>().is_ok(),
+                        self.state.parse_state.parse_offset.parse::<u64>().is_ok(),
                         egui::Button::new("Jump to offset"),
                     )
                     .clicked()
@@ -148,7 +135,7 @@ impl eframe::App for MyApp {
                     jump_to_offset = true;
                 }
                 ui.checkbox(
-                    &mut self.sync_parse_offset_to_selection_start,
+                    &mut self.state.parse_state.sync_parse_offset_to_selection_start,
                     "Sync parse offset to selection start",
                 );
 
@@ -180,8 +167,6 @@ impl eframe::App for MyApp {
                     });
             });
 
-            let mut parse_offset = self.parse_offset.parse().ok().map(AbsoluteOffset::from);
-
             ui.scope_builder(
                 UiBuilder::new()
                     .max_rect(ui.max_rect().intersect(ui.cursor()))
@@ -192,7 +177,7 @@ impl eframe::App for MyApp {
                         &mut self.state.scroll_state,
                         &self.state.settings,
                         &mut self.state.marked_locations,
-                        &self.statistics_handler,
+                        &self.state.statistics_handler,
                     );
 
                     let display_type = match self.state.settings.view_kind() {
@@ -205,6 +190,7 @@ impl eframe::App for MyApp {
                         DisplayType::Statistics => {
                             let window = self.state.scroll_state.selected_window();
                             let (statistics, quality) = self
+                                .state
                                 .statistics_handler
                                 .get_bigram(window)
                                 .into_result_with_quality()
@@ -295,42 +281,13 @@ impl eframe::App for MyApp {
                             });
                         }
                         DisplayType::Hexview => {
-                            let ir;
-
-                            let parse_type = if self.parse_type == "custom parser" {
-                                'parse_type: {
-                                    let Ok(content) = std::fs::read_to_string(
-                                        self.custom_parser.as_ref().expect(
-                                            "if a custom parser is selected it should also exist",
-                                        ),
-                                    ) else {
-                                        break 'parse_type None;
-                                    };
-
-                                    let parse = hexbait_lang::parse(&content);
-                                    if !parse.errors.is_empty() {
-                                        break 'parse_type None;
-                                    }
-
-                                    ir = hexbait_lang::ir::lower_file(parse.ast);
-
-                                    Some(&ir)
-                                }
-                            } else {
-                                self.built_in_format_descriptions.get(self.parse_type)
-                            };
-
                             let rect = ui.max_rect().intersect(ui.cursor());
                             ui.scope_builder(
                                 UiBuilder::new()
                                     .max_rect(rect)
                                     .layout(Layout::left_to_right(Align::Min)),
                                 |ui| {
-                                    hexbait::gui::hex::render(
-                                        ui,
-                                        &mut self.state,
-                                        &mut self.input,
-                                    );
+                                    hexbait::gui::hex::render(ui, &mut self.state, &self.input);
 
                                     let rest_rect = ui.max_rect().intersect(ui.cursor());
                                     let half_height = rest_rect.height() / 2.0;
@@ -355,25 +312,10 @@ impl eframe::App for MyApp {
                                                 .max_height(half_height)
                                                 .show(ui, |ui| {
                                                     ui.vertical(|ui| {
-                                                        let selected_buf = if let Some(selection) =
-                                                            self.state
-                                                                .selection_state
-                                                                .selected_window()
-                                                        {
-                                                            self.input
-                                                                .read_at(
-                                                                    selection.start(),
-                                                                    selection.size(),
-                                                                    None,
-                                                                )
-                                                                .ok()
-                                                        } else {
-                                                            None
-                                                        };
-                                                        render_inspector(
+                                                        hexbait::gui::modules::inspector::show(
                                                             ui,
                                                             &mut self.state,
-                                                            selected_buf.as_deref(),
+                                                            &self.input,
                                                         );
                                                     });
                                                 });
@@ -389,59 +331,11 @@ impl eframe::App for MyApp {
                                                 .id_salt("parser_scroll")
                                                 .max_height(half_height)
                                                 .show(ui, |ui| {
-                                                    self.state.marked_locations.remove_where(|location| {
-                                                        location.kind() == MarkingKind::HoveredParsed
-                                                            || location.kind() == MarkingKind::HoveredParseErr
-                                                    });
-
-                                                    let Some(parse_type) = parse_type else { return };
-                                                    let current_parse_offset = parse_offset;
-                                                    if let Some(window) = self.state.selection_state.selected_window() {
-                                                        parse_offset = Some(window.start());
-                                                    }
-                                                    let Some(parse_offset) = current_parse_offset else {
-                                                        return;
-                                                    };
-
-                                                    let view = View::from_input(self.input.clone());
-                                                    let view = view.subview(
-                                                        parse_offset.to_relative()..RelativeOffset::from(view.len().as_u64()),
-                                                    );
-                                                    let result = hexbait_lang::eval_ir(parse_type, view, RelativeOffset::ZERO);
-                                                    let hovered = hexbait::gui::parse_result::show_value(
+                                                    hexbait::gui::modules::parsed_value::show(
                                                         ui,
                                                         &mut self.state,
-                                                        hexbait_lang::ir::path::Path::new(),
-                                                        None,
-                                                        &result.value,
-                                                        &result.errors,
+                                                        &self.input,
                                                     );
-
-                                                    match hovered {
-                                                        HoverInfo::Nothing => (),
-                                                        HoverInfo::Value { path } => {
-                                                            if let Some(value) = result.value.subvalue_at_path(&path) {
-                                                                for range in value.provenance.byte_ranges() {
-                                                                    self.state.marked_locations.add(MarkedLocation::new(
-                                                                        (AbsoluteOffset::from(*range.start())
-                                                                            ..=AbsoluteOffset::from(*range.end()))
-                                                                            .into(),
-                                                                        MarkingKind::HoveredParsed,
-                                                                    ));
-                                                                }
-                                                            }
-                                                        }
-                                                        HoverInfo::Error { id } => {
-                                                            for range in result.errors[id.raw_idx()].provenance.byte_ranges() {
-                                                                self.state.marked_locations.add(MarkedLocation::new(
-                                                                    (AbsoluteOffset::from(*range.start())
-                                                                        ..=AbsoluteOffset::from(*range.end()))
-                                                                        .into(),
-                                                                    MarkingKind::HoveredParseErr,
-                                                                ));
-                                                            }
-                                                        }
-                                                    }
                                                 });
                                         },
                                     );
@@ -451,31 +345,17 @@ impl eframe::App for MyApp {
                     }
 
                     if jump_to_offset
-                        && let Ok(offset) = self.parse_offset.parse().map(AbsoluteOffset::from)
+                        && let Ok(offset) = self
+                            .state
+                            .parse_state
+                            .parse_offset
+                            .parse()
+                            .map(AbsoluteOffset::from)
                     {
                         self.state.scroll_state.rearrange_bars_for_point(0, offset);
                     }
-
-                    self.statistics_handler
-                        .end_of_frame(self.state.scroll_state.changed());
                 },
             );
-
-            self.state
-                .marked_locations
-                .remove_where(|loc| loc.kind() == MarkingKind::SearchResult);
-            for result in self.state.search.searcher.results().iter() {
-                self.state
-                    .marked_locations
-                    .add(MarkedLocation::new(*result, MarkingKind::SearchResult));
-            }
-            self.state.marked_locations.end_of_frame();
-
-            if self.sync_parse_offset_to_selection_start
-                && let Some(parse_offset) = parse_offset
-            {
-                self.parse_offset = parse_offset.as_u64().to_string();
-            }
         });
         self.frame_time = start.elapsed();
     }

@@ -1,16 +1,102 @@
-//! Implements display logic for parsing results.
+//! Implements showing of a parsed value.
 
-use egui::{FontId, Response, RichText, TextStyle, Ui};
-use hexbait_common::AbsoluteOffset;
+use egui::{FontId, Layout, Response, RichText, TextStyle, Ui, UiBuilder};
+use hexbait_common::{AbsoluteOffset, Input, RelativeOffset};
 use hexbait_lang::{
-    ParseErr, ParseErrId, Value, ValueKind,
+    ParseErr, ParseErrId, Value, ValueKind, View,
     ir::{
         Symbol,
         path::{Path, PathComponent},
     },
 };
 
-use crate::state::State;
+use crate::{
+    gui::marking::{MarkedLocation, MarkingKind},
+    state::State,
+};
+
+/// Shows the parsed value module.
+pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
+    state.marked_locations.remove_where(|location| {
+        location.kind() == MarkingKind::HoveredParsed
+            || location.kind() == MarkingKind::HoveredParseErr
+    });
+
+    let ir;
+    let parse_type = if state.parse_state.parse_type == "custom parser" {
+        'parse_type: {
+            let Ok(content) = std::fs::read_to_string(
+                state
+                    .parse_state
+                    .custom_parser
+                    .as_ref()
+                    .expect("if a custom parser is selected it should also exist"),
+            ) else {
+                break 'parse_type None;
+            };
+
+            let parse = hexbait_lang::parse(&content);
+            if !parse.errors.is_empty() {
+                break 'parse_type None;
+            }
+
+            ir = hexbait_lang::ir::lower_file(parse.ast);
+
+            Some(&ir)
+        }
+    } else {
+        state
+            .parse_state
+            .built_in_format_descriptions
+            .get(state.parse_state.parse_type)
+    };
+
+    let Some(parse_type) = parse_type else { return };
+    let Ok(parse_offset) = state
+        .parse_state
+        .parse_offset
+        .parse()
+        .map(AbsoluteOffset::from)
+    else {
+        return;
+    };
+
+    let view = View::from_input(input.clone());
+    let view = view.subview(parse_offset.to_relative()..RelativeOffset::from(view.len().as_u64()));
+    let result = hexbait_lang::eval_ir(parse_type, view, RelativeOffset::ZERO);
+    let hovered = show_value(
+        ui,
+        state,
+        hexbait_lang::ir::path::Path::new(),
+        None,
+        &result.value,
+        &result.errors,
+    );
+
+    match hovered {
+        HoverInfo::Nothing => (),
+        HoverInfo::Value { path } => {
+            if let Some(value) = result.value.subvalue_at_path(&path) {
+                for range in value.provenance.byte_ranges() {
+                    state.marked_locations.add(MarkedLocation::new(
+                        (AbsoluteOffset::from(*range.start())..=AbsoluteOffset::from(*range.end()))
+                            .into(),
+                        MarkingKind::HoveredParsed,
+                    ));
+                }
+            }
+        }
+        HoverInfo::Error { id } => {
+            for range in result.errors[id.raw_idx()].provenance.byte_ranges() {
+                state.marked_locations.add(MarkedLocation::new(
+                    (AbsoluteOffset::from(*range.start())..=AbsoluteOffset::from(*range.end()))
+                        .into(),
+                    MarkingKind::HoveredParseErr,
+                ));
+            }
+        }
+    }
+}
 
 /// Information about what is hovered.
 #[derive(Debug, PartialEq, Eq)]
@@ -32,7 +118,7 @@ pub enum HoverInfo {
 /// Displays the given [`Value`] in the GUI.
 ///
 /// The return value is the path of the hovered value.
-pub fn show_value(
+fn show_value(
     ui: &mut Ui,
     state: &mut State,
     path: Path,
@@ -154,9 +240,9 @@ pub fn show_value(
                 let mut child_rect = ui.cursor().intersect(ui.max_rect());
                 child_rect.min.x += state.settings.font_size();
                 ui.scope_builder(
-                    egui::UiBuilder::new()
+                    UiBuilder::new()
                         .max_rect(child_rect)
-                        .layout(egui::Layout::top_down(egui::Align::Min)),
+                        .layout(Layout::top_down(egui::Align::Min)),
                     |ui| {
                         for (i, value) in items.iter().enumerate() {
                             let mut path = path.clone();

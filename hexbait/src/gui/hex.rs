@@ -18,7 +18,7 @@ pub use primitives::{render_glyph, render_hex, render_offset};
 use super::marking::{MarkedLocation, MarkingKind, render_locations_on_bar};
 
 /// Renders a hexdump to the GUI.
-pub fn render(ui: &mut Ui, state: &mut State, input: &mut Input) {
+pub fn render(ui: &mut Ui, state: &mut State, input: &Input) {
     let start = state.scroll_state.hex_start();
     let start_row = start.as_u64() / 16;
 

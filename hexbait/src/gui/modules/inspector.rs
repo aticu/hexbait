@@ -1,12 +1,20 @@
 //! Implements rendering of the inspector window for bytes.
 
 use egui::{Color32, Rect, RichText, Sense, Ui, vec2};
-use hexbait_common::Endianness;
+use hexbait_common::{Endianness, Input};
 
 use crate::state::State;
 
-/// Renders a data inspector, showing different views on the selected data.
-pub fn render_inspector(ui: &mut Ui, state: &mut State, selected: Option<&[u8]>) {
+/// Renders a data inspector, showing different interpretations on the selected data.
+pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
+    let selected = if let Some(selection) = state.selection_state.selected_window() {
+        input
+            .read_at(selection.start(), selection.size(), None)
+            .ok()
+    } else {
+        None
+    };
+
     let row_height = state.settings.font_size() * 1.1;
 
     ui.horizontal(|ui| {
@@ -14,7 +22,7 @@ pub fn render_inspector(ui: &mut Ui, state: &mut State, selected: Option<&[u8]>)
         ui.selectable_value(&mut state.endianness, Endianness::Big, "Big Endian");
     });
 
-    let buf = selected.unwrap_or(&[]);
+    let buf = selected.as_deref().unwrap_or(&[]);
     let endianness = state.endianness;
 
     macro_rules! read_int {
