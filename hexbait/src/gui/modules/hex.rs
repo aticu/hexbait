@@ -2,23 +2,20 @@
 
 use egui::{Color32, Rect, Sense, Ui, Vec2};
 use hexbait_common::{AbsoluteOffset, Input, Len};
-use highlighting::highlight;
 
 use crate::{
-    gui::color,
+    gui::{
+        color,
+        highlighting::highlight,
+        marking::{MarkedLocation, MarkingKind, render_locations_on_bar},
+        primitives::{render_glyph, render_hex, render_offset},
+    },
     state::{ScrollState, SelectionState, State},
     window::Window,
 };
 
-pub mod highlighting;
-mod primitives;
-
-pub use primitives::{render_glyph, render_hex, render_offset};
-
-use super::marking::{MarkedLocation, MarkingKind, render_locations_on_bar};
-
-/// Renders a hexdump to the GUI.
-pub fn render(ui: &mut Ui, state: &mut State, input: &Input) {
+/// Shows a hexdump in the GUI.
+pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     let start = state.scroll_state.hex_start();
     let start_row = start.as_u64() / 16;
 

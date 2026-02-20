@@ -1,15 +1,37 @@
-//! Implements displaying of bigram statistics.
+//! Implements display of statistics of the input data.
 
 use egui::{Align2, Color32, FontId, PopupAnchor, Rect, Sense, Tooltip, Ui, Vec2, vec2};
+use hexbait_common::Input;
 
 use crate::{
     IDLE_TIME,
-    state::{Settings, StatisticsDisplayState},
+    gui::primitives::{render_glyph, render_hex},
+    state::{Settings, State, StatisticsDisplayState},
     statistics::Statistics,
     window::Window,
 };
 
-use super::hex::{render_glyph, render_hex};
+/// Shows the statistics display module.
+pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
+    let window = state.scroll_state.selected_window();
+    let (statistics, quality) = state
+        .statistics_handler
+        .get_bigram(window)
+        .into_result_with_quality()
+        .unwrap()
+        .unwrap_or_else(|| (Statistics::empty_for_window(window), 0.0));
+    let rect = ui.max_rect().intersect(ui.cursor());
+
+    render(
+        &mut state.statistics_display_state,
+        ui,
+        rect,
+        window,
+        &statistics,
+        quality,
+        &state.settings,
+    );
+}
 
 /// Converts the given statistics to a grid that can be displayed.
 fn statistics_to_grid(statistics: &Statistics) -> Box<[[u8; 256]; 256]> {
@@ -51,7 +73,7 @@ fn statistics_to_grid(statistics: &Statistics) -> Box<[[u8; 256]; 256]> {
 }
 
 /// Renders the statistics into the given rect.
-pub fn render(
+fn render(
     statistics_display_state: &mut StatisticsDisplayState,
     ui: &mut Ui,
     rect: Rect,
@@ -74,13 +96,12 @@ pub fn render(
     statistics_display_state.cached_image.paint_at(
         ui,
         rect,
-        (window, statistics_display_state.xor_value, quality),
+        (window, quality, settings.color_map()),
         |x, y| {
             let first = x / side_len as usize;
             let second = y / side_len as usize;
 
-            let intensity = grid[(first as u8 ^ statistics_display_state.xor_value) as usize]
-                [(second as u8 ^ statistics_display_state.xor_value) as usize];
+            let intensity = grid[first][second];
 
             settings.scale_color_u8(intensity)
         },
@@ -113,8 +134,7 @@ pub fn render(
     });
 
     if let Some((first, second)) = hover_positions {
-        let intensity = grid[(first ^ statistics_display_state.xor_value) as usize]
-            [(second ^ statistics_display_state.xor_value) as usize];
+        let intensity = grid[first as usize][second as usize];
 
         Tooltip::always_open(
             ui.ctx().clone(),

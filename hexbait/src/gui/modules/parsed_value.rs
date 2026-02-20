@@ -17,6 +17,53 @@ use crate::{
 
 /// Shows the parsed value module.
 pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
+    ui.horizontal(|ui| {
+        ui.label("Parse as:");
+        egui::ComboBox::new("parse_type", "")
+            .selected_text(state.parse_state.parse_type)
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut state.parse_state.parse_type, "none", "none");
+                if state.parse_state.custom_parser.is_some() {
+                    ui.selectable_value(
+                        &mut state.parse_state.parse_type,
+                        "custom parser",
+                        "custom parser",
+                    );
+                }
+                for description in state.parse_state.built_in_format_descriptions.keys() {
+                    ui.selectable_value(
+                        &mut state.parse_state.parse_type,
+                        description,
+                        *description,
+                    );
+                }
+            });
+    });
+
+    ui.horizontal(|ui| {
+        ui.label("Parse offset:");
+        ui.text_edit_singleline(&mut state.parse_state.parse_offset);
+        if ui
+            .add_enabled(
+                state.parse_state.parse_offset.parse::<u64>().is_ok(),
+                egui::Button::new("Jump to offset"),
+            )
+            .clicked()
+            && let Ok(offset) = state
+                .parse_state
+                .parse_offset
+                .parse()
+                .map(AbsoluteOffset::from)
+        {
+            state.scroll_state.rearrange_bars_for_point(0, offset);
+        }
+    });
+
+    ui.checkbox(
+        &mut state.parse_state.sync_parse_offset_to_selection_start,
+        "Sync parse offset to selection start",
+    );
+
     state.marked_locations.remove_where(|location| {
         location.kind() == MarkingKind::HoveredParsed
             || location.kind() == MarkingKind::HoveredParseErr

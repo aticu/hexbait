@@ -8,6 +8,7 @@ edition = "2024"
 [dependencies]
 eframe = "0.33.2"
 egui = { version = "0.33.2", default-features = false }
+egui_dock = { version = "0.18.0", default-features = false }
 egui_extras = { version = "0.33.2", default-features = false }
 chrono = { version = "0.4.42", default-features = false }
 unicode_names2 = { version = "2.0.0", default-features = false }

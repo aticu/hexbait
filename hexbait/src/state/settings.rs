@@ -87,6 +87,21 @@ impl Settings {
         self.fine_grained_scrollbars
     }
 
+    /// Mutable access to the scale.
+    pub fn scale_mut(&mut self) -> &mut f32 {
+        &mut self.scale
+    }
+
+    /// The currently selected color map.
+    pub fn color_map(&self) -> ColorMap {
+        self.color_map
+    }
+
+    /// Mutable access to the color map to use.
+    pub fn color_map_mut(&mut self) -> &mut ColorMap {
+        &mut self.color_map
+    }
+
     /// The font size of normal text.
     pub fn font_size(&self) -> f32 {
         self.scale * 0.75

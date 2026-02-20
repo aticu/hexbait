@@ -104,6 +104,7 @@ pub const fn linear_opposite(color: Color32) -> Color32 {
 }
 
 /// Represents the different possible color maps.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ColorMap {
     /// The magma color map.
     Magma,
@@ -133,6 +134,20 @@ impl ColorMap {
             ColorMap::Turbo => &TURBO,
             ColorMap::Managua => &MANAGUA,
         }
+    }
+
+    /// Iterates over all possible color maps.
+    pub fn iter_all() -> impl Iterator<Item = ColorMap> {
+        [
+            ColorMap::Magma,
+            ColorMap::Inferno,
+            ColorMap::Plasma,
+            ColorMap::Viridis,
+            ColorMap::Cividis,
+            ColorMap::Turbo,
+            ColorMap::Managua,
+        ]
+        .into_iter()
     }
 }
 

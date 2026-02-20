@@ -3,57 +3,51 @@
 use egui::{
     Color32, Context, FontId, PointerButton, PopupAnchor, Pos2, Rect, Sense, Tooltip, Ui, vec2,
 };
-use hexbait_common::{AbsoluteOffset, Len, RelativeOffset};
+use hexbait_common::{AbsoluteOffset, Input, Len, RelativeOffset};
 use size_format::SizeFormatterBinary;
 
 use crate::{
     IDLE_TIME,
-    state::{DisplayType, InteractionState, ScrollState, Scrollbar, Settings},
-    statistics::StatisticsHandler,
+    gui::{color, marking::render_locations_on_bar},
+    state::{DisplayType, InteractionState, ScrollState, Scrollbar, Settings, State},
     window::Window,
 };
 
-use super::{
-    color,
-    marking::{MarkedLocations, render_locations_on_bar},
-};
-
-/// Renders the scrollbars.
-pub fn render(
-    ui: &mut Ui,
-    scroll_state: &mut ScrollState,
-    settings: &Settings,
-    marked_locations: &mut MarkedLocations,
-    handler: &StatisticsHandler,
-) {
-    let file_size = scroll_state.file_size();
+/// Shows the scrollbars.
+pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
+    let file_size = state.scroll_state.file_size();
     let rect = ui.max_rect().intersect(ui.cursor());
 
-    scroll_state.update_parameters(rect.height(), settings);
+    state
+        .scroll_state
+        .update_parameters(rect.height(), &state.settings);
 
     // be deliberately small to fit more text here
-    let size_text_height = settings.font_size() * 0.7;
+    let size_text_height = state.settings.font_size() * 0.7;
 
-    let total_bytes = scroll_state.total_hexdump_bytes();
+    let total_bytes = state.scroll_state.total_hexdump_bytes();
 
     if total_bytes >= file_size {
-        scroll_state.display_suggestion = DisplayType::Hexview;
+        state.scroll_state.display_suggestion = DisplayType::Hexview;
         return;
-    } else if scroll_state.scrollbars.is_empty() {
-        scroll_state.scrollbars.push(Scrollbar::new(file_size));
+    } else if state.scroll_state.scrollbars.is_empty() {
+        state
+            .scroll_state
+            .scrollbars
+            .push(Scrollbar::new(file_size));
     }
 
-    let mut window = scroll_state.first_window();
+    let mut window = state.scroll_state.first_window();
     let mut show_hex = false;
 
-    for i in 0..scroll_state.scrollbars.len() {
-        if i >= scroll_state.scrollbars.len() {
+    for i in 0..state.scroll_state.scrollbars.len() {
+        if i >= state.scroll_state.scrollbars.len() {
             break;
         }
 
         let mut rect = ui.max_rect().intersect(ui.cursor());
         rect.min += vec2(0.0, size_text_height);
-        rect.set_width(16.0 * settings.bar_width_multiplier() as f32 + 3.0);
+        rect.set_width(16.0 * state.settings.bar_width_multiplier() as f32 + 3.0);
         let rect = rect;
 
         ui.painter().text(
@@ -70,10 +64,10 @@ pub fn render(
         }
 
         let mut full_quality = true;
-        let allow_selection = marked_locations.hovered().is_none();
+        let allow_selection = state.marked_locations.hovered().is_none();
         handle_interactions(
             rect,
-            scroll_state,
+            &mut state.scroll_state,
             i,
             total_bytes,
             window,
@@ -83,12 +77,13 @@ pub fn render(
 
         let hovered_row_window = render_bar(
             ui,
-            &mut scroll_state.scrollbars[i],
-            settings,
+            &mut state.scroll_state.scrollbars[i],
+            &state.settings,
             rect,
             window,
             |window| {
-                if let Some((entropy, quality)) = handler
+                if let Some((entropy, quality)) = state
+                    .statistics_handler
                     .get_entropy(window)
                     .into_result_with_quality()
                     .unwrap()
@@ -105,13 +100,15 @@ pub fn render(
         );
 
         if !full_quality {
-            scroll_state.scrollbars[i].cached_image.require_repaint();
+            state.scroll_state.scrollbars[i]
+                .cached_image
+                .require_repaint();
             ui.ctx().request_repaint_after(IDLE_TIME);
         }
 
-        render_locations_on_bar(ui, rect, window, marked_locations);
+        render_locations_on_bar(ui, rect, window, &mut state.marked_locations);
 
-        if let Some(location) = marked_locations.hovered()
+        if let Some(location) = state.marked_locations.hovered()
             && ui.input(|input| {
                 input
                     .pointer
@@ -131,7 +128,7 @@ pub fn render(
                 ui.label(format!("{}", offset.as_u64()));
             });
             if ui.input(|input| input.pointer.primary_clicked()) {
-                scroll_state.rearrange_bars_for_point(i, offset);
+                state.scroll_state.rearrange_bars_for_point(i, offset);
                 show_hex = true;
                 break;
             }
@@ -143,7 +140,8 @@ pub fn render(
                 PopupAnchor::Pointer,
             )
             .show(|ui| {
-                if let Some((entropy, quality)) = handler
+                if let Some((entropy, quality)) = state
+                    .statistics_handler
                     .get_entropy(row_window)
                     .into_result_with_quality()
                     .unwrap()
@@ -162,21 +160,24 @@ pub fn render(
             });
         }
 
-        window = scroll_state.scrollbars[i].window(window, total_bytes);
+        window = state.scroll_state.scrollbars[i].window(window, total_bytes);
 
-        if scroll_state.interaction_state.selecting_bar(i) {
-            scroll_state.scrollbars.truncate(i + 1);
-            scroll_state.scrollbars.push(Scrollbar::new(window.size()));
+        if state.scroll_state.interaction_state.selecting_bar(i) {
+            state.scroll_state.scrollbars.truncate(i + 1);
+            state
+                .scroll_state
+                .scrollbars
+                .push(Scrollbar::new(window.size()));
         }
     }
 
     // keep bars consistent in case of double clicks
-    scroll_state.enforce_no_full_bar_in_middle_invariant();
+    state.scroll_state.enforce_no_full_bar_in_middle_invariant();
 
     if show_hex {
-        scroll_state.display_suggestion = DisplayType::Hexview;
+        state.scroll_state.display_suggestion = DisplayType::Hexview;
     } else {
-        scroll_state.display_suggestion = DisplayType::Statistics;
+        state.scroll_state.display_suggestion = DisplayType::Statistics;
     }
 }
 

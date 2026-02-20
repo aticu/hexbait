@@ -5,9 +5,12 @@ use std::collections::BTreeMap;
 use egui::{Color32, Rect, Stroke, Ui, pos2};
 use hexbait_common::{AbsoluteOffset, Len};
 
-use crate::{gui::hex::highlighting::trace_path, window::Window};
+use crate::{
+    gui::{highlighting::trace_path, modules::scrollbars::offset_on_bar},
+    window::Window,
+};
 
-use super::{color, scrollbars::offset_on_bar};
+use super::color;
 
 /// Stores the marked locations to highlight.
 pub struct MarkedLocations {
