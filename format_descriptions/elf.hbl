@@ -1,0 +1,55 @@
+!endian le;
+
+ident {
+    magic bytes = <7f "ELF">;
+    class u8;
+    endianness u8;
+    version u8;
+    pad u8;
+    rest_of_ident bytes len 8;
+};
+
+!assert ident.endianness < 3 && ident.endianness != 0;
+
+!if ident.endianness == 1 {
+    !endian le;
+} else {
+    !endian be;
+}
+
+type u16;
+machine u16;
+version u32;
+entrypoint u64;
+program_header_off u64;
+section_header_off u64;
+flags u32;
+header_size u16;
+program_header_entry_size u16;
+program_header_entry_num u16;
+section_header_entry_size u16;
+section_header_entry_num u16;
+section_header_string_index u16;
+
+let string_table_start_off = peek(u64 at section_header_off + section_header_entry_size * section_header_string_index + 24);
+
+!seek to section_header_off;
+sections [{
+    name_idx u32;
+    !scope at $parent.string_table_start_off + name_idx {
+        name bytes len 16;
+    }
+    type u32;
+    flags u64;
+    addr u64;
+    offset u64;
+    size u64;
+    link u32;
+    info u32;
+    addr_align u64;
+    entry_size u64;
+
+    !scope at offset {
+        content bytes len size;
+    }
+}] len section_header_entry_num;
