@@ -194,6 +194,5 @@ impl AddAssign<&Statistics> for Statistics {
         }
 
         self.window = window;
-        self.first_byte = self.first_byte.or(rhs.first_byte);
     }
 }

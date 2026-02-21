@@ -55,6 +55,7 @@ fn statistics_to_grid(statistics: &Statistics) -> Box<[[u8; 256]; 256]> {
 
     // compute gamma such that the mean will get a middle color
     let gamma = 0.5f64.log2() / mean.log2();
+    let gamma = if gamma.is_normal() { gamma } else { 1.0 };
 
     for first in 0..=255 {
         for second in 0..=255 {

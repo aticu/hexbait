@@ -85,25 +85,27 @@ where
     type Item = (u8, u8, u64);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.second == 256 {
-            return None;
-        }
+        loop {
+            if self.second == 256 {
+                return None;
+            }
 
-        if self.first < 256 {
-            let old_first = self.first;
-            self.first += 1;
+            let first = self.first as u8;
+            let second = self.second as u8;
+            let count = u64::from(self.raw[self.second][self.first]);
 
-            Some((
-                old_first as u8,
-                self.second as u8,
-                u64::from(self.raw[self.second][old_first]),
-            ))
-        } else {
-            let old_second = self.second;
-            self.second += 1;
-            self.first = 0;
+            if first == 255 {
+                self.second += 1;
+                self.first = 0;
+            } else {
+                self.first += 1;
+            }
 
-            Some((0, self.second as u8, u64::from(self.raw[old_second][0])))
+            if count == 0 {
+                continue;
+            }
+
+            return Some((first, second, count));
         }
     }
 }
