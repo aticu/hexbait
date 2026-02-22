@@ -35,7 +35,11 @@ let size_of_pe_header = 24;
 !seek to mz_header.new_exe_header + pe_header.size_of_optional_header + size_of_pe_header;
 
 sections [{
-    section_name bytes len 8;
+    !scope at $offset {
+        section_name bytes while peek(u8) != 0 && $len < 8;
+    }
+    !seek by 8;
+
     virtual_size u32;
     virtual_address u32;
     size_of_raw_data u32;

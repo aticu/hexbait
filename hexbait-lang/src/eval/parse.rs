@@ -671,6 +671,61 @@ impl Scope {
         Ok(())
     }
 
+    /// Reads a bytes value.
+    fn read_bytes_value(
+        &mut self,
+        count: u64,
+        span: Span,
+        parse_ctx: &mut ParseContext,
+    ) -> Result<Value, ParseErrWithMaybePartialResult> {
+        let (bytes, provenance) = if count > BytesValue::INLINE_LEN as u64 {
+            let convert_read_bytes = |read_bytes: ReadBytes| {
+                let mut buf = [0; 8];
+                buf.copy_from_slice(&read_bytes);
+                buf
+            };
+
+            let start = self.offset.0;
+            let (prefix, _) = self.read_bytes(Len::from(8), span, parse_ctx)?;
+            let prefix = convert_read_bytes(prefix);
+            self.offset.0 += Len::from(count - (8 + 8));
+            let (suffix, _) = self.read_bytes(Len::from(8), span, parse_ctx)?;
+            let suffix = convert_read_bytes(suffix);
+
+            let provenance = self
+                .view
+                .provenance_from_range(start..start + Len::from(count));
+
+            (
+                BytesValue::FromView {
+                    view: self.view.clone(),
+                    start,
+                    len: Len::from(count),
+                    prefix,
+                    suffix,
+                },
+                provenance,
+            )
+        } else {
+            let (bytes, provenance) = self.read_bytes(Len::from(count), span, parse_ctx)?;
+            let mut buf = [0; BytesValue::INLINE_LEN];
+            buf[..bytes.len()].copy_from_slice(&bytes);
+
+            (
+                BytesValue::Inline {
+                    buf,
+                    len: bytes.len() as u8,
+                },
+                provenance,
+            )
+        };
+
+        Ok(Value {
+            kind: ValueKind::Bytes(bytes),
+            provenance,
+        })
+    }
+
     /// Evaluates the given parsing type.
     fn eval_parse_type(
         &mut self,
@@ -688,55 +743,7 @@ impl Scope {
                         self.eval_expr(count_expr, struct_ctx, parse_ctx, Default::default())?;
 
                     if let Ok(count) = u64::try_from(count_val.kind.expect_int()) {
-                        let (bytes, provenance) = if count > BytesValue::INLINE_LEN as u64 {
-                            let convert_read_bytes = |read_bytes: ReadBytes| {
-                                let mut buf = [0; 8];
-                                buf.copy_from_slice(&read_bytes);
-                                buf
-                            };
-
-                            let start = self.offset.0;
-                            let (prefix, _) =
-                                self.read_bytes(Len::from(8), count_expr.span, parse_ctx)?;
-                            let prefix = convert_read_bytes(prefix);
-                            self.offset.0 += Len::from(count - (8 + 8));
-                            let (suffix, _) =
-                                self.read_bytes(Len::from(8), count_expr.span, parse_ctx)?;
-                            let suffix = convert_read_bytes(suffix);
-
-                            let provenance = self
-                                .view
-                                .provenance_from_range(start..start + Len::from(count));
-
-                            (
-                                BytesValue::FromView {
-                                    view: self.view.clone(),
-                                    start,
-                                    len: Len::from(count),
-                                    prefix,
-                                    suffix,
-                                },
-                                provenance,
-                            )
-                        } else {
-                            let (bytes, provenance) =
-                                self.read_bytes(Len::from(count), count_expr.span, parse_ctx)?;
-                            let mut buf = [0; BytesValue::INLINE_LEN];
-                            buf[..bytes.len()].copy_from_slice(&bytes);
-
-                            (
-                                BytesValue::Inline {
-                                    buf,
-                                    len: bytes.len() as u8,
-                                },
-                                provenance,
-                            )
-                        };
-
-                        Value {
-                            kind: ValueKind::Bytes(bytes),
-                            provenance,
-                        }
+                        self.read_bytes_value(count, parse_type.span, parse_ctx)?
                     } else {
                         return Err(ParseErrWithMaybePartialResult {
                             parse_err: parse_ctx.new_err(ParseErr {
@@ -750,9 +757,37 @@ impl Scope {
                     }
                 }
                 RepeatKind::While { condition } => {
-                    todo!(
-                        "while condition {condition:?} is unimplemented for bytes repetitions yet"
-                    )
+                    let start_offset = self.offset;
+                    let mut last_byte = None;
+                    let mut len = 0;
+                    while self
+                        .eval_expr(
+                            condition,
+                            struct_ctx,
+                            parse_ctx,
+                            AdditionalExprContext {
+                                last: last_byte.as_ref(),
+                                len: Some(&Value {
+                                    kind: ValueKind::Integer(Int::from(len)),
+                                    provenance: Provenance::empty(),
+                                }),
+                            },
+                        )?
+                        .kind
+                        .expect_bool()
+                    {
+                        let (bytes, provenance) =
+                            self.read_bytes(Len::from(1), parse_type.span, parse_ctx)?;
+
+                        last_byte = Some(Value {
+                            kind: ValueKind::Integer(bytes[0].into()),
+                            provenance,
+                        });
+                        len += 1;
+                    }
+                    self.offset = start_offset;
+
+                    self.read_bytes_value(len, parse_type.span, parse_ctx)?
                 }
                 RepeatKind::Error => impossible!(),
             },
