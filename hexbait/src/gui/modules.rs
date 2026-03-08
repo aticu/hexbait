@@ -82,7 +82,11 @@ pub fn hex_dock_state() -> DockState<TabType> {
     let [_, inspector_node] =
         surface.split_right(NodeIndex::root(), 0.75, vec![TabType::Inspector]);
 
-    surface.split_below(inspector_node, 0.5, vec![TabType::ParsedValue]);
+    let [_, parsed_value] = surface.split_below(inspector_node, 0.5, vec![TabType::ParsedValue]);
+
+    surface.set_focused_node(parsed_value);
+    surface.push_to_focused_leaf(TabType::Search);
+    surface.set_active_tab(parsed_value, 0);
 
     dock_state
 }

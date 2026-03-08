@@ -17,6 +17,8 @@ pub struct SearchState {
     pub search_ascii_case_insensitive: bool,
     /// Whether to search for a UTF-16 version of the input.
     pub search_utf16: bool,
+    /// Whether to search only the current window instead of the whole input.
+    pub search_current_window: bool,
 }
 
 impl SearchState {
@@ -27,6 +29,7 @@ impl SearchState {
             search_text: String::new(),
             search_ascii_case_insensitive: true,
             search_utf16: true,
+            search_current_window: false,
         }
     }
 

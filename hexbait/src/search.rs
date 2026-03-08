@@ -21,7 +21,7 @@ pub struct Searcher {
     /// The search results.
     results: Arc<RwLock<BTreeSet<Window>>>,
     /// The requests for new searches to run.
-    requests: mpsc::Sender<SearchRequest>,
+    requests: mpsc::Sender<Option<SearchRequest>>,
 }
 
 impl Searcher {
@@ -42,6 +42,7 @@ impl Searcher {
         content: &[u8],
         ascii_case_insensitive: bool,
         include_utf16: bool,
+        window: Window,
     ) {
         let mut search_sequences = vec![content.to_vec()];
         if include_utf16 && let Ok(as_str) = std::str::from_utf8(content) {
@@ -57,11 +58,17 @@ impl Searcher {
         }
 
         self.requests
-            .send(SearchRequest {
+            .send(Some(SearchRequest {
                 content: search_sequences,
                 ascii_case_insensitive,
-            })
+                window,
+            }))
             .unwrap();
+    }
+
+    /// Stops a currently ongoing search.
+    pub fn stop_search(&self) {
+        self.requests.send(None).unwrap();
     }
 
     /// The progress of the current search.

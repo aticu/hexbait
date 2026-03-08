@@ -20,7 +20,7 @@ pub(crate) struct BackgroundSearcherStartResult {
     /// The search results.
     pub(crate) results: Arc<RwLock<BTreeSet<Window>>>,
     /// The requests for new searches to run.
-    pub(crate) requests: mpsc::Sender<SearchRequest>,
+    pub(crate) requests: mpsc::Sender<Option<SearchRequest>>,
 }
 
 /// The search request that the background thread receives.
@@ -29,6 +29,8 @@ pub(crate) struct SearchRequest {
     pub(crate) content: Vec<Vec<u8>>,
     /// Whether to search case insensitively.
     pub(crate) ascii_case_insensitive: bool,
+    /// The window to search.
+    pub(crate) window: Window,
 }
 
 /// The search state of the background searcher.
@@ -39,6 +41,8 @@ pub(crate) struct BackgroundSearcher {
     results: Arc<RwLock<BTreeSet<Window>>>,
     /// The current offset at which the search happens.
     current_offset: AbsoluteOffset,
+    /// The window that is searched.
+    search_window: Window,
     /// The searcher performing the search itself.
     searcher: Option<AhoCorasick>,
     /// The size of the portion of the buffer that needs to overlap between searches.
@@ -48,7 +52,7 @@ pub(crate) struct BackgroundSearcher {
     /// The buffer where file contents are loaded.
     buf: Vec<u8>,
     /// The requests for new searches to run.
-    requests: mpsc::Receiver<SearchRequest>,
+    requests: mpsc::Receiver<Option<SearchRequest>>,
     /// The input to read from.
     input: Input,
 }
@@ -69,6 +73,7 @@ impl BackgroundSearcher {
             progress: Arc::clone(&progress),
             results: Arc::clone(&results),
             current_offset: AbsoluteOffset::ZERO,
+            search_window: Window::from_start_len(AbsoluteOffset::ZERO, input.len()),
             searcher: None,
             overlap_size: Len::ZERO,
             search_window_size: Len::ZERO,
@@ -105,6 +110,11 @@ impl BackgroundSearcher {
             }
         };
 
+        let Some(request) = request else {
+            self.stop_search();
+            return true;
+        };
+
         let largest_content_size = Len::from(
             request
                 .content
@@ -121,7 +131,8 @@ impl BackgroundSearcher {
         *self.progress.write().unwrap() = 0.0;
         self.results.write().unwrap().clear();
 
-        self.current_offset = AbsoluteOffset::ZERO;
+        self.current_offset = request.window.start();
+        self.search_window = request.window;
         self.searcher = Some(
             AhoCorasick::builder()
                 .ascii_case_insensitive(request.ascii_case_insensitive)
@@ -135,6 +146,12 @@ impl BackgroundSearcher {
         true
     }
 
+    /// Stops a currently running search.
+    fn stop_search(&mut self) {
+        self.searcher = None;
+        *self.progress.write().unwrap() = 1.0;
+    }
+
     /// Returns whether a search is currently running.
     fn search_is_running(&self) -> bool {
         self.searcher.is_some()
@@ -142,12 +159,13 @@ impl BackgroundSearcher {
 
     /// Runs one iteration of the search.
     fn run_search(&mut self) {
-        let current_overlap = if self.current_offset.is_start_of_file() {
+        let current_overlap = if self.current_offset == self.search_window.start() {
             Len::ZERO
         } else {
             self.overlap_size
         };
         let start = self.current_offset - current_overlap;
+        let end = self.search_window.end();
 
         // This is a bit wasteful because it reads overlapping bytes multiple times.
         //
@@ -157,7 +175,11 @@ impl BackgroundSearcher {
         // But even then, when using memory mapped reads, this makes it actually more efficient.
         let buf = self
             .input
-            .read_at(start, self.search_window_size, Some(&mut self.buf))
+            .read_at(
+                start,
+                self.search_window_size.min(end - start),
+                Some(&mut self.buf),
+            )
             .expect("TODO: improve error handling here");
         if buf.is_empty() {
             // we finished the search
@@ -175,7 +197,7 @@ impl BackgroundSearcher {
             self.results.write().unwrap().insert(window);
         }
 
-        if Len::from((start + buf_len).as_u64()) == self.input.len() {
+        if start + buf_len == self.search_window.end() {
             // we finished the search
             self.searcher = None;
             *self.progress.write().unwrap() = 1.0;
@@ -184,8 +206,9 @@ impl BackgroundSearcher {
 
         self.current_offset += buf_len - current_overlap;
 
-        let fraction_completed =
-            (self.current_offset.as_u64() as f32) / (self.input.len().as_u64() as f32);
+        let fraction_completed = ((self.current_offset - self.search_window.start()).as_u64()
+            as f32)
+            / (self.search_window.size().as_u64() as f32);
 
         *self.progress.write().unwrap() = fraction_completed;
     }
@@ -197,7 +220,9 @@ impl BackgroundSearcher {
                 break;
             }
 
-            self.run_search();
+            if self.search_is_running() {
+                self.run_search();
+            }
         }
     }
 }
