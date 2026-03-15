@@ -41,6 +41,8 @@ pub struct Settings {
     fine_grained_scrollbars: bool,
     /// The thing to display in the main screen.
     view_kind: ViewKind,
+    /// How much to use gamma smoothing in the statistics display.
+    statistics_gamma_factor: f64,
 }
 
 impl Settings {
@@ -52,6 +54,7 @@ impl Settings {
             linear_byte_colors: false,
             fine_grained_scrollbars: true,
             view_kind: ViewKind::Auto,
+            statistics_gamma_factor: 1.0,
         }
     }
 
@@ -100,6 +103,16 @@ impl Settings {
     /// Mutable access to the color map to use.
     pub fn color_map_mut(&mut self) -> &mut ColorMap {
         &mut self.color_map
+    }
+
+    /// How much gamma smoothing to use for the statistics display.
+    pub fn statistics_gamma_factor(&self) -> f64 {
+        self.statistics_gamma_factor
+    }
+
+    /// Mutable access to the gamma smoothing factor to use for the statistics display.
+    pub fn statistics_gamma_factor_mut(&mut self) -> &mut f64 {
+        &mut self.statistics_gamma_factor
     }
 
     /// The font size of normal text.

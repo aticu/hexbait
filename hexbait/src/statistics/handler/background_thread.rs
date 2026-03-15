@@ -164,8 +164,8 @@ impl BackgroundThread {
 
     /// Serves the given bigram request.
     fn serve_bigram_request(&mut self, window: Window) {
-        let mut compute = || {
-            let stats = Statistics::compute(&mut self.input, window)
+        let compute = || {
+            let stats = Statistics::compute(&self.input, window)
                 .expect("TODO: improve error handling here in the future");
             Arc::new(stats)
         };
@@ -237,7 +237,7 @@ impl BackgroundThread {
             return;
         }
 
-        let stats = FlatStatistics::compute(&mut self.input, window)
+        let stats = FlatStatistics::compute(&self.input, window)
             .expect("TODO: improve error handling here in the future");
         let entropy = stats.entropy();
 
@@ -253,7 +253,7 @@ impl BackgroundThread {
             return;
         }
 
-        let stats = FlatStatistics::compute(&mut self.input, window)
+        let stats = FlatStatistics::compute(&self.input, window)
             .expect("TODO: improve error handling here in the future");
         let entropy = stats.entropy();
 

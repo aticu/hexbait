@@ -35,7 +35,7 @@ impl FlatStatistics {
     }
 
     /// Computes statistics about a given window of data.
-    pub fn compute(input: &mut Input, window: Window) -> Result<FlatStatistics, io::Error> {
+    pub fn compute(input: &Input, window: Window) -> Result<FlatStatistics, io::Error> {
         let capacity = window.size();
         let mut statistics = FlatStatisticsKind::with_capacity(capacity.as_u64());
 
@@ -269,7 +269,7 @@ where
     }
 
     /// Computes raw statistics for the given window.
-    fn compute(&mut self, input: &mut Input, window: Window) -> Result<Window, io::Error> {
+    fn compute(&mut self, input: &Input, window: Window) -> Result<Window, io::Error> {
         const WINDOW_SIZE: usize = 4096;
         let mut buf = Vec::new();
 

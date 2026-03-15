@@ -5,7 +5,7 @@ use std::hash::{Hash as _, Hasher as _};
 use hexbait_common::{AbsoluteOffset, Input, Len, RelativeOffset, StateChangeFlag};
 
 use crate::{
-    gui::cached_image::CachedImage,
+    gui::{cached_image::CachedImage, color::ColorMap},
     state::{DisplayType, Settings},
     window::Window,
 };
@@ -288,7 +288,7 @@ pub struct Scrollbar {
     /// The cached image for this scrollbar.
     ///
     /// This depends on the selection of the scrollbar as well as the full window of the bar.
-    pub cached_image: CachedImage<((RelativeOffset, Len), Window, bool)>,
+    pub cached_image: CachedImage<((RelativeOffset, Len), Window, bool, ColorMap)>,
 }
 
 impl Scrollbar {

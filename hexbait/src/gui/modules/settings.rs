@@ -58,6 +58,14 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
             }
         });
 
-        ui.add(Slider::new(state.settings.scale_mut(), 10.0..=50.0));
+        ui.horizontal(|ui| {
+            ui.label("Scale:");
+            ui.add(Slider::new(state.settings.scale_mut(), 10.0..=50.0));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Statistics gamma smoothing:");
+            ui.add(Slider::new(state.settings.statistics_gamma_factor_mut(), 0.0..=1.0));
+        });
     });
 }

@@ -1593,6 +1593,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hexbait-generate-classification-data"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "hexbait",
+ "hexbait-common",
+]
+
+[[package]]
 name = "hexbait-lang"
 version = "0.1.0"
 dependencies = [

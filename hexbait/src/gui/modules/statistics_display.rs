@@ -34,7 +34,7 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
 }
 
 /// Converts the given statistics to a grid that can be displayed.
-fn statistics_to_grid(statistics: &Statistics) -> Box<[[u8; 256]; 256]> {
+fn statistics_to_grid(statistics: &Statistics, gamma_factor: f64) -> Box<[[u8; 256]; 256]> {
     let mut grid = Box::new([[0; 256]; 256]);
 
     // first calculate some statistics
@@ -54,8 +54,14 @@ fn statistics_to_grid(statistics: &Statistics) -> Box<[[u8; 256]; 256]> {
     let mean = sum as f64 / nonzero_count as f64 / max as f64;
 
     // compute gamma such that the mean will get a middle color
-    let gamma = 0.5f64.log2() / mean.log2();
-    let gamma = if gamma.is_normal() { gamma } else { 1.0 };
+    let raw_gamma = 0.5f64.log2() / mean.log2();
+    let raw_gamma = if raw_gamma.is_normal() {
+        raw_gamma
+    } else {
+        1.0
+    };
+
+    let gamma = raw_gamma * gamma_factor + (1.0 - gamma_factor) * 1.0;
 
     for first in 0..=255 {
         for second in 0..=255 {
@@ -83,7 +89,7 @@ fn render(
     quality: f32,
     settings: &Settings,
 ) {
-    let grid = statistics_to_grid(statistics);
+    let grid = statistics_to_grid(statistics, settings.statistics_gamma_factor());
 
     let side_len_x = (rect.width().trunc() / 256.0).trunc();
     let side_len_y = (rect.height().trunc() / 256.0).trunc();
@@ -97,7 +103,12 @@ fn render(
     statistics_display_state.cached_image.paint_at(
         ui,
         rect,
-        (window, quality, settings.color_map()),
+        (
+            window,
+            quality,
+            settings.color_map(),
+            settings.statistics_gamma_factor(),
+        ),
         |x, y| {
             let first = x / side_len as usize;
             let second = y / side_len as usize;

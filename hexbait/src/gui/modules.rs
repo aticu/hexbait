@@ -5,6 +5,7 @@ use hexbait_common::Input;
 
 use crate::state::State;
 
+pub mod classification_info;
 pub mod content;
 pub mod hex;
 pub mod inspector;
@@ -30,6 +31,8 @@ pub enum TabType {
     Settings,
     /// Shows search controls.
     Search,
+    /// Shows the classification info module.
+    ClassificationInfo,
 }
 
 /// The context for the hexbait application.
@@ -56,13 +59,17 @@ impl egui_dock::TabViewer for Context {
             TabType::ParsedValue => parsed_value::show,
             TabType::Settings => settings::show,
             TabType::Search => search::show,
+            TabType::ClassificationInfo => classification_info::show,
         };
 
         show_fn(ui, &mut self.state, &self.input);
     }
 
     fn is_closeable(&self, tab: &Self::Tab) -> bool {
-        matches!(tab, TabType::Settings | TabType::Search)
+        matches!(
+            tab,
+            TabType::Settings | TabType::Search | TabType::ClassificationInfo
+        )
     }
 
     fn scroll_bars(&self, tab: &Self::Tab) -> [bool; 2] {
@@ -86,6 +93,7 @@ pub fn hex_dock_state() -> DockState<TabType> {
 
     surface.set_focused_node(parsed_value);
     surface.push_to_focused_leaf(TabType::Search);
+    surface.push_to_focused_leaf(TabType::ClassificationInfo);
     surface.set_active_tab(parsed_value, 0);
 
     dock_state

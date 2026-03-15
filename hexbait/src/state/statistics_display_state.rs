@@ -8,7 +8,7 @@ use crate::{
 /// The state used by the statistics display.
 pub struct StatisticsDisplayState {
     /// The cached statistics display image.
-    pub cached_image: CachedImage<(Window, f32, ColorMap)>,
+    pub cached_image: CachedImage<(Window, f32, ColorMap, f64)>,
 }
 
 impl StatisticsDisplayState {

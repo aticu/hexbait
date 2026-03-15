@@ -8,6 +8,7 @@ use size_format::SizeFormatterBinary;
 
 use crate::window::Window;
 
+pub mod classification;
 mod flat;
 mod handler;
 mod raw_bigrams;
@@ -64,7 +65,7 @@ impl Statistics {
     }
 
     /// Computes statistics about a given window of data.
-    pub fn compute(input: &mut Input, window: Window) -> Result<Statistics, io::Error> {
+    pub fn compute(input: &Input, window: Window) -> Result<Statistics, io::Error> {
         let capacity = window.size();
         let mut statistics = StatisticsKind::with_capacity(capacity.as_u64());
 

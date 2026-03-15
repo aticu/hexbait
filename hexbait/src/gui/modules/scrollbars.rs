@@ -346,6 +346,7 @@ fn render_bar(
             scrollbar.state_for_cached_image(),
             window,
             settings.fine_grained_scrollbars(),
+            settings.color_map(),
         ),
         |x, y| {
             if x >= side_start {

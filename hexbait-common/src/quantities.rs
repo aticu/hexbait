@@ -257,6 +257,16 @@ impl Len {
     pub const fn round_up(self, align: u64) -> Self {
         Self(align_up(self.0, align))
     }
+
+    /// Aligns this length down towards the given alignment.
+    ///
+    /// The alignment must be a power of two.
+    ///
+    /// # Panics
+    /// This function MAY panic if the alignment is not a power of two.
+    pub const fn align_down(self, align: u64) -> Self {
+        Self(align_down(self.0, align))
+    }
 }
 
 impl Add<Len> for Len {

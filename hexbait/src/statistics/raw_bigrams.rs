@@ -38,7 +38,7 @@ where
     /// Fills the bigram counts with information about the given window.
     pub(super) fn compute(
         &mut self,
-        input: &mut Input,
+        input: &Input,
         window: Window,
     ) -> Result<(Window, Option<u8>), io::Error> {
         raw_compute(
@@ -133,7 +133,7 @@ impl SmallRawBigrams {
     /// Fills the bigram counts with information about the given window.
     pub(super) fn compute(
         &mut self,
-        input: &mut Input,
+        input: &Input,
         window: Window,
     ) -> Result<(Window, Option<u8>), io::Error> {
         raw_compute(
@@ -191,7 +191,7 @@ fn raw_compute<T>(
     this: &mut T,
     mut increase_count: impl FnMut(&mut T, u8, u8),
     decrease_count: impl FnOnce(&mut T, u8, u8),
-    input: &mut Input,
+    input: &Input,
     window: Window,
 ) -> Result<(Window, Option<u8>), io::Error> {
     const WINDOW_SIZE: usize = 4096;
