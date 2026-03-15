@@ -1589,7 +1589,6 @@ name = "hexbait-common"
 version = "0.1.0"
 dependencies = [
  "memmap2",
- "positioned-io",
 ]
 
 [[package]]
@@ -2694,16 +2693,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8a2f0d8d040d7848a709caf78912debcc3f33ee4b3cac47d73d1e1069e83507"
 dependencies = [
  "portable-atomic",
-]
-
-[[package]]
-name = "positioned-io"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4ec4b80060f033312b99b6874025d9503d2af87aef2dd4c516e253fbfcdada7"
-dependencies = [
- "libc",
- "winapi",
 ]
 
 [[package]]

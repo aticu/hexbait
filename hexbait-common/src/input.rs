@@ -1,9 +1,14 @@
 //! Models how the raw data is accessed in hexamine.
 
-use std::{io, ops::Deref, path::Path, sync::Arc};
+use std::{
+    fs::File,
+    io::{self, Seek as _},
+    ops::Deref,
+    path::Path,
+    sync::Arc,
+};
 
 use memmap2::Mmap;
-use positioned_io::{RandomAccessFile, ReadAt as _, Size as _};
 
 use crate::{AbsoluteOffset, Len};
 
@@ -16,7 +21,7 @@ enum InputType {
     /// The input is the given file.
     File {
         /// The open file handle.
-        file: RandomAccessFile,
+        file: File,
         /// The length of the file in bytes.
         len: u64,
     },
@@ -52,13 +57,14 @@ impl Input {
 
         let path = path.as_ref();
 
-        if let Ok(mmap) = mmap_from_path(path) {
+        // NOTE: We disable mmaps for now, since it turns out to have much worse performance for the statistics access patterns we have.
+        // The fix here is probably to keep the file and have different modes for different access patterns.
+        // For parsing for example mmaps are likely better (though this should also be checked).
+        if false && let Ok(mmap) = mmap_from_path(path) {
             Ok(Input(Arc::new(InputType::Memmap(mmap))))
         } else {
-            let file = positioned_io::RandomAccessFile::open(path).unwrap();
-            let len = file
-                .size()?
-                .ok_or_else(|| io::Error::other("cannot get file size"))?;
+            let mut file = File::open(path).unwrap();
+            let len = file.seek(io::SeekFrom::End(0))?;
 
             Ok(Input(Arc::new(InputType::File { file, len })))
         }
@@ -125,14 +131,14 @@ impl Input {
 
                 Ok(if let Some(preallocated_buf) = preallocated_buf {
                     preallocated_buf.resize(output_size, 0);
-                    file.read_exact_at(offset.as_u64(), &mut preallocated_buf[..output_size])?;
+                    read_exact(file, offset.as_u64(), &mut preallocated_buf[..output_size])?;
 
                     ReadBytes(ReadBytesInner::ByRef {
                         buf: &preallocated_buf[..output_size],
                     })
                 } else if output_size <= READ_BYTES_INLINE_LEN {
                     let mut buf = [0u8; READ_BYTES_INLINE_LEN];
-                    file.read_exact_at(offset.as_u64(), &mut buf)?;
+                    read_exact(file, offset.as_u64(), &mut buf)?;
 
                     ReadBytes(ReadBytesInner::Inline {
                         buf,
@@ -140,7 +146,7 @@ impl Input {
                     })
                 } else {
                     let mut buf = vec![0u8; output_size].into_boxed_slice();
-                    file.read_exact_at(offset.as_u64(), &mut buf)?;
+                    read_exact(file, offset.as_u64(), &mut buf)?;
 
                     ReadBytes(ReadBytesInner::Owned { buf })
                 })
@@ -251,5 +257,36 @@ impl From<ReadBytes<'_>> for Vec<u8> {
             ReadBytesInner::Inline { buf, len } => buf[..len as usize].into(),
             ReadBytesInner::ByRef { buf } => buf.into(),
         }
+    }
+}
+
+/// An internal helper to read exact bytes into a buffer.
+fn read_exact(file: &File, mut pos: u64, mut buf: &mut [u8]) -> io::Result<()> {
+    #[cfg(unix)]
+    let read_at = std::os::unix::fs::FileExt::read_at;
+    // NOTE: Using seek_read would be a problem for multi-threaded use of the file if it were possible to use the `File` directly.
+    // However since `Input` is private internally, this is not a problem, since `read_seek` itself is atomic.
+    #[cfg(windows)]
+    let read_at = std::os::window::fs::FileExt::seek_read;
+
+    while !buf.is_empty() {
+        match read_at(file, buf, pos) {
+            Ok(0) => break,
+            Ok(n) => {
+                let tmp = buf;
+                buf = &mut tmp[n..];
+                pos += n as u64;
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+            Err(e) => return Err(e),
+        }
+    }
+    if !buf.is_empty() {
+        Err(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "failed to fill whole buffer",
+        ))
+    } else {
+        Ok(())
     }
 }
