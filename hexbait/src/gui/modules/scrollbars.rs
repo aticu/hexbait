@@ -395,6 +395,18 @@ fn render_bar(
                     settings.missing_color()
                 };
 
+                let raw_color = if settings.fine_grained_scrollbars() {
+                    raw_color
+                } else if let Some(raw_entropy) = raw_entropy {
+                    if x as f32 <= raw_entropy * side_start as f32 {
+                        raw_color
+                    } else {
+                        Color32::BLACK
+                    }
+                } else {
+                    settings.missing_color()
+                };
+
                 const HIGHLIGHT_STRENGTH: f64 = 0.4;
 
                 if selection_start <= y && y <= selection_end {
