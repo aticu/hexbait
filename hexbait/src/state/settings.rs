@@ -185,8 +185,28 @@ impl Settings {
     }
 
     /// The color representing missing data.
-    pub fn missing_color(&self) -> Color32 {
-        Color32::BROWN
+    pub fn entropy_missing_color(&self) -> Color32 {
+        Color32::GRAY
+    }
+
+    /// The color of the selection border in the scrollbars.
+    pub fn scrollbar_selection_border_color(&self) -> Color32 {
+        Color32::WHITE
+    }
+
+    /// The background color of a non-finegrained scrollbar.
+    pub fn scrollbar_background_color(&self) -> Color32 {
+        Color32::BLACK
+    }
+
+    /// The color that is used as a tint for non-selected regions on the scrollbar.
+    pub fn scrollbar_non_selected_color(&self) -> Color32 {
+        Color32::BLACK
+    }
+
+    /// The strength of the tint used for non selected regions of the scrollbar.
+    pub fn scrollbar_non_selected_tint_strength(&self) -> f64 {
+        0.4
     }
 
     /// The width multiplier of the scrollbars.

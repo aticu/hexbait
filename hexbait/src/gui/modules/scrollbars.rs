@@ -1,7 +1,8 @@
 //! Implements scrollbars to zoom in on the content of a file and scroll around in it.
 
 use egui::{
-    Color32, Context, FontId, PointerButton, PopupAnchor, Pos2, Rect, Sense, Tooltip, Ui, vec2,
+    Color32, Context, FontId, PointerButton, PopupAnchor, Pos2, Rect, Sense, Shape, Stroke,
+    Tooltip, Ui, pos2, vec2,
 };
 use hexbait_common::{AbsoluteOffset, Input, Len, RelativeOffset};
 use size_format::SizeFormatterBinary;
@@ -40,7 +41,10 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
     let mut window = state.scroll_state.first_window();
     let mut show_hex = false;
 
+    let mut old_selection = None::<[Pos2; 2]>;
+
     for i in 0..state.scroll_state.scrollbars.len() {
+        // in case scrollbars get removed before the loop ends, we still exit early
         if i >= state.scroll_state.scrollbars.len() {
             break;
         }
@@ -75,6 +79,29 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
             ui.ctx(),
         );
 
+        if let Some(old_selection) = old_selection {
+            ui.painter()
+                .with_clip_rect(Rect::from_points(&[
+                    old_selection[0],
+                    old_selection[1],
+                    rect.left_top(),
+                    rect.left_bottom(),
+                ]))
+                .add(Shape::convex_polygon(
+                    vec![
+                        old_selection[0],
+                        rect.left_top(),
+                        rect.left_bottom(),
+                        old_selection[1],
+                    ],
+                    state
+                        .settings
+                        .scrollbar_selection_border_color()
+                        .gamma_multiply(0.3),
+                    Stroke::new(1.0, state.settings.scrollbar_selection_border_color()),
+                ));
+        }
+
         let hovered_row_window = render_bar(
             ui,
             &mut state.scroll_state.scrollbars[i],
@@ -98,6 +125,20 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
                 }
             },
         );
+
+        let selection_start = pos2(
+            rect.max.x,
+            rect.min.y
+                + state.scroll_state.scrollbars[i].relative_selection_start(window) as f32
+                    * rect.height(),
+        );
+        let selection_end = pos2(
+            rect.max.x,
+            rect.min.y
+                + state.scroll_state.scrollbars[i].relative_selection_end(window) as f32
+                    * rect.height(),
+        );
+        old_selection = Some([selection_start, selection_end]);
 
         if !full_quality {
             state.scroll_state.scrollbars[i]
@@ -389,31 +430,36 @@ fn render_bar(
                     full_quality_row = false;
                 }
 
-                let raw_color = if let Some(entropy) = raw_entropy {
-                    settings.entropy_color(entropy)
-                } else {
-                    settings.missing_color()
-                };
-
-                let raw_color = if settings.fine_grained_scrollbars() {
-                    raw_color
-                } else if let Some(raw_entropy) = raw_entropy {
-                    if x as f32 <= raw_entropy * side_start as f32 {
-                        raw_color
+                let raw_color = if let Some(raw_entropy) = raw_entropy {
+                    if settings.fine_grained_scrollbars()
+                        || x as f32 <= raw_entropy * side_start as f32
+                    {
+                        settings.entropy_color(raw_entropy)
                     } else {
-                        Color32::BLACK
+                        settings.scrollbar_background_color()
                     }
                 } else {
-                    settings.missing_color()
+                    settings.entropy_missing_color()
                 };
 
-                const HIGHLIGHT_STRENGTH: f64 = 0.4;
-
-                if selection_start <= y && y <= selection_end {
-                    //color::lerp(raw_color, egui::Color32::WHITE, HIGHLIGHT_STRENGTH)
-                    raw_color
+                let color_with_estimate = if quality < 1.0 {
+                    color::lerp(raw_color, settings.entropy_missing_color(), 0.65)
                 } else {
-                    color::lerp(raw_color, egui::Color32::BLACK, HIGHLIGHT_STRENGTH)
+                    raw_color
+                };
+
+                if (y == selection_start && selection_start != 0)
+                    || (y == selection_end && selection_end != rect.height().trunc() as usize)
+                {
+                    settings.scrollbar_selection_border_color()
+                } else if selection_start < y && y < selection_end {
+                    color_with_estimate
+                } else {
+                    color::lerp(
+                        color_with_estimate,
+                        settings.scrollbar_non_selected_color(),
+                        settings.scrollbar_non_selected_tint_strength(),
+                    )
                 }
             }
         },
