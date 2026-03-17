@@ -1,6 +1,6 @@
 //! Implements showing of a parsed value.
 
-use egui::{FontId, Layout, Response, RichText, TextStyle, Ui, UiBuilder};
+use egui::{FontId, Key, Layout, Response, RichText, TextStyle, Ui, UiBuilder};
 use hexbait_common::{AbsoluteOffset, Input, RelativeOffset};
 use hexbait_lang::{
     ParseErr, ParseErrId, Value, ValueKind, View,
@@ -42,7 +42,19 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
 
     ui.horizontal(|ui| {
         ui.label("Parse offset:");
-        ui.text_edit_singleline(&mut state.parse_state.parse_offset);
+        if ui
+            .text_edit_singleline(&mut state.parse_state.parse_offset)
+            .lost_focus()
+            && ui.input(|i| i.key_pressed(Key::Enter))
+            && let Ok(offset) = state
+                .parse_state
+                .parse_offset
+                .parse()
+                .map(AbsoluteOffset::from)
+        {
+            state.scroll_state.rearrange_bars_for_point(0, offset);
+        }
+
         if ui
             .add_enabled(
                 state.parse_state.parse_offset.parse::<u64>().is_ok(),

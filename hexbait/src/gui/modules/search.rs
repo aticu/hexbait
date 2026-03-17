@@ -1,6 +1,6 @@
 //! Renders a search screen in the GUI.
 
-use egui::{Button, Checkbox, RichText, Ui};
+use egui::{Button, Checkbox, Key, RichText, Ui};
 use hexbait_common::{AbsoluteOffset, Input};
 
 use crate::{state::State, window::Window};
@@ -8,7 +8,15 @@ use crate::{state::State, window::Window};
 /// Shows the search screen in the GUI.
 pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     ui.vertical(|ui| {
-        ui.text_edit_singleline(&mut state.search.search_text);
+        let mut trigger_search = false;
+        if ui
+            .text_edit_singleline(&mut state.search.search_text)
+            .lost_focus()
+            && ui.input(|i| i.key_pressed(Key::Enter))
+        {
+            trigger_search = true;
+        }
+
         let search_bytes = match state.search.search_bytes() {
             Ok(bytes) => Some(bytes),
             Err(msg) => {
@@ -46,8 +54,11 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
                 Button::new("start search"),
             )
             .clicked()
-            && let Some(search_bytes) = &search_bytes
         {
+            trigger_search = true;
+        }
+
+        if trigger_search && let Some(search_bytes) = &search_bytes {
             let window = if state.search.search_current_window {
                 state.scroll_state.selected_window()
             } else {
