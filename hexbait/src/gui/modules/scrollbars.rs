@@ -80,26 +80,30 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
         );
 
         if let Some(old_selection) = old_selection {
-            ui.painter()
-                .with_clip_rect(Rect::from_points(&[
+            let painter = ui.painter().with_clip_rect(Rect::from_points(&[
+                old_selection[0],
+                old_selection[1],
+                rect.left_top(),
+                rect.left_bottom(),
+            ]));
+
+            let stroke = Stroke::new(1.0, state.settings.scrollbar_selection_border_color());
+
+            painter.line_segment([old_selection[0], rect.left_top()], stroke);
+            painter.line_segment([old_selection[1], rect.left_bottom()], stroke);
+            painter.add(Shape::convex_polygon(
+                vec![
                     old_selection[0],
-                    old_selection[1],
                     rect.left_top(),
                     rect.left_bottom(),
-                ]))
-                .add(Shape::convex_polygon(
-                    vec![
-                        old_selection[0],
-                        rect.left_top(),
-                        rect.left_bottom(),
-                        old_selection[1],
-                    ],
-                    state
-                        .settings
-                        .scrollbar_selection_border_color()
-                        .gamma_multiply(0.3),
-                    Stroke::new(1.0, state.settings.scrollbar_selection_border_color()),
-                ));
+                    old_selection[1],
+                ],
+                state
+                    .settings
+                    .scrollbar_selection_border_color()
+                    .gamma_multiply(0.3),
+                Stroke::NONE,
+            ));
         }
 
         let hovered_row_window = render_bar(
