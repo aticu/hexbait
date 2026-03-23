@@ -138,7 +138,7 @@ impl Input {
                     })
                 } else if output_size <= READ_BYTES_INLINE_LEN {
                     let mut buf = [0u8; READ_BYTES_INLINE_LEN];
-                    read_exact(file, offset.as_u64(), &mut buf)?;
+                    read_exact(file, offset.as_u64(), &mut buf[..output_size])?;
 
                     ReadBytes(ReadBytesInner::Inline {
                         buf,
