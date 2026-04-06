@@ -96,8 +96,8 @@ impl BackgroundSearcher {
     /// Processes new search requests.
     ///
     /// A new request will always cancel previous requests.
-    fn process_new_requests(&mut self, has_more_work: bool) -> bool {
-        let request = if has_more_work {
+    fn process_new_requests(&mut self) -> bool {
+        let request = if self.search_is_running() {
             match self.requests.try_recv() {
                 Ok(request) => request,
                 Err(TryRecvError::Empty) => return true,
@@ -216,7 +216,7 @@ impl BackgroundSearcher {
     /// Runs the background thread.
     fn run(mut self) {
         loop {
-            if !self.process_new_requests(self.search_is_running()) {
+            if !self.process_new_requests() {
                 break;
             }
 

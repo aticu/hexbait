@@ -11,6 +11,7 @@ use crate::{
     IDLE_TIME,
     gui::{color, marking::render_locations_on_bar},
     state::{DisplayType, InteractionState, ScrollState, Scrollbar, Settings, State},
+    statistics::{Entropy, EntropyQuality},
     window::Window,
 };
 
@@ -113,19 +114,14 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
             rect,
             window,
             |window| {
-                if let Some((entropy, quality)) = state
-                    .statistics_handler
-                    .get_entropy(window)
-                    .into_result_with_quality()
-                    .unwrap()
-                {
-                    if quality < 1.0 {
+                if let Some((entropy, quality)) = state.statistics_handler.get_entropy(window) {
+                    if quality.is_estimated() {
                         full_quality = false;
                     }
-                    (Some(entropy), quality)
+                    Some((entropy, quality))
                 } else {
                     full_quality = false;
-                    (None, 0.0)
+                    None
                 }
             },
         );
@@ -185,19 +181,13 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
                 PopupAnchor::Pointer,
             )
             .show(|ui| {
-                if let Some((entropy, quality)) = state
-                    .statistics_handler
-                    .get_entropy(row_window)
-                    .into_result_with_quality()
-                    .unwrap()
-                {
-                    if quality < 1.0 {
+                if let Some((entropy, quality)) = state.statistics_handler.get_entropy(row_window) {
+                    if quality.is_estimated() {
                         ui.label(format!(
-                            "Entropy: {entropy:.02} (Estimation quality: {:.2}%)",
-                            quality * 100.0
+                            "Entropy: {entropy} (estimate based on subsampling)",
                         ));
                     } else {
-                        ui.label(format!("Entropy: {entropy:.02}"));
+                        ui.label(format!("Entropy: {entropy}"));
                     }
                 } else {
                     ui.label("Entropy unknown");
@@ -365,7 +355,7 @@ fn render_bar(
     settings: &Settings,
     rect: Rect,
     window: Window,
-    mut entropy: impl FnMut(Window) -> (Option<f32>, f32),
+    mut entropy: impl FnMut(Window) -> Option<(Entropy, EntropyQuality)>,
 ) -> Option<Window> {
     let total_rows = rect.height().trunc() as u64;
 
@@ -427,16 +417,20 @@ fn render_bar(
                     window_size,
                 );
 
-                let (raw_entropy, quality) = entropy(window);
+                let (raw_entropy, quality) = if let Some((entropy, quality)) = entropy(window) {
+                    (Some(entropy), quality)
+                } else {
+                    (None, EntropyQuality::Estimated)
+                };
 
-                if quality < 1.0 {
+                if quality.is_estimated() {
                     full_quality_scrollbar = false;
                     full_quality_row = false;
                 }
 
                 let raw_color = if let Some(raw_entropy) = raw_entropy {
                     if settings.fine_grained_scrollbars()
-                        || x as f32 <= raw_entropy * side_start as f32
+                        || x as f32 <= raw_entropy.as_f32() * side_start as f32
                     {
                         settings.entropy_color(raw_entropy)
                     } else {
@@ -446,7 +440,7 @@ fn render_bar(
                     settings.entropy_missing_color()
                 };
 
-                let color_with_estimate = if quality < 1.0 {
+                let color_with_estimate = if quality.is_estimated() {
                     color::lerp(raw_color, settings.entropy_missing_color(), 0.65)
                 } else {
                     raw_color

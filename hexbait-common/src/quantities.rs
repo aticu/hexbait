@@ -82,6 +82,7 @@ where
 impl Sub<AbsoluteOffset> for AbsoluteOffset {
     type Output = Len;
 
+    #[track_caller]
     fn sub(self, rhs: AbsoluteOffset) -> Self::Output {
         Len(self.0 - rhs.0)
     }
@@ -90,12 +91,14 @@ impl Sub<AbsoluteOffset> for AbsoluteOffset {
 impl Add<RelativeOffset> for AbsoluteOffset {
     type Output = AbsoluteOffset;
 
+    #[track_caller]
     fn add(self, rhs: RelativeOffset) -> Self::Output {
         AbsoluteOffset(self.0 + rhs.0)
     }
 }
 
 impl AddAssign<RelativeOffset> for AbsoluteOffset {
+    #[track_caller]
     fn add_assign(&mut self, rhs: RelativeOffset) {
         self.0 += rhs.0;
     }
@@ -104,12 +107,14 @@ impl AddAssign<RelativeOffset> for AbsoluteOffset {
 impl Add<Len> for AbsoluteOffset {
     type Output = AbsoluteOffset;
 
+    #[track_caller]
     fn add(self, rhs: Len) -> Self::Output {
         AbsoluteOffset(self.0 + rhs.0)
     }
 }
 
 impl AddAssign<Len> for AbsoluteOffset {
+    #[track_caller]
     fn add_assign(&mut self, rhs: Len) {
         self.0 += rhs.0;
     }
@@ -118,12 +123,14 @@ impl AddAssign<Len> for AbsoluteOffset {
 impl Sub<Len> for AbsoluteOffset {
     type Output = AbsoluteOffset;
 
+    #[track_caller]
     fn sub(self, rhs: Len) -> Self::Output {
         AbsoluteOffset(self.0 - rhs.0)
     }
 }
 
 impl SubAssign<Len> for AbsoluteOffset {
+    #[track_caller]
     fn sub_assign(&mut self, rhs: Len) {
         self.0 -= rhs.0;
     }
@@ -193,6 +200,7 @@ where
 impl Sub<RelativeOffset> for RelativeOffset {
     type Output = Len;
 
+    #[track_caller]
     fn sub(self, rhs: RelativeOffset) -> Self::Output {
         Len(self.0 - rhs.0)
     }
@@ -201,6 +209,7 @@ impl Sub<RelativeOffset> for RelativeOffset {
 impl Sub<Len> for RelativeOffset {
     type Output = RelativeOffset;
 
+    #[track_caller]
     fn sub(self, rhs: Len) -> Self::Output {
         RelativeOffset(self.0 - rhs.0)
     }
@@ -209,12 +218,14 @@ impl Sub<Len> for RelativeOffset {
 impl Add<Len> for RelativeOffset {
     type Output = RelativeOffset;
 
+    #[track_caller]
     fn add(self, rhs: Len) -> Self::Output {
         RelativeOffset(self.0 + rhs.0)
     }
 }
 
 impl AddAssign<Len> for RelativeOffset {
+    #[track_caller]
     fn add_assign(&mut self, rhs: Len) {
         self.0 += rhs.0;
     }
@@ -272,12 +283,14 @@ impl Len {
 impl Add<Len> for Len {
     type Output = Len;
 
+    #[track_caller]
     fn add(self, rhs: Len) -> Self::Output {
         Len(self.0 + rhs.0)
     }
 }
 
 impl AddAssign<Len> for Len {
+    #[track_caller]
     fn add_assign(&mut self, rhs: Len) {
         self.0 += rhs.0;
     }
@@ -286,6 +299,7 @@ impl AddAssign<Len> for Len {
 impl Mul<u64> for Len {
     type Output = Len;
 
+    #[track_caller]
     fn mul(self, rhs: u64) -> Self::Output {
         Len(self.0 * rhs)
     }
@@ -294,12 +308,14 @@ impl Mul<u64> for Len {
 impl Mul<Len> for u64 {
     type Output = Len;
 
+    #[track_caller]
     fn mul(self, rhs: Len) -> Self::Output {
         Len(self * rhs.0)
     }
 }
 
 impl MulAssign<u64> for Len {
+    #[track_caller]
     fn mul_assign(&mut self, rhs: u64) {
         self.0 *= rhs;
     }
@@ -308,12 +324,14 @@ impl MulAssign<u64> for Len {
 impl Div<u64> for Len {
     type Output = Len;
 
+    #[track_caller]
     fn div(self, rhs: u64) -> Self::Output {
         Len(self.0 / rhs)
     }
 }
 
 impl DivAssign<u64> for Len {
+    #[track_caller]
     fn div_assign(&mut self, rhs: u64) {
         self.0 /= rhs;
     }
@@ -322,12 +340,14 @@ impl DivAssign<u64> for Len {
 impl Sub<Len> for Len {
     type Output = Len;
 
+    #[track_caller]
     fn sub(self, rhs: Len) -> Self::Output {
         Len(self.0 - rhs.0)
     }
 }
 
 impl SubAssign<Len> for Len {
+    #[track_caller]
     fn sub_assign(&mut self, rhs: Len) {
         self.0 -= rhs.0;
     }

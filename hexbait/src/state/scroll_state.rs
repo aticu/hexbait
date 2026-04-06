@@ -65,6 +65,11 @@ impl ScrollState {
         self.height = height;
     }
 
+    /// Returns the effective height as an integer.
+    pub fn effective_height(&self) -> usize {
+        self.height.trunc() as usize
+    }
+
     /// Returns the size of the file this scroll state is for.
     pub fn file_size(&self) -> Len {
         self.file_size
@@ -75,16 +80,18 @@ impl ScrollState {
         Window::from_start_len(AbsoluteOffset::ZERO, self.file_size())
     }
 
+    /// An iterator over the windows contained in scrollbars represented by the state.
+    pub fn windows(&self) -> impl Iterator<Item = Window> {
+        WindowIter {
+            next_window: Some(self.first_window()),
+            scrollbar_iter: self.scrollbars.iter().take(self.scrollbars.len() - 1),
+            total_hexdump_bytes: self.total_hexdump_bytes(),
+        }
+    }
+
     /// Returns the window selected by the scroll state.
     pub fn selected_window(&self) -> Window {
-        let mut window = self.first_window();
-        let total_hexdump_bytes = self.total_hexdump_bytes().min(window.size());
-
-        for bar in &self.scrollbars {
-            window = bar.window(window, total_hexdump_bytes);
-        }
-
-        window
+        self.windows().last().unwrap()
     }
 
     /// Returns the start offset of a hexdump showing the current window.
@@ -418,5 +425,30 @@ impl InteractionState {
             InteractionState::WindowSelection { bar_idx, .. } => *bar_idx == i,
             _ => false,
         }
+    }
+}
+
+/// An iterator over the windows in the scroll state.
+struct WindowIter<'state> {
+    /// The next window that the iterator will return.
+    next_window: Option<Window>,
+    /// The iterator over the scrollbars.
+    scrollbar_iter: std::iter::Take<std::slice::Iter<'state, Scrollbar>>,
+    /// The number of bytes that can be displayed per hexdump.
+    total_hexdump_bytes: Len,
+}
+
+impl Iterator for WindowIter<'_> {
+    type Item = Window;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let this_window = self.next_window;
+
+        self.next_window = self
+            .scrollbar_iter
+            .next()
+            .map(|scrollbar| scrollbar.window(this_window.unwrap(), self.total_hexdump_bytes));
+
+        this_window
     }
 }

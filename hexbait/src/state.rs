@@ -68,7 +68,7 @@ impl State {
     /// This method is called once at the end of a frame to do necessary bookkeeping.
     pub fn end_of_frame(&mut self) {
         self.statistics_handler
-            .end_of_frame(self.scroll_state.changed());
+            .end_of_frame(&self.settings, &self.scroll_state);
 
         self.marked_locations
             .remove_where(|loc| loc.kind() == MarkingKind::SearchResult);

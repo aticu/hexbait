@@ -105,21 +105,17 @@ impl ClassificationData {
 
 /// Classifies the currently selected window.
 pub fn classify_selected_window(state: &mut State) {
-    let Ok(Some((statistics, _))) = state
+    let (statistics, quality) = state
         .statistics_handler
-        .get_bigram(state.scroll_state.selected_window())
-        .into_result_with_quality()
-    else {
-        state.classification_state.classification_results = None;
+        .get_bigram_statistics(state.scroll_state.selected_window());
+    if quality == 0.0 {
         return;
-    };
+    }
+
     let mut quantized_statistics = Box::new([[0; 256]; 256]);
     quantized_hellinger_statistics(&statistics, &mut quantized_statistics);
 
-    let total_count = statistics
-        .iter_non_zero()
-        .map(|(_, _, count)| count)
-        .sum::<u64>();
+    let total_count = statistics.num_covered_bytes();
     if total_count == 0 {
         state.classification_state.classification_results = None;
         return;
@@ -188,10 +184,7 @@ pub fn classify_selected_window(state: &mut State) {
 
 /// Computes the quantized statistics ready for a Hellinger comparison.
 fn quantized_hellinger_statistics(statistics: &Statistics, out: &mut [[u16; 256]; 256]) -> u64 {
-    let total_count = statistics
-        .iter_non_zero()
-        .map(|(_, _, count)| count)
-        .sum::<u64>();
+    let total_count = statistics.num_covered_bytes();
 
     let beta = if total_count <= 32 * KIB {
         512.0

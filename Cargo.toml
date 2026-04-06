@@ -8,3 +8,10 @@ members = [
     "hexbait-lang",
     "hexbait-parse",
 ]
+
+[profile.dev]
+opt-level = 3
+debug = true
+incremental = true
+debug-assertions = true
+overflow-checks = true

@@ -15,6 +15,12 @@ pub struct Window {
 }
 
 impl Window {
+    /// The `ZERO` window that is empty at the start of the file.
+    pub const ZERO: Window = Window {
+        start: AbsoluteOffset::from(0),
+        end: AbsoluteOffset::from(0),
+    };
+
     /// Creates a new window.
     pub fn new(start: AbsoluteOffset, end: AbsoluteOffset) -> Window {
         if start < end {
@@ -75,6 +81,11 @@ impl Window {
     /// Determines if the window contains the given offset.
     pub fn contains(self, offset: AbsoluteOffset) -> bool {
         self.start() <= offset && offset < self.end()
+    }
+
+    /// Determines if the window contains the given other window.
+    pub fn contains_window(self, other: Window) -> bool {
+        self.start() <= other.start() && other.end() <= self.end()
     }
 
     /// Determines if the window overlaps with the other window.

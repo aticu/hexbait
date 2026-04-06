@@ -2,7 +2,10 @@
 
 use egui::{Color32, FontId, TextStyle, Ui};
 
-use crate::gui::color::{BYTE_COLORS, ColorMap};
+use crate::{
+    gui::color::{BYTE_COLORS, ColorMap},
+    statistics::Entropy,
+};
 
 /// Determine what to show in the main screen.
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
@@ -180,8 +183,8 @@ impl Settings {
     }
 
     /// A color representing an entropy.
-    pub fn entropy_color(&self, entropy: f32) -> Color32 {
-        self.scale_color_f32(entropy)
+    pub fn entropy_color(&self, entropy: Entropy) -> Color32 {
+        self.scale_color_u8(entropy.0)
     }
 
     /// The color representing missing data.

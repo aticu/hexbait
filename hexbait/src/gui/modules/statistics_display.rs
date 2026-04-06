@@ -14,12 +14,7 @@ use crate::{
 /// Shows the statistics display module.
 pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
     let window = state.scroll_state.selected_window();
-    let (statistics, quality) = state
-        .statistics_handler
-        .get_bigram(window)
-        .into_result_with_quality()
-        .unwrap()
-        .unwrap_or_else(|| (Statistics::empty_for_window(window), 0.0));
+    let (statistics, quality) = state.statistics_handler.get_bigram_statistics(window);
     let rect = ui.max_rect().intersect(ui.cursor());
 
     render(
@@ -42,12 +37,14 @@ fn statistics_to_grid(statistics: &Statistics, gamma_factor: f64) -> Box<[[u8; 2
     let mut sum = 0;
     let mut max = 0;
 
-    for (_, _, count) in statistics.iter_non_zero() {
+    for (_, _, count) in statistics.iter() {
         if count > max {
             max = count;
         }
-        nonzero_count += 1;
-        sum += count;
+        if count != 0 {
+            nonzero_count += 1;
+            sum += count;
+        }
     }
 
     // the mean scaled as a value between 0 and 1

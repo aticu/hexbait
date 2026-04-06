@@ -100,6 +100,27 @@ impl Input {
         self.len().is_zero()
     }
 
+    /// Signals a planned read so that the data at this offset can already be prefetched.
+    ///
+    /// This method is merely a hint and may also do nothing on some operating systems.
+    pub fn signal_planned_read(&self, offset: AbsoluteOffset, len: Len) {
+        match &*self.0 {
+            InputType::File { file, .. } => {
+                #[cfg(unix)]
+                {
+                    let _ = nix::fcntl::posix_fadvise(
+                        file,
+                        offset.as_u64() as i64,
+                        len.as_u64() as i64,
+                        nix::fcntl::PosixFadviseAdvice::POSIX_FADV_WILLNEED,
+                    );
+                }
+            }
+            InputType::Memmap(_) => (),
+            InputType::Stdin(_) => (),
+        }
+    }
+
     /// Reads from the input at the given offset.
     ///
     /// If the requested start offset is beyond the end of the input an error is returned.
