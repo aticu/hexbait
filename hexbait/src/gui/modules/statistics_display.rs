@@ -7,14 +7,16 @@ use crate::{
     IDLE_TIME,
     gui::primitives::{render_glyph, render_hex},
     state::{Settings, State, StatisticsDisplayState},
-    statistics::Statistics,
+    statistics::BigramStatistics,
     window::Window,
 };
 
 /// Shows the statistics display module.
 pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
     let window = state.scroll_state.selected_window();
-    let (statistics, quality) = state.statistics_handler.get_bigram_statistics(window);
+    let (statistics, quality) = state
+        .statistics_handler
+        .get_bigram_statistics(state.scroll_state.selected_window());
     let rect = ui.max_rect().intersect(ui.cursor());
 
     render(
@@ -29,7 +31,7 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
 }
 
 /// Converts the given statistics to a grid that can be displayed.
-fn statistics_to_grid(statistics: &Statistics, gamma_factor: f64) -> Box<[[u8; 256]; 256]> {
+fn statistics_to_grid(statistics: &BigramStatistics, gamma_factor: f64) -> Box<[[u8; 256]; 256]> {
     let mut grid = Box::new([[0; 256]; 256]);
 
     // first calculate some statistics
@@ -82,7 +84,7 @@ fn render(
     ui: &mut Ui,
     rect: Rect,
     window: Window,
-    statistics: &Statistics,
+    statistics: &BigramStatistics,
     quality: f32,
     settings: &Settings,
 ) {

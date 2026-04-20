@@ -80,7 +80,7 @@ impl StatisticsComputation {
 
                     computation_state
                         .derived_values
-                        .insert(bin, statistics.entropy());
+                        .insert(bin, statistics.downsampled().metrics());
 
                     if self.window_index == computation_state.last_window_index() {
                         computation_state.current_window_statistics += &statistics;

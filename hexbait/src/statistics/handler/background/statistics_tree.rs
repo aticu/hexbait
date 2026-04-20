@@ -4,10 +4,7 @@ use std::{cmp, collections::BTreeMap};
 
 use hexbait_common::{AbsoluteOffset, Len};
 
-use crate::{
-    statistics::{Statistics, handler::ENTROPY_SAMPLE_SIZE},
-    window::Window,
-};
+use crate::{statistics::handler::MIN_SAMPLE_SIZE, window::Window};
 
 /// The branching factor of the tree.
 ///
@@ -15,7 +12,7 @@ use crate::{
 const BRANCHING_FACTOR: u64 = 2;
 
 /// The size of a leaf node in the tree.
-pub const LEAF_NODE_SIZE: Len = ENTROPY_SAMPLE_SIZE;
+pub const LEAF_NODE_SIZE: Len = MIN_SAMPLE_SIZE;
 
 /// Stores bigram statistics for parts of an input in a tree.
 ///
@@ -31,21 +28,21 @@ pub const LEAF_NODE_SIZE: Len = ENTROPY_SAMPLE_SIZE;
 ///   descendants within the new node's range and any ancestor whose range
 ///   covers the new node's offset.
 ///
-/// - **Sparse coverage**: The tree may have gaps — not every byte of the input
+/// - **Sparse coverage**: The tree may have gaps - not every byte of the input
 ///   needs to be covered by a node. Use [`StatisticsTree::covers_window_exactly`]
 ///   to check whether a particular window is fully covered.
 ///
 /// - **`memory_usage` consistency**: `memory_usage` always equals the sum of
 ///   `approximate_memory_usage()` across all stored nodes.
-pub struct StatisticsTree {
+pub struct StatisticsTree<Statistics> {
     /// The nodes in the tree.
-    nodes: BTreeMap<AbsoluteOffset, StatisticsTreeNode>,
+    nodes: BTreeMap<AbsoluteOffset, StatisticsTreeNode<Statistics>>,
     /// The current approximate memory usage of the tree.
     memory_usage: u64,
 }
 
 /// A node in the statistics tree.
-pub struct StatisticsTreeNode {
+pub struct StatisticsTreeNode<Statistics> {
     /// The current tier of the node.
     ///
     /// Lower is smaller, `0` is a node of size `LEAF_NODE_SIZE`, `1` is a node of size `BRANCHING_FACTOR * LEAF_NODE_SIZE` and so on.
@@ -72,7 +69,7 @@ impl Tier {
     /// Finds the smallest tier that has nodes smaller than the given length.
     pub const fn fitting_tier(len: Len) -> Tier {
         let mut tier = Tier::LEAF_TIER;
-        while tier.next().size().as_u64() < len.as_u64() {
+        while tier.next().size().as_u64() <= len.as_u64() {
             tier = tier.next();
         }
 
@@ -90,9 +87,9 @@ impl Tier {
     }
 }
 
-impl StatisticsTree {
+impl<Statistics: crate::statistics::Statistics> StatisticsTree<Statistics> {
     /// Creates a new statistics tree.
-    pub fn new() -> StatisticsTree {
+    pub fn new() -> StatisticsTree<Statistics> {
         StatisticsTree {
             nodes: BTreeMap::new(),
             memory_usage: 0,
@@ -314,7 +311,7 @@ impl StatisticsTree {
                 self.try_promote(offset);
             }
 
-            // No promotion succeeded this pass — nothing more we can do.
+            // No promotion succeeded this pass - nothing more we can do.
             if self.memory_usage >= memory_before {
                 return;
             }
@@ -330,7 +327,7 @@ const MAX_ZONE_TIER_GAP: u64 = 2;
 /// Sort key for garbage collection candidates.
 ///
 /// Derives `Ord` so that `Vec::sort` gives the correct promotion order:
-/// 1. Lower `tier_adjusted` first — interleaves zones so that no zone gets
+/// 1. Lower `tier_adjusted` first - interleaves zones so that no zone gets
 ///    more than `MAX_ZONE_TIER_GAP` tiers ahead of the next.
 /// 2. Nodes farther from the next higher-priority zone boundary first.
 #[derive(PartialEq, Eq, PartialOrd, Ord)]

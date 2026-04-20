@@ -110,8 +110,8 @@ impl Input {
                 {
                     let _ = nix::fcntl::posix_fadvise(
                         file,
-                        offset.as_u64() as i64,
-                        len.as_u64() as i64,
+                        offset.as_u64() as nix::libc::off_t,
+                        len.as_u64() as nix::libc::off_t,
                         nix::fcntl::PosixFadviseAdvice::POSIX_FADV_WILLNEED,
                     );
                 }

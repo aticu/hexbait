@@ -15,9 +15,9 @@ use hexbait_common::{Input, Len};
 
 use crate::{
     statistics::{
-        Entropy, Statistics,
+        BigramStatistics, StatisticsMetrics,
         handler::{
-            CalculationResult, EntropyValue, Request,
+            CalculationResult, Request, WindowMetrics,
             background::{statistics_tree::StatisticsTree, work_phase::WorkPhase},
             compute_bin_size_and_align_window,
         },
@@ -56,8 +56,9 @@ impl BackgroundStatisticsEngine {
     pub fn start(input: Input) -> BackgroundStatisticsEngineStartResult {
         let (send, recv) = mpsc::channel();
         let result = Arc::new(ArcSwap::from_pointee(CalculationResult {
-            entropy_values: Vec::new(),
-            statistics: Statistics::empty(),
+            metrics: Vec::new(),
+            statistics: BigramStatistics::empty(),
+            selected_window: Window::ZERO,
         }));
         let frontend_result = Arc::clone(&result);
 
@@ -80,16 +81,20 @@ impl BackgroundStatisticsEngine {
 
     /// Publishes work performed by the backend.
     fn publish_work(&mut self) {
-        let entropy_values = self
+        let metrics = self
             .computation_state
             .derived_values
             .iter()
-            .map(|(&window, &entropy)| EntropyValue { window, entropy })
+            .map(|(&window, &metrics)| WindowMetrics { window, metrics })
             .collect::<Vec<_>>();
+        let (_, selected_window) = self
+            .computation_state
+            .bin_size_and_aligned_window(self.computation_state.last_window_index());
 
         let result = CalculationResult {
-            entropy_values,
+            metrics,
             statistics: self.computation_state.current_window_statistics.clone(),
+            selected_window,
         };
 
         self.result.store(Arc::new(result));
@@ -108,6 +113,8 @@ impl BackgroundStatisticsEngine {
                 .statistics_tree
                 .garbage_collect(800 * 1024 * 1024, &request.windows);
         }
+        // TODO: choose a smarter limit
+        // TODO: garbage collect scalars as well
     }
 
     /// Determines if there is still work left.
@@ -126,6 +133,12 @@ impl BackgroundStatisticsEngine {
                 Err(TryRecvError::Disconnected) => return false,
             }
         } else {
+            // we will possibly block now, so let's ensure that we publish one last time and garbage collect
+            if self.computation_state.latest_request.is_some() {
+                self.publish_work();
+                self.do_garbage_collection();
+            }
+
             match self.request_channel.recv() {
                 Ok(request) => request,
                 Err(RecvError) => return false,
@@ -168,11 +181,11 @@ struct ComputationState {
     /// The latest request for what should be computed.
     latest_request: Option<Request>,
     /// All values derived from statistics.
-    derived_values: BTreeMap<Window, Entropy>,
+    derived_values: BTreeMap<Window, StatisticsMetrics>,
     /// The tree of statistics information.
-    statistics_tree: StatisticsTree,
+    statistics_tree: StatisticsTree<BigramStatistics>,
     /// The computed statistics of the current window.
-    current_window_statistics: Statistics,
+    current_window_statistics: BigramStatistics,
     /// The last time when an update was sent to the frontend.
     last_yield: Instant,
 }
@@ -185,14 +198,14 @@ impl ComputationState {
             latest_request: None,
             derived_values: BTreeMap::new(),
             statistics_tree: StatisticsTree::new(),
-            current_window_statistics: Statistics::empty(),
+            current_window_statistics: BigramStatistics::empty(),
             last_yield: Instant::now(),
         }
     }
 
     /// Resets the computation state for a new request.
     fn reset_for_request(&mut self, request: Request) {
-        self.current_window_statistics = Statistics::empty();
+        self.current_window_statistics = BigramStatistics::empty();
         self.last_yield = Instant::now();
         self.latest_request = Some(request);
     }

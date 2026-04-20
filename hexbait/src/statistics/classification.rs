@@ -22,7 +22,7 @@ use std::io;
 
 use hexbait_common::{AbsoluteOffset, Input, Len};
 
-use crate::{state::State, statistics::Statistics, window::Window};
+use crate::{state::State, statistics::BigramStatistics, window::Window};
 
 mod builtin;
 
@@ -183,7 +183,10 @@ pub fn classify_selected_window(state: &mut State) {
 }
 
 /// Computes the quantized statistics ready for a Hellinger comparison.
-fn quantized_hellinger_statistics(statistics: &Statistics, out: &mut [[u16; 256]; 256]) -> u64 {
+fn quantized_hellinger_statistics(
+    statistics: &BigramStatistics,
+    out: &mut [[u16; 256]; 256],
+) -> u64 {
     let total_count = statistics.num_covered_bytes();
 
     let beta = if total_count <= 32 * KIB {
@@ -214,7 +217,7 @@ fn quantized_hellinger_statistics(statistics: &Statistics, out: &mut [[u16; 256]
 /// Compute the classification data from a given input.
 pub fn compute_classification_data(input: Input) -> io::Result<ClassificationData> {
     let full_window = Window::from_start_len(AbsoluteOffset::ZERO, input.len());
-    let statistics = Statistics::compute(&input, full_window)?;
+    let statistics = BigramStatistics::compute(&input, full_window)?;
 
     let mut out = ClassificationData {
         quantized_hellinger_statistics: [[0; 256]; 256],
@@ -234,7 +237,7 @@ pub fn compute_classification_data(input: Input) -> io::Result<ClassificationDat
         for window in Window::from_start_len(AbsoluteOffset::ZERO, input.len().align_down(size))
             .subwindows_of_size(Len::from(size))
         {
-            let substatistics = Statistics::compute(&input, window)?;
+            let substatistics = BigramStatistics::compute(&input, window)?;
             quantized_hellinger_statistics(&substatistics, &mut substats);
 
             let score = compute_score(&out.quantized_hellinger_statistics, &substats);

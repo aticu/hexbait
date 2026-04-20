@@ -4,7 +4,7 @@ use hexbait_common::{AbsoluteOffset, Len};
 
 use crate::{
     statistics::{
-        Statistics,
+        BigramStatistics,
         handler::background::{
             ComputationState,
             statistics_tree::Tier,
@@ -18,7 +18,7 @@ use crate::{
 #[derive(Debug)]
 pub struct ComputeBin {
     /// The statistics into which the bin should be computed.
-    statistics: Statistics,
+    statistics: BigramStatistics,
     /// The window that represents the bin.
     bin: Window,
     /// Until which offset previous statistics have already been aggregated.
@@ -29,7 +29,7 @@ impl ComputeBin {
     /// Creates a new bin computation state.
     pub fn new(bin: Window) -> ComputeBin {
         ComputeBin {
-            statistics: Statistics::empty(),
+            statistics: BigramStatistics::empty(),
             bin,
             aggregated_until: bin.start(),
         }
@@ -53,6 +53,11 @@ impl ComputeBin {
         {
             computation_state.maybe_yield()?;
 
+            // if we're at the end of the input, we should stop here, since there is nothing we can meaningfully do still
+            if uncovered_section.start().as_u64() == computation_state.input.len().as_u64() {
+                break;
+            }
+
             let section_align = 1
                 << ((0..63)
                     .find(|shift| !uncovered_section.start().is_aligned(1 << shift))
@@ -62,7 +67,8 @@ impl ComputeBin {
             let tier = Tier::fitting_tier(tier_size).min(Tier::MAX_DIRECT_TIER);
             let new_section = Window::from_start_len(uncovered_section.start(), tier.size());
 
-            if let Ok(statistics) = Statistics::compute(&computation_state.input, new_section) {
+            if let Ok(statistics) = BigramStatistics::compute(&computation_state.input, new_section)
+            {
                 self.statistics += &statistics;
                 computation_state
                     .statistics_tree
@@ -74,7 +80,7 @@ impl ComputeBin {
     }
 
     /// Returns the contained statistics and the bin.
-    pub fn statistics_and_bin(self) -> (Statistics, Window) {
+    pub fn statistics_and_bin(self) -> (BigramStatistics, Window) {
         (self.statistics, self.bin)
     }
 }

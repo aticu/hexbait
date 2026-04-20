@@ -1,21 +1,21 @@
-//! Implements the entropy estimation phase.
+//! Implements the metric estimation phase.
 
 use hexbait_common::{AbsoluteOffset, Len};
 
 use crate::{
     statistics::{
-        Statistics,
+        downsampled_bigrams::DownsampledBigramStatistics,
         handler::{
-            ENTROPY_SAMPLE_SIZE,
+            MIN_SAMPLE_SIZE,
             background::{ComputationState, work_phase::FinishedWork},
         },
     },
     window::Window,
 };
 
-/// Performs entropy estimation.
+/// Performs estimation for the computed metrics.
 #[derive(Debug)]
-pub struct EntropyEstimation {
+pub struct MetricEstimation {
     /// The index of the window that is currently being worked on.
     window_index: usize,
     /// The size of bins in this window.
@@ -33,14 +33,14 @@ pub struct EntropyEstimation {
 /// The number of bins to prefetch.
 const PREFETCH_COUNT: usize = 64;
 
-impl EntropyEstimation {
-    /// Returns the initial state for the entropy estimation phase.
-    pub fn new(computation_state: &mut ComputationState) -> EntropyEstimation {
+impl MetricEstimation {
+    /// Returns the initial state for the metric estimation phase.
+    pub fn new(computation_state: &mut ComputationState) -> MetricEstimation {
         let window_index = computation_state.last_window_index();
         let (bin_size, aligned_window) =
             computation_state.bin_size_and_aligned_window(window_index);
 
-        let mut out = EntropyEstimation {
+        let mut out = MetricEstimation {
             window_index,
             bin_size,
             window_offset: aligned_window.start(),
@@ -97,7 +97,7 @@ impl EntropyEstimation {
             if self.still_needs_bin(old_offset, computation_state) {
                 computation_state
                     .input
-                    .signal_planned_read(old_offset, ENTROPY_SAMPLE_SIZE);
+                    .signal_planned_read(old_offset, MIN_SAMPLE_SIZE);
                 break;
             }
         }
@@ -117,14 +117,15 @@ impl EntropyEstimation {
                 }
                 self.prefetch_once(computation_state);
 
-                let sample_window = Window::from_start_len(old_offset, ENTROPY_SAMPLE_SIZE);
-                let Ok(statistics) = Statistics::compute(&computation_state.input, sample_window)
+                let sample_window = Window::from_start_len(old_offset, MIN_SAMPLE_SIZE);
+                let Ok(statistics) =
+                    DownsampledBigramStatistics::compute(&computation_state.input, sample_window)
                 else {
                     continue;
                 };
                 computation_state
                     .derived_values
-                    .insert(sample_window, statistics.entropy());
+                    .insert(sample_window, statistics.metrics());
             }
 
             if self.window_index == 0 {

@@ -4,7 +4,7 @@ use hexbait_common::{AbsoluteOffset, Len};
 
 use crate::{
     statistics::{
-        Statistics,
+        BigramStatistics,
         handler::background::{
             ComputationState,
             statistics_tree::Tier,
@@ -24,7 +24,7 @@ pub struct AccumulateOldStatistics {
     /// The end offset until which statistics need to be accumulated.
     end_offset: AbsoluteOffset,
     /// Tracks statistics of a partially aggregated bin.
-    bin_statistics: Option<Statistics>,
+    bin_statistics: Option<BigramStatistics>,
 }
 
 impl AccumulateOldStatistics {
@@ -53,7 +53,7 @@ impl AccumulateOldStatistics {
                 Some(partial_bin_statistics) => partial_bin_statistics,
                 None => {
                     if computation_state.statistics_tree.covers_window_exactly(bin) {
-                        self.bin_statistics.insert(Statistics::empty())
+                        self.bin_statistics.insert(BigramStatistics::empty())
                     } else {
                         self.offset += self.bin_size;
                         continue;
@@ -62,17 +62,21 @@ impl AccumulateOldStatistics {
             };
 
             if let Some(uncovered_section) = bin_statistics.first_uncovered_section_in_window(bin) {
-                computation_state.statistics_tree.aggregate_for_window(
+                let end_offset = computation_state.statistics_tree.aggregate_for_window(
                     bin_statistics,
                     uncovered_section,
                     MAX_AGGREGATION_WORK_STEPS,
                     Tier::LEAF_TIER,
                 );
+
+                if end_offset == self.end_offset {
+                    self.offset = end_offset;
+                }
             } else {
                 let statistics = self.bin_statistics.take().unwrap();
                 computation_state
                     .derived_values
-                    .insert(bin, statistics.entropy());
+                    .insert(bin, statistics.downsampled().metrics());
                 computation_state.current_window_statistics += &statistics;
 
                 self.offset += self.bin_size;

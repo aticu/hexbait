@@ -3,14 +3,14 @@
 use crate::statistics::handler::background::{
     ComputationState,
     work_phase::{
-        accumulate_old_statistics::AccumulateOldStatistics, entropy_estimation::EntropyEstimation,
+        accumulate_old_statistics::AccumulateOldStatistics, metric_estimation::MetricEstimation,
         statistics_computation::StatisticsComputation,
     },
 };
 
 mod accumulate_old_statistics;
 mod compute_bin;
-mod entropy_estimation;
+mod metric_estimation;
 mod statistics_computation;
 
 /// Represents that some work was finished.
@@ -22,8 +22,8 @@ pub struct FinishedWork;
 pub enum WorkPhase {
     /// There is nothing to do.
     Idle,
-    /// Performs entropy estimation.
-    EntropyEstimation(EntropyEstimation),
+    /// Performs estimation for the computed metrics.
+    MetricEstimation(MetricEstimation),
     /// Performs accumulation of previously computed statistics.
     AccumulateOldStatistics(AccumulateOldStatistics),
     /// Performs statistics computation.
@@ -33,7 +33,7 @@ pub enum WorkPhase {
 impl WorkPhase {
     /// Restarts work from the beginning.
     pub fn from_beginning(computation_state: &mut ComputationState) -> WorkPhase {
-        WorkPhase::EntropyEstimation(EntropyEstimation::new(computation_state))
+        WorkPhase::MetricEstimation(MetricEstimation::new(computation_state))
     }
 
     /// Continues the current work.
@@ -43,7 +43,7 @@ impl WorkPhase {
                 WorkPhase::Idle => {
                     break;
                 }
-                WorkPhase::EntropyEstimation(entropy_estimation) => {
+                WorkPhase::MetricEstimation(entropy_estimation) => {
                     entropy_estimation.advance(computation_state)?;
                     *self = WorkPhase::AccumulateOldStatistics(AccumulateOldStatistics::new(
                         computation_state,
