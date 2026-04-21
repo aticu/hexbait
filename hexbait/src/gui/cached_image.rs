@@ -6,29 +6,19 @@ use egui::{
     Color32, ColorImage, Image, Rect, TextureHandle, TextureOptions, Ui, load::SizedTexture, vec2,
 };
 
+use crate::cache::Cached;
+
 /// Represents an image that is cached if possible and otherwise drawn again.
 pub struct CachedImage<T: PartialEq> {
-    /// The texture handle for the image.
-    texture_handle: Option<TextureHandle>,
-    /// The last width of the rendered image.
-    width: usize,
-    /// The last height of the rendered image.
-    height: usize,
-    /// The parameters that determine the staleness of the image.
-    params: Option<T>,
-    /// Can be set for images where the parameters are only known during rendering.
-    require_repaint: bool,
+    /// The cached image.
+    cached_image: Cached<(usize, usize, T), TextureHandle>,
 }
 
 impl<T: PartialEq> CachedImage<T> {
     /// Creates a new cached image.
     pub fn new() -> CachedImage<T> {
         CachedImage {
-            texture_handle: None,
-            width: 0,
-            height: 0,
-            params: None,
-            require_repaint: false,
+            cached_image: Cached::new(),
         }
     }
 
@@ -38,7 +28,7 @@ impl<T: PartialEq> CachedImage<T> {
     /// to render.
     /// The supplied closure is called with the `x` and `y` coordinates of the pixel for which the
     /// color is then returned.
-    pub fn rendered(
+    fn rendered(
         &mut self,
         ui: &mut Ui,
         width: usize,
@@ -46,58 +36,38 @@ impl<T: PartialEq> CachedImage<T> {
         params: T,
         mut render: impl FnMut(usize, usize) -> Color32,
     ) -> Image<'static> {
-        let can_keep = self.texture_handle.is_some()
-            && !self.require_repaint
-            && width == self.width
-            && height == self.height
-            && Some(&params) == self.params.as_ref();
+        let handle = self.cached_image.get((width, height, params), |old| {
+            let mut bytes = vec![0; width * height * 4];
 
-        if can_keep {
-            let id = self.texture_handle.as_ref().unwrap().id();
-            return Image::new(SizedTexture {
-                id,
-                size: vec2(width as f32, height as f32),
-            });
-        }
+            for y in 0..height {
+                for x in 0..width {
+                    let start = (width * y + x) * 4;
+                    let color = render(x, y);
 
-        self.width = width;
-        self.height = height;
-        self.params = Some(params);
-
-        let mut bytes = vec![0; width * height * 4];
-
-        for y in 0..height {
-            for x in 0..width {
-                let start = (width * y + x) * 4;
-                let color = render(x, y);
-
-                bytes[start] = color.r();
-                bytes[start + 1] = color.g();
-                bytes[start + 2] = color.b();
-                bytes[start + 3] = color.a();
+                    bytes[start] = color.r();
+                    bytes[start + 1] = color.g();
+                    bytes[start + 2] = color.b();
+                    bytes[start + 3] = color.a();
+                }
             }
-        }
 
-        let img = ColorImage::from_rgba_premultiplied([width, height], &bytes);
+            let img = ColorImage::from_rgba_premultiplied([width, height], &bytes);
 
-        let id = match &mut self.texture_handle {
-            Some(handle) => {
-                handle.set(img, TextureOptions::NEAREST);
-                handle.id()
+            match old {
+                Some(handle) => {
+                    let mut handle = handle.clone();
+                    handle.set(img, TextureOptions::NEAREST);
+
+                    handle
+                }
+                None => ui
+                    .ctx()
+                    .load_texture("cached_image", img, TextureOptions::NEAREST),
             }
-            None => {
-                self.texture_handle = Some(ui.ctx().load_texture(
-                    "cached_image",
-                    img,
-                    TextureOptions::NEAREST,
-                ));
-
-                self.texture_handle.as_ref().unwrap().id()
-            }
-        };
+        });
 
         Image::new(SizedTexture {
-            id,
+            id: handle.id(),
             size: vec2(width as f32, height as f32),
         })
     }
@@ -124,7 +94,7 @@ impl<T: PartialEq> CachedImage<T> {
 
     /// Signals that the image requires a repaint.
     pub fn require_repaint(&mut self) {
-        self.require_repaint = true;
+        self.cached_image.invalidate();
     }
 }
 
