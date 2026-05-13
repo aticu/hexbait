@@ -19,12 +19,12 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
 
             let display_type = match state.settings.view_kind() {
                 ViewKind::Auto => state.scroll_state.display_suggestion,
-                ViewKind::ForceHexView => DisplayType::Hexview,
-                ViewKind::ForceStatisticsView => DisplayType::Statistics,
+                ViewKind::ForceHex => DisplayType::Hexview,
+                ViewKind::ForceOverview => DisplayType::Overview,
             };
 
             let display_fn = match display_type {
-                DisplayType::Statistics => modules::statistics_display::show,
+                DisplayType::Overview => modules::gilbert_map::show,
                 DisplayType::Hexview => modules::hex::show,
             };
 

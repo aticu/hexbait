@@ -2,6 +2,11 @@
 
 use egui::Color32;
 
+use crate::{
+    state::Settings,
+    statistics::{MetricsQuality, StatisticsMetrics},
+};
+
 /// The color to use for highlights.
 pub const HIGHLIGHT_COLOR: Color32 = Color32::WHITE;
 
@@ -63,7 +68,7 @@ const fn generate_color_gradient<const N: usize>(stops: &[(Color32, f64)]) -> [C
         let diff = stop.1 - prev_stop.1;
         let t = (relative_byte - prev_stop.1) / diff;
 
-        let color = lerp(prev_stop.0, stop.0, t);
+        let color = lerp_const(prev_stop.0, stop.0, t);
 
         out[byte] = color;
 
@@ -73,34 +78,105 @@ const fn generate_color_gradient<const N: usize>(stops: &[(Color32, f64)]) -> [C
     out
 }
 
+/// Shows how far between two values should be interpolated.
+///
+/// Conceptually this is a value between `0.0` and `1.0`, but the actual representation differs to make the code more efficient.
+#[derive(Clone, Copy, Debug)]
+pub struct LerpStrength(u32);
+
+impl LerpStrength {
+    /// Converts an `f32` into a lerp strength.
+    pub const fn from_f32(value: f32) -> LerpStrength {
+        if value.is_nan() {
+            LerpStrength(0)
+        } else {
+            LerpStrength((value.clamp(0.0, 1.0) * 256.0).round() as u32)
+        }
+    }
+
+    /// Converts an `f64` into a lerp strength.
+    pub const fn from_f64(value: f64) -> LerpStrength {
+        if value.is_nan() {
+            LerpStrength(0)
+        } else {
+            LerpStrength((value.clamp(0.0, 1.0) * 256.0).round() as u32)
+        }
+    }
+}
+
+impl From<f32> for LerpStrength {
+    fn from(value: f32) -> Self {
+        LerpStrength::from_f32(value)
+    }
+}
+
+impl From<f64> for LerpStrength {
+    fn from(value: f64) -> Self {
+        LerpStrength::from_f64(value)
+    }
+}
+
+/// `t` is in [0, 256]. Compute it once, reuse for many pixels.
+#[inline]
+const fn lerp_fixed(color1: Color32, color2: Color32, t: LerpStrength) -> Color32 {
+    let t = t.0;
+    const fn channel(a: u8, b: u8, t: u32) -> u8 {
+        // +128 for round-to-nearest; drop it if you want truncation
+        ((a as u32 * (256 - t) + b as u32 * t + 128) >> 8) as u8
+    }
+    Color32::from_rgba_premultiplied(
+        channel(color1.r(), color2.r(), t),
+        channel(color1.g(), color2.g(), t),
+        channel(color1.b(), color2.b(), t),
+        channel(color1.a(), color2.a(), t),
+    )
+}
+
 /// Linearly interpolates between the two given colors.
 ///
 /// If `between` is `0.0`, the result will be `color1` and if it is `1.0`, the result will be
 /// `color2`.
-pub const fn lerp(color1: Color32, color2: Color32, mut between: f64) -> Color32 {
-    between = if between.is_nan() {
-        0.5
-    } else {
-        between.clamp(0.0, 1.0)
-    };
-
-    const fn transform(val1: u8, val2: u8, between: f64) -> u8 {
-        (val1 as f64 * (1.0 - between) + val2 as f64 * between) as u8
-    }
-
-    Color32::from_rgba_premultiplied(
-        transform(color1.r(), color2.r(), between),
-        transform(color1.g(), color2.g(), between),
-        transform(color1.b(), color2.b(), between),
-        transform(color1.a(), color2.a(), between),
-    )
+pub const fn lerp_const(color1: Color32, color2: Color32, between: f64) -> Color32 {
+    lerp_fixed(color1, color2, LerpStrength::from_f64(between))
 }
 
-/// The linear opposite color.
+/// Linearly interpolates between the two given colors.
 ///
-/// Takes the linear opposite of all color components.
-pub const fn linear_opposite(color: Color32) -> Color32 {
-    Color32::from_rgba_premultiplied(255 - color.r(), 255 - color.g(), 255 - color.b(), color.a())
+/// If `between` is `0.0`, the result will be `color1` and if it is `1.0`, the result will be
+/// `color2`.
+#[inline]
+pub fn lerp<T>(color1: Color32, color2: Color32, between: T) -> Color32
+where
+    LerpStrength: From<T>,
+{
+    lerp_fixed(color1, color2, between.into())
+}
+
+/// Returns the color for the given metrics.
+pub fn metrics_color(
+    metrics: Option<StatisticsMetrics>,
+    quality: MetricsQuality,
+    settings: &Settings,
+) -> Color32 {
+    let raw_color = if let Some(raw_metrics) = metrics {
+        Color32::from_rgb(
+            raw_metrics.entropy,
+            raw_metrics.printable_ascii,
+            raw_metrics.byte_delta,
+        )
+    } else {
+        settings.missing_color()
+    };
+
+    if quality.is_estimated() {
+        lerp(
+            raw_color,
+            settings.missing_color(),
+            settings.estimation_tint_strength(),
+        )
+    } else {
+        raw_color
+    }
 }
 
 /// Represents the different possible color maps.

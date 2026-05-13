@@ -89,7 +89,7 @@ impl BackgroundStatisticsEngine {
             .collect::<Vec<_>>();
         let (_, selected_window) = self
             .computation_state
-            .bin_size_and_aligned_window(self.computation_state.last_window_index());
+            .innermost_bin_size_and_aligned_window();
 
         let result = CalculationResult {
             metrics,
@@ -175,6 +175,7 @@ impl BackgroundStatisticsEngine {
     }
 }
 
+/// The state shared by computations done by the backend.
 struct ComputationState {
     /// The input that computations are based on.
     input: Input,
@@ -234,6 +235,20 @@ impl ComputationState {
     fn bin_size_and_aligned_window(&self, window_index: usize) -> (Len, Window) {
         let request = self.latest_request.as_ref().unwrap();
         compute_bin_size_and_align_window(request.windows[window_index], request.bins_per_window)
+    }
+
+    /// Returns the bin size and the aligned window for the innermost window.
+    ///
+    /// # Panics
+    ///
+    /// This fuction may panic if
+    /// - there is no current request.
+    fn innermost_bin_size_and_aligned_window(&self) -> (Len, Window) {
+        let request = self.latest_request.as_ref().unwrap();
+        compute_bin_size_and_align_window(
+            *request.windows.last().unwrap(),
+            request.bins_in_innermost_window,
+        )
     }
 
     /// Returns the index of the last window in the current request.

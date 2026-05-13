@@ -7,6 +7,8 @@ use crate::state::State;
 
 pub mod classification_info;
 pub mod content;
+pub mod data_inspector;
+pub mod gilbert_map;
 pub mod hex;
 pub mod inspector;
 pub mod parsed_value;

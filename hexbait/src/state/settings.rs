@@ -2,7 +2,7 @@
 
 use egui::{Color32, FontId, TextStyle, Ui};
 
-use crate::gui::color::{BYTE_COLORS, ColorMap};
+use crate::gui::color::{BYTE_COLORS, ColorMap, LerpStrength};
 
 /// Determine what to show in the main screen.
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
@@ -11,9 +11,9 @@ pub enum ViewKind {
     #[default]
     Auto,
     /// Always show a hex view.
-    ForceHexView,
-    /// Always show a statistics view.
-    ForceStatisticsView,
+    ForceHex,
+    /// Always show an overview.
+    ForceOverview,
 }
 
 impl ViewKind {
@@ -21,8 +21,8 @@ impl ViewKind {
     pub fn display_str(&self) -> &str {
         match self {
             ViewKind::Auto => "auto",
-            ViewKind::ForceHexView => "hex only",
-            ViewKind::ForceStatisticsView => "statistics only",
+            ViewKind::ForceHex => "hex only",
+            ViewKind::ForceOverview => "overview only",
         }
     }
 }
@@ -180,18 +180,23 @@ impl Settings {
     }
 
     /// The color representing missing data.
-    pub fn entropy_missing_color(&self) -> Color32 {
+    pub fn missing_color(&self) -> Color32 {
         Color32::GRAY
+    }
+
+    /// The size of the selection border.
+    pub fn selection_border_size(&self) -> usize {
+        10
+    }
+
+    /// Determines how strong the tint towards the missing color should be for estimated pixels.
+    pub fn estimation_tint_strength(&self) -> LerpStrength {
+        const { LerpStrength::from_f32(0.5) }
     }
 
     /// The color of the selection border in the scrollbars.
     pub fn scrollbar_selection_border_color(&self) -> Color32 {
         Color32::WHITE
-    }
-
-    /// The background color of a non-finegrained scrollbar.
-    pub fn scrollbar_background_color(&self) -> Color32 {
-        Color32::BLACK
     }
 
     /// The color that is used as a tint for non-selected regions on the scrollbar.
@@ -200,8 +205,8 @@ impl Settings {
     }
 
     /// The strength of the tint used for non selected regions of the scrollbar.
-    pub fn scrollbar_non_selected_tint_strength(&self) -> f64 {
-        0.4
+    pub fn scrollbar_non_selected_tint_strength(&self) -> LerpStrength {
+        const { LerpStrength::from_f32(0.5) }
     }
 
     /// The width multiplier of the scrollbars.

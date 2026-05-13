@@ -9,7 +9,7 @@ use size_format::SizeFormatterBinary;
 
 use crate::{
     IDLE_TIME,
-    gui::{color, marking::render_locations_on_bar},
+    gui::{color, image_processing::blur_image, marking::render_locations_on_bar},
     state::{DisplayType, InteractionState, ScrollState, Scrollbar, Settings, State},
     statistics::{MetricsQuality, StatisticsMetrics},
     window::Window,
@@ -107,22 +107,33 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
             ));
         }
 
+        let selected_window = if i == state.scroll_state.scrollbars.len() - 1
+            && let Some(hover_pos) = state.scroll_state.gilbert_hover_position
+        {
+            let size = state.scroll_state.hover_selection_size / 2.0;
+            let hover_pos = hover_pos.clamp(size, 1.0 - size);
+
+            (
+                (hover_pos - size).clamp(0.0, 1.0) as f64,
+                (hover_pos + size).clamp(0.0, 1.0) as f64,
+            )
+        } else {
+            (
+                state.scroll_state.scrollbars[i].relative_selection_start(window),
+                state.scroll_state.scrollbars[i].relative_selection_end(window),
+            )
+        };
         let hovered_row_window = render_bar(
             ui,
             &mut state.scroll_state.scrollbars[i],
             &state.settings,
             rect,
             window,
+            selected_window,
             |window| {
-                if let Some((metrics, quality)) = state.statistics_handler.get_metrics(window) {
-                    if quality.is_estimated() {
-                        full_quality = false;
-                    }
-                    Some((metrics, quality))
-                } else {
-                    full_quality = false;
-                    None
-                }
+                let (metrics, quality) = state.statistics_handler.get_metrics(window);
+                full_quality &= !quality.is_estimated();
+                (metrics, quality)
             },
         );
 
@@ -181,7 +192,7 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
                 PopupAnchor::Pointer,
             )
             .show(|ui| {
-                if let Some((metrics, quality)) = state.statistics_handler.get_metrics(row_window) {
+                if let (Some(metrics), quality) = state.statistics_handler.get_metrics(row_window) {
                     if quality.is_estimated() {
                         ui.label(format!(
                             "Entropy: {} (estimate based on subsampling)",
@@ -213,7 +224,7 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
     if show_hex {
         state.scroll_state.display_suggestion = DisplayType::Hexview;
     } else {
-        state.scroll_state.display_suggestion = DisplayType::Statistics;
+        state.scroll_state.display_suggestion = DisplayType::Overview;
     }
 }
 
@@ -356,14 +367,13 @@ fn render_bar(
     settings: &Settings,
     rect: Rect,
     window: Window,
-    mut metrics: impl FnMut(Window) -> Option<(StatisticsMetrics, MetricsQuality)>,
+    selected_window: (f64, f64),
+    mut metrics: impl FnMut(Window) -> (Option<StatisticsMetrics>, MetricsQuality),
 ) -> Option<Window> {
     let total_rows = rect.height().trunc() as u64;
 
-    let selection_start =
-        (scrollbar.relative_selection_start(window) * rect.height() as f64).round() as usize;
-    let selection_end =
-        (scrollbar.relative_selection_end(window) * rect.height() as f64).round() as usize;
+    let selection_start = (selected_window.0 * rect.height() as f64).round() as usize;
+    let selection_end = (selected_window.1 * rect.height() as f64).round() as usize;
 
     let bytes_per_row =
         Len::from((window.size().as_u64() as f64 / total_rows as f64).round() as u64);
@@ -378,13 +388,9 @@ fn render_bar(
     scrollbar.cached_image.paint_at(
         ui,
         rect,
-        (
-            scrollbar.state_for_cached_image(),
-            window,
-            settings.fine_grained_scrollbars(),
-            settings.color_map(),
-        ),
-        |x, y| {
+        (window, settings.fine_grained_scrollbars()),
+        || (),
+        |_, x, y| {
             if x >= side_start {
                 if full_quality_row {
                     Color32::GREEN
@@ -418,58 +424,71 @@ fn render_bar(
                     window_size,
                 );
 
-                let (raw_metrics, quality) = if let Some((entropy, quality)) = metrics(window) {
-                    (Some(entropy), quality)
-                } else {
-                    (None, MetricsQuality::Estimated)
-                };
+                let (metrics, quality) = metrics(window);
 
                 if quality.is_estimated() {
                     full_quality_scrollbar = false;
                     full_quality_row = false;
                 }
 
-                let raw_color = if let Some(raw_metrics) = raw_metrics {
-                    if settings.fine_grained_scrollbars()
-                        || x as f32 <= (raw_metrics.entropy as f32 / 255.0) * side_start as f32
-                    {
-                        Color32::from_rgb(
-                            raw_metrics.entropy,
-                            raw_metrics.printable_ascii,
-                            raw_metrics.byte_delta,
-                        )
-                    } else {
-                        settings.scrollbar_background_color()
-                    }
-                } else {
-                    settings.entropy_missing_color()
-                };
+                color::metrics_color(metrics, quality, settings)
+            }
+        },
+    );
 
-                let color_with_estimate = if quality.is_estimated() {
-                    color::lerp(raw_color, settings.entropy_missing_color(), 0.65)
-                } else {
-                    raw_color
-                };
+    let selection_state = scrollbar.state_for_cached_image();
+    scrollbar.selection_overlay.paint_at(
+        ui,
+        rect,
+        (
+            selection_state,
+            window,
+            settings.fine_grained_scrollbars(),
+            selected_window,
+        ),
+        || {
+            scrollbar
+                .blurred_image
+                .get((rect, window, settings.fine_grained_scrollbars()), |_| {
+                    blur_image(scrollbar.cached_image.raw(), settings)
+                })
+        },
+        |blurred_image, x, y| {
+            if x >= side_start {
+                return Color32::TRANSPARENT;
+            }
+            if selection_start < y && y < selection_end {
+                return Color32::TRANSPARENT;
+            }
 
-                if (y == selection_start && selection_start != 0)
-                    || (y == selection_end && selection_end != rect.height().trunc() as usize)
-                {
-                    settings.scrollbar_selection_border_color()
-                } else if selection_start < y && y < selection_end {
-                    color_with_estimate
-                } else {
-                    color::lerp(
-                        color_with_estimate,
-                        settings.scrollbar_non_selected_color(),
-                        settings.scrollbar_non_selected_tint_strength(),
-                    )
-                }
+            let dist = if y <= selection_start {
+                selection_start - y
+            } else {
+                y - selection_end
+            };
+
+            let selection_border_size = settings.selection_border_size();
+            if dist == 0 {
+                Color32::TRANSPARENT
+            } else if dist > selection_border_size {
+                blurred_image[(x, y)]
+            } else {
+                let rel_dist = (selection_border_size - dist) as f32 / selection_border_size as f32;
+                let border_strength = rel_dist.powi(2);
+
+                color::lerp(
+                    blurred_image[(x, y)],
+                    settings.scrollbar_selection_border_color(),
+                    border_strength as f64,
+                )
             }
         },
     );
 
     if !full_quality_scrollbar {
         scrollbar.cached_image.require_repaint();
+        scrollbar.blurred_image.invalidate();
+        scrollbar.selection_overlay.require_repaint();
     }
 
     ui.allocate_rect(rect, Sense::hover())

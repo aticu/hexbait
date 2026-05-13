@@ -1,7 +1,7 @@
 //! Implements the state required for the statistics display.
 
 use crate::{
-    gui::{cached_image::CachedImage, color::ColorMap},
+    gui::{color::ColorMap, image_processing::CachedImage},
     window::Window,
 };
 
@@ -15,7 +15,7 @@ impl StatisticsDisplayState {
     /// Creates a new statistics display state.
     pub fn new() -> StatisticsDisplayState {
         StatisticsDisplayState {
-            cached_image: CachedImage::new(),
+            cached_image: CachedImage::new(false),
         }
     }
 }

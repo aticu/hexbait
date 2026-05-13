@@ -302,7 +302,8 @@ fn render_sidebar(
             state.scroll_state.hex_scroll_offset,
             state.settings.linear_byte_colors(),
         ),
-        |x, y| {
+        || (),
+        |_, x, y| {
             let x = x / bar_width_multiplier;
             if let Some(&byte) = window.get(y * 16 + x) {
                 if highlight_row_range.contains(&(y as u64)) {

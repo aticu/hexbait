@@ -88,8 +88,6 @@ fn render(
     quality: f32,
     settings: &Settings,
 ) {
-    let grid = statistics_to_grid(statistics, settings.statistics_gamma_factor());
-
     let side_len_x = (rect.width().trunc() / 256.0).trunc();
     let side_len_y = (rect.height().trunc() / 256.0).trunc();
     let side_len = side_len_x.min(side_len_y);
@@ -108,7 +106,8 @@ fn render(
             settings.color_map(),
             settings.statistics_gamma_factor(),
         ),
-        |x, y| {
+        || statistics_to_grid(statistics, settings.statistics_gamma_factor()),
+        |grid, x, y| {
             let first = x / side_len as usize;
             let second = y / side_len as usize;
 
@@ -145,7 +144,8 @@ fn render(
     });
 
     if let Some((first, second)) = hover_positions {
-        let intensity = grid[first as usize][second as usize];
+        let intensity =
+            statistics.follow(first, second) as f32 / statistics.num_covered_bytes() as f32;
 
         Tooltip::always_open(
             ui.ctx().clone(),

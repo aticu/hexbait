@@ -28,8 +28,8 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
                 .show_ui(ui, |ui| {
                     for kind in [
                         ViewKind::Auto,
-                        ViewKind::ForceHexView,
-                        ViewKind::ForceStatisticsView,
+                        ViewKind::ForceHex,
+                        ViewKind::ForceOverview,
                     ] {
                         ui.selectable_value(state.settings.view_kind(), kind, kind.display_str());
                     }

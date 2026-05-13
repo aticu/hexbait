@@ -24,6 +24,8 @@ struct Request {
     windows: Vec<Window>,
     /// How many bins are visible in each view.
     bins_per_window: u64,
+    /// How many bins are visible in the innermost window.
+    bins_in_innermost_window: u64,
 }
 
 /// The size of the minimum sample window for derived metrics.
@@ -95,7 +97,7 @@ impl StatisticsHandler {
     /// The quality of the estimation is returned and ranges from `0.0` (worst) to `1.0` (best).
     pub fn get_bigram_statistics(&self, window: Window) -> (BigramStatistics, f32) {
         let result = self.result.load();
-        if result.selected_window != window {
+        if !result.selected_window.contains_window(window) {
             return (BigramStatistics::empty(), 1.0);
         }
 
@@ -105,7 +107,7 @@ impl StatisticsHandler {
     }
 
     /// Returns the metrics of the given window.
-    pub fn get_metrics(&self, window: Window) -> Option<(StatisticsMetrics, MetricsQuality)> {
+    pub fn get_metrics(&self, window: Window) -> (Option<StatisticsMetrics>, MetricsQuality) {
         let bin_size = raw_bin_size_to_bin_size(window.size());
 
         let result = self.result.load();
@@ -132,7 +134,7 @@ impl StatisticsHandler {
         // TODO: maybe choose a smarter strategy here to subsample? maybe search for end and uniformly choose sub-samples
         for sample in result.metrics[index..].iter().take(5) {
             if sample.window == window {
-                return Some((sample.metrics, MetricsQuality::Accurate));
+                return (Some(sample.metrics), MetricsQuality::Accurate);
             }
 
             if sample.window.start() > window.end() {
@@ -143,16 +145,14 @@ impl StatisticsHandler {
             count += 1;
         }
 
-        StatisticsMetrics::from_average(&buf[..count]).map(|metric| {
-            (
-                metric,
-                if window.size() == MIN_SAMPLE_SIZE {
-                    MetricsQuality::Accurate
-                } else {
-                    MetricsQuality::Estimated
-                },
-            )
-        })
+        (
+            StatisticsMetrics::from_average(&buf[..count]),
+            if window.size() == MIN_SAMPLE_SIZE {
+                MetricsQuality::Accurate
+            } else {
+                MetricsQuality::Estimated
+            },
+        )
     }
 
     /// Signals to the statistics handler that a frame has ended.
@@ -171,6 +171,7 @@ impl StatisticsHandler {
                 .send(Request {
                     windows: scroll_state.windows().collect(),
                     bins_per_window: self.bins_per_window,
+                    bins_in_innermost_window: self.bins_per_window,
                 })
                 .unwrap();
         }

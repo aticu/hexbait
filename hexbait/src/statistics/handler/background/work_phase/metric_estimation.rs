@@ -37,8 +37,7 @@ impl MetricEstimation {
     /// Returns the initial state for the metric estimation phase.
     pub fn new(computation_state: &mut ComputationState) -> MetricEstimation {
         let window_index = computation_state.last_window_index();
-        let (bin_size, aligned_window) =
-            computation_state.bin_size_and_aligned_window(window_index);
+        let (bin_size, aligned_window) = computation_state.innermost_bin_size_and_aligned_window();
 
         let mut out = MetricEstimation {
             window_index,

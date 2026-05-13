@@ -91,8 +91,8 @@ impl State {
 /// The different things that can be displayed in the main views.
 #[derive(Debug, Clone, Copy)]
 pub enum DisplayType {
-    /// Show statistics of the selected byte window.
-    Statistics,
+    /// Shows an overview of the selected byte window.
+    Overview,
     /// Show a hexview at the start of the selected byte window.
     Hexview,
 }

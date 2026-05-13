@@ -2,13 +2,18 @@
 
 use std::hash::{Hash as _, Hasher as _};
 
+use egui::{ColorImage, Rect};
 use hexbait_common::{AbsoluteOffset, Input, Len, RelativeOffset, StateChangeFlag};
 
 use crate::{
-    gui::{cached_image::CachedImage, color::ColorMap},
+    cache::Cached,
+    gui::{gilbert_curve::GilbertCurve, image_processing::CachedImage},
     state::{DisplayType, Settings},
     window::Window,
 };
+
+/// Whether or not fine grained scrollbars are used.
+type FineGrainedSrcollbars = bool;
 
 /// The state of the scrolling.
 pub struct ScrollState {
@@ -21,7 +26,21 @@ pub struct ScrollState {
     /// The number of rows that have been scrolled down from the start in hex view.
     pub hex_scroll_offset: u64,
     /// The cached image for the sidebar in the hex view.
-    pub hex_sidebar_cached_image: CachedImage<(u64, u64, bool)>,
+    pub hex_sidebar_cached_image: CachedImage<(u64, u64, FineGrainedSrcollbars)>,
+    /// The cached image for the gilbert map.
+    pub gilbert_map_cached_image: CachedImage<(Window, FineGrainedSrcollbars)>,
+    /// The blurred version of the gilbert map.
+    pub gilbert_map_blurred_image: Cached<(Rect, Window, FineGrainedSrcollbars), ColorImage>,
+    /// The cached image for the gilbert map hover overlay.
+    pub gilbert_map_hover_cached_image: CachedImage<(f32, Option<f32>)>,
+    /// The gilbert curve that is rendered.
+    pub gilbert_curve: Cached<(u32, u32), GilbertCurve>,
+    /// The percentage of the hovered section of the innermost bar.
+    pub hover_selection_size: f32,
+    /// The currently hovered position on the innermost bar.
+    pub gilbert_hover_position: Option<f32>,
+    /// The pixel budget of the gilbert map.
+    pub gilbert_pixel_budget: u64,
     /// Store the file size so the scroll state can independently compute windows.
     file_size: Len,
     /// The height of the scrollbars in the current frame.
@@ -39,10 +58,18 @@ impl ScrollState {
     pub fn new(input: &Input) -> ScrollState {
         ScrollState {
             scrollbars: vec![Scrollbar::new(input.len())],
-            display_suggestion: DisplayType::Statistics,
+            display_suggestion: DisplayType::Overview,
             interaction_state: InteractionState::None,
             hex_scroll_offset: 0,
-            hex_sidebar_cached_image: CachedImage::new(),
+            hex_sidebar_cached_image: CachedImage::new(false),
+            gilbert_map_cached_image: CachedImage::new(true),
+            gilbert_map_blurred_image: Cached::new(),
+            gilbert_map_hover_cached_image: CachedImage::new(false),
+            gilbert_curve: Cached::new(),
+            hover_selection_size: 0.25,
+            gilbert_hover_position: None,
+            // start with a non-zero pixel budget just to be safe
+            gilbert_pixel_budget: 1,
             file_size: input.len(),
             // the height is irrelevant for the first frame since we draw anyway
             height: 0.0,
@@ -140,6 +167,7 @@ impl ScrollState {
         self.height.to_ne_bytes().hash(&mut hasher);
         self.hex_char_height.to_ne_bytes().hash(&mut hasher);
         self.scrollbars.len().hash(&mut hasher);
+        self.gilbert_pixel_budget.hash(&mut hasher);
         for bar in &self.scrollbars {
             bar.selection_start.hash(&mut hasher);
             bar.selection_len.hash(&mut hasher);
@@ -285,8 +313,13 @@ impl ScrollState {
     }
 }
 
+/// The selection within a single bar.
+type Selection = (RelativeOffset, Len);
+
+/// The information about what is hovered in the Gilbert map.
+type HoveredGilbertMap = (f64, f64);
+
 /// The state of a single scrollbar.
-#[derive(Debug)]
 pub struct Scrollbar {
     /// The start offset of the selection relative to the previous scrollbar's start.
     selection_start: RelativeOffset,
@@ -294,8 +327,14 @@ pub struct Scrollbar {
     selection_len: Len,
     /// The cached image for this scrollbar.
     ///
-    /// This depends on the selection of the scrollbar as well as the full window of the bar.
-    pub cached_image: CachedImage<((RelativeOffset, Len), Window, bool, ColorMap)>,
+    /// This does not depend on the selection.
+    /// This is handled by the selection_overlay.
+    pub cached_image: CachedImage<(Window, FineGrainedSrcollbars)>,
+    /// The blurred image of the scrollbar.
+    pub blurred_image: Cached<(Rect, Window, FineGrainedSrcollbars), ColorImage>,
+    /// The overlay for the current selection.
+    pub selection_overlay:
+        CachedImage<(Selection, Window, FineGrainedSrcollbars, HoveredGilbertMap)>,
 }
 
 impl Scrollbar {
@@ -304,7 +343,9 @@ impl Scrollbar {
         Scrollbar {
             selection_start: RelativeOffset::ZERO,
             selection_len: len,
-            cached_image: CachedImage::new(),
+            cached_image: CachedImage::new(true),
+            blurred_image: Cached::new(),
+            selection_overlay: CachedImage::new(false),
         }
     }
 
@@ -334,6 +375,11 @@ impl Scrollbar {
         } else {
             self.selection_start = center - half_len;
         }
+    }
+
+    /// Returns the length of the current selection.
+    pub fn selection_len(&self) -> Len {
+        self.selection_len
     }
 
     /// Sets the selection for this scroll bar.
