@@ -5,9 +5,10 @@ use hexbait_common::{AbsoluteOffset, Len};
 use crate::{
     statistics::{
         BigramStatistics,
+        downsampled_bigrams::DownsampledBigramStatistics,
         handler::background::{
             ComputationState,
-            statistics_tree::Tier,
+            statistics_tree::{StatisticsTree, Tier},
             work_phase::{FinishedWork, MAX_AGGREGATION_WORK_STEPS},
         },
     },
@@ -16,31 +17,48 @@ use crate::{
 
 /// Contains the state to compute a single bin.
 #[derive(Debug)]
-pub struct ComputeBin {
+pub struct ComputeBin<Statistics> {
     /// The statistics into which the bin should be computed.
-    statistics: BigramStatistics,
+    statistics: Statistics,
     /// The window that represents the bin.
     bin: Window,
     /// Until which offset previous statistics have already been aggregated.
     aggregated_until: AbsoluteOffset,
+    /// A function to access the correct statistics tree.
+    get_tree: fn(&mut ComputationState) -> &mut StatisticsTree<Statistics>,
 }
 
-impl ComputeBin {
+impl ComputeBin<BigramStatistics> {
     /// Creates a new bin computation state.
-    pub fn new(bin: Window) -> ComputeBin {
+    pub fn new_full(bin: Window) -> ComputeBin<BigramStatistics> {
         ComputeBin {
             statistics: BigramStatistics::empty(),
             bin,
             aggregated_until: bin.start(),
+            get_tree: |computation_state| &mut computation_state.statistics_tree,
         }
     }
+}
 
+impl ComputeBin<DownsampledBigramStatistics> {
+    /// Creates a new bin computation state.
+    pub fn new_downsampled(bin: Window) -> ComputeBin<DownsampledBigramStatistics> {
+        ComputeBin {
+            statistics: DownsampledBigramStatistics::empty(),
+            bin,
+            aggregated_until: bin.start(),
+            get_tree: |computation_state| &mut computation_state.downsampled_statistics_tree,
+        }
+    }
+}
+
+impl<Statistics: crate::statistics::Statistics> ComputeBin<Statistics> {
     /// Fills the given bin in the statistics tree and updates the given statistics.
     pub fn advance(&mut self, computation_state: &mut ComputationState) -> Option<FinishedWork> {
         while self.aggregated_until < self.bin.end() {
             computation_state.maybe_yield()?;
 
-            self.aggregated_until = computation_state.statistics_tree.aggregate_for_window(
+            self.aggregated_until = (self.get_tree)(computation_state).aggregate_for_window(
                 &mut self.statistics,
                 Window::new(self.aggregated_until, self.bin.end()),
                 MAX_AGGREGATION_WORK_STEPS,
@@ -67,12 +85,9 @@ impl ComputeBin {
             let tier = Tier::fitting_tier(tier_size).min(Tier::MAX_DIRECT_TIER);
             let new_section = Window::from_start_len(uncovered_section.start(), tier.size());
 
-            if let Ok(statistics) = BigramStatistics::compute(&computation_state.input, new_section)
-            {
+            if let Ok(statistics) = Statistics::compute(&computation_state.input, new_section) {
                 self.statistics += &statistics;
-                computation_state
-                    .statistics_tree
-                    .insert(new_section.start(), tier, statistics);
+                (self.get_tree)(computation_state).insert(new_section.start(), tier, statistics);
             }
         }
 
@@ -80,7 +95,7 @@ impl ComputeBin {
     }
 
     /// Returns the contained statistics and the bin.
-    pub fn statistics_and_bin(self) -> (BigramStatistics, Window) {
+    pub fn statistics_and_bin(self) -> (Statistics, Window) {
         (self.statistics, self.bin)
     }
 }

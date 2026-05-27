@@ -1,6 +1,6 @@
 //! Implements a handler that manages statistics for an input.
 
-use std::sync::{Arc, mpsc};
+use std::sync::{Arc, atomic::AtomicU32, mpsc};
 
 use arc_swap::ArcSwap;
 use hexbait_common::{Input, Len};
@@ -31,27 +31,100 @@ struct Request {
 /// The size of the minimum sample window for derived metrics.
 const MIN_SAMPLE_SIZE: Len = Len::from(1024);
 
-/// The metrics for a window.
-struct WindowMetrics {
-    /// The window this entropy value was computed over.
+/// The result for a single scrollbar.
+struct BarResultBuffer {
+    /// The window covered by the scrollbar.
+    ///
+    /// This is used to check for staleness.
     window: Window,
-    /// The metrics of the window.
-    metrics: StatisticsMetrics,
+    /// The bin size used by the buffer.
+    ///
+    /// This is used to check for staleness.
+    bin_size: Len,
+    /// The shared buffer between frontend and backend that contains the results for each bin.
+    ///
+    /// The length of this is the ceiling of `window.size() / bin_size`.
+    buf: Box<[AtomicU32]>,
+}
+
+impl BarResultBuffer {
+    /// Returns the metrics for the given window.
+    fn get(&self, index: usize) -> (Option<StatisticsMetrics>, MetricsQuality) {
+        let raw = self.buf[index].load(std::sync::atomic::Ordering::Relaxed);
+
+        let status = raw & 0xff;
+        if status == 0 {
+            return (None, MetricsQuality::Estimated);
+        }
+
+        let quality = if status == 1 {
+            MetricsQuality::Estimated
+        } else {
+            MetricsQuality::Accurate
+        };
+
+        let entropy = ((raw >> 8) & 0xff) as u8;
+        let printable_ascii = ((raw >> 16) & 0xff) as u8;
+        let byte_delta = ((raw >> 24) & 0xff) as u8;
+
+        (
+            Some(StatisticsMetrics {
+                entropy,
+                printable_ascii,
+                byte_delta,
+            }),
+            quality,
+        )
+    }
+
+    /// Sets the slot in the buffer corresponding to the window to the given metrics and quality.
+    fn set(&self, index: usize, metrics: StatisticsMetrics, quality: MetricsQuality) {
+        let status = match quality {
+            MetricsQuality::Estimated => 1,
+            MetricsQuality::Accurate => 2,
+        };
+        let val = ((metrics.byte_delta as u32) << 24)
+            | ((metrics.printable_ascii as u32) << 16)
+            | ((metrics.entropy as u32) << 8)
+            | status;
+
+        self.buf[index].store(val, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// Provides access to the computed statistics metrics.
+///
+/// Access to this type is only given once it was checked that the window is the correct one.
+pub struct StatisticsBufAccess {
+    /// The index into the slice of buffers.
+    idx: usize,
+    /// The slice of buffers to access.
+    buf: Arc<[BarResultBuffer]>,
+}
+
+impl StatisticsBufAccess {
+    /// Returns the metrics for the map and the given window.
+    pub fn get_metrics(&self, index: usize) -> (Option<StatisticsMetrics>, MetricsQuality) {
+        self.buf[self.idx].get(index)
+    }
 }
 
 /// Contains the result of backend computations.
 struct CalculationResult {
-    /// Computed metrics.
-    ///
-    /// Sorted by `window`.
-    metrics: Vec<WindowMetrics>,
     /// The computed statistics for the selected window.
     statistics: BigramStatistics,
     /// The selected window for which the statistics are calculated.
     selected_window: Window,
+    /// The buffers where the computation results for the bars are stored.
+    bar_buffers: Arc<[BarResultBuffer]>,
+    /// The buffer where the computation results for the Gilbert map are stored.
+    ///
+    /// This will always be of length `1`, but allows for more uniform code in the buffer access.
+    map_buffer: Arc<[BarResultBuffer]>,
 }
 
 /// The quality of a returned metrics.
+#[derive(Debug, Clone, Copy)]
 pub enum MetricsQuality {
     /// The metrics are estimated.
     Estimated,
@@ -106,53 +179,44 @@ impl StatisticsHandler {
         (result.statistics.clone(), coverage.clamp(0.0, 1.0))
     }
 
-    /// Returns the metrics of the given window.
-    pub fn get_metrics(&self, window: Window) -> (Option<StatisticsMetrics>, MetricsQuality) {
-        let bin_size = raw_bin_size_to_bin_size(window.size());
+    /// Returns access to the map metrics if the window still matches.
+    pub fn get_map_metrics_access(
+        &self,
+        window: Window,
+        pixel_budget: usize,
+    ) -> Option<StatisticsBufAccess> {
+        let buf = Arc::clone(&self.result.load().map_buffer);
 
-        let result = self.result.load();
-        let window_center = window.start() + window.size() / 2;
-        let window =
-            Window::from_start_len(window_center, Len::from(1)).expand_to_align(bin_size.as_u64());
-
-        let index = match result
-            .metrics
-            .binary_search_by_key(&window.start(), |sample| sample.window.start())
+        if buf[0].window != window.expand_to_align(buf[0].bin_size.as_u64())
+            || buf[0].buf.len() != pixel_budget
         {
-            Ok(mut index) => {
-                while index > 0 && result.metrics[index - 1].window.start() == window.start() {
-                    index -= 1;
-                }
-                index
-            }
-            Err(index) => index,
-        };
-
-        let mut buf = [StatisticsMetrics::empty(); 5];
-        let mut count = 0;
-
-        // TODO: maybe choose a smarter strategy here to subsample? maybe search for end and uniformly choose sub-samples
-        for sample in result.metrics[index..].iter().take(5) {
-            if sample.window == window {
-                return (Some(sample.metrics), MetricsQuality::Accurate);
-            }
-
-            if sample.window.start() > window.end() {
-                break;
-            }
-
-            buf[count] = sample.metrics;
-            count += 1;
+            return None;
         }
 
-        (
-            StatisticsMetrics::from_average(&buf[..count]),
-            if window.size() == MIN_SAMPLE_SIZE {
-                MetricsQuality::Accurate
-            } else {
-                MetricsQuality::Estimated
-            },
-        )
+        Some(StatisticsBufAccess { idx: 0, buf })
+    }
+
+    /// Returns access to the bar metrics for the give bar index if the window still matches.
+    pub fn get_bar_metrics_access(
+        &self,
+        bar_idx: usize,
+        window: Window,
+        bin_count: usize,
+    ) -> Option<StatisticsBufAccess> {
+        let result = self.result.load();
+
+        if result.bar_buffers.len() <= bar_idx
+            || result.bar_buffers[bar_idx].window
+                != window.expand_to_align(result.bar_buffers[bar_idx].bin_size.as_u64())
+            || result.bar_buffers[bar_idx].buf.len() != bin_count
+        {
+            return None;
+        }
+
+        Some(StatisticsBufAccess {
+            idx: bar_idx,
+            buf: Arc::clone(&result.bar_buffers),
+        })
     }
 
     /// Signals to the statistics handler that a frame has ended.
@@ -171,7 +235,7 @@ impl StatisticsHandler {
                 .send(Request {
                     windows: scroll_state.windows().collect(),
                     bins_per_window: self.bins_per_window,
-                    bins_in_innermost_window: self.bins_per_window,
+                    bins_in_innermost_window: scroll_state.gilbert_pixel_budget,
                 })
                 .unwrap();
         }

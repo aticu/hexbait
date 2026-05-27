@@ -2,7 +2,7 @@
 
 use std::{fmt, io, ops::AddAssign};
 
-use hexbait_common::{AbsoluteOffset, Input, Len};
+use hexbait_common::{Input, Len};
 use range_set_blaze::RangeSetBlaze;
 use size_format::SizeFormatterBinary;
 
@@ -29,8 +29,65 @@ impl BigramStatistics {
         }
     }
 
-    /// Fills the bigram counts with information about the given window.
-    pub fn compute(input: &Input, window: Window) -> Result<BigramStatistics, io::Error> {
+    /// Returns the number of times that `first` is followed by `second` in the statistics.
+    pub fn follow(&self, first: u8, second: u8) -> u64 {
+        self.follow[second as usize][first as usize]
+    }
+
+    /// Iterates over the statistics.
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = (u8, u8, u64)> {
+        self.follow.iter().enumerate().flat_map(|(second, row)| {
+            row.iter()
+                .enumerate()
+                .map(move |(first, count)| (first as u8, second as u8, *count))
+        })
+    }
+
+    /// Returns the number of bytes that the statistics cover.
+    pub fn num_covered_bytes(&self) -> u64 {
+        self.contained_regions.len() as u64
+    }
+
+    /// Returns `true` if the given window is fully covered by the statistics.
+    pub fn fully_contains(&self, window: Window) -> bool {
+        if window.is_empty() {
+            return true;
+        }
+
+        let mut window_region = RangeSetBlaze::new();
+        window_region.ranges_insert(window.start().as_u64()..=window.end().as_u64() - 1);
+
+        self.contained_regions.is_superset(&window_region)
+    }
+
+    /// Returns the downsampled statistics.
+    pub fn downsampled(&self) -> DownsampledBigramStatistics {
+        let mut follow = Box::new([[0; 16]; 16]);
+
+        for x in 0..256 {
+            for y in 0..256 {
+                follow[x >> 4][y >> 4] += self.follow[x][y];
+            }
+        }
+
+        DownsampledBigramStatistics {
+            follow,
+            contained_regions: self.contained_regions.clone(),
+        }
+    }
+}
+
+impl Statistics for BigramStatistics {
+    fn empty() -> Self {
+        BigramStatistics::empty()
+    }
+
+    fn approximate_memory_usage(&self) -> u64 {
+        std::mem::size_of::<[[u64; 256]; 256]>() as u64
+    }
+
+    fn compute(input: &Input, window: Window) -> Result<BigramStatistics, io::Error> {
         let mut follow = Box::new([[0; 256]; 256]);
 
         const WINDOW_SIZE: usize = 4 * 1024 * 1024;
@@ -82,96 +139,8 @@ impl BigramStatistics {
         })
     }
 
-    /// Returns the number of times that `first` is followed by `second` in the statistics.
-    pub fn follow(&self, first: u8, second: u8) -> u64 {
-        self.follow[second as usize][first as usize]
-    }
-
-    /// Iterates over the statistics.
-    #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = (u8, u8, u64)> {
-        self.follow.iter().enumerate().flat_map(|(second, row)| {
-            row.iter()
-                .enumerate()
-                .map(move |(first, count)| (first as u8, second as u8, *count))
-        })
-    }
-
-    /// Returns the number of bytes that the statistics cover.
-    pub fn num_covered_bytes(&self) -> u64 {
-        self.contained_regions.len() as u64
-    }
-
-    /// Returns `true` if the given window is fully covered by the statistics.
-    pub fn fully_contains(&self, window: Window) -> bool {
-        if window.is_empty() {
-            return true;
-        }
-
-        let mut window_region = RangeSetBlaze::new();
-        window_region.ranges_insert(window.start().as_u64()..=window.end().as_u64() - 1);
-
-        self.contained_regions.is_superset(&window_region)
-    }
-
-    /// Returns the first section in the given window that is not covered by the statistics.
-    pub fn first_uncovered_section_in_window(&self, window: Window) -> Option<Window> {
-        if window.is_empty() {
-            return None;
-        }
-
-        let mut cursor = window.start();
-
-        for range in self.contained_regions.ranges() {
-            let range_start = AbsoluteOffset::from(*range.start());
-            let range_end = AbsoluteOffset::from(*range.end() + 1); // exclusive end
-
-            if range_end <= cursor {
-                continue;
-            }
-
-            if range_start > cursor {
-                return Some(Window::new(cursor, range_start.min(window.end())));
-            }
-
-            cursor = range_end;
-
-            if cursor >= window.end() {
-                return None;
-            }
-        }
-
-        if cursor < window.end() {
-            Some(Window::new(cursor, window.end()))
-        } else {
-            None
-        }
-    }
-
-    /// Returns the downsampled statistics.
-    pub fn downsampled(&self) -> DownsampledBigramStatistics {
-        let mut follow = Box::new([[0; 16]; 16]);
-
-        for x in 0..256 {
-            for y in 0..256 {
-                follow[x >> 4][y >> 4] += self.follow[x][y];
-            }
-        }
-
-        DownsampledBigramStatistics {
-            follow,
-            contained_regions: self.contained_regions.clone(),
-        }
-    }
-}
-
-impl Statistics for BigramStatistics {
-    fn empty() -> Self {
-        BigramStatistics::empty()
-    }
-
-    fn approximate_memory_usage(&self) -> u64 {
-        std::mem::size_of::<[[u64; 256]; 256]>() as u64
+    fn contained_regions(&self) -> impl IntoIterator<Item = std::ops::RangeInclusive<u64>> {
+        self.contained_regions.ranges()
     }
 }
 

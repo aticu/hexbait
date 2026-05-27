@@ -6,7 +6,7 @@ use hexbait_common::{Input, Len, RelativeOffset};
 use crate::{
     gui::{color, gilbert_curve::GilbertCurve, image_processing::blur_image},
     state::{Scrollbar, State},
-    window::Window,
+    statistics::MetricsQuality,
 };
 
 /// How many bytes to show per pixel when there is enough data.
@@ -93,21 +93,24 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
             },
         );
     } else {
-        let bin_size = selected_window.size() / pixel_budget;
         state.scroll_state.gilbert_map_cached_image.paint_at(
             ui,
             rect,
             (selected_window, state.settings.linear_byte_colors()),
-            || (),
-            |_, x, y| {
-                let idx = gilbert_curve.index_from_point(x, y) as u64;
+            || {
+                state
+                    .statistics_handler
+                    .get_map_metrics_access(selected_window, pixel_budget as usize)
+            },
+            |stats, x, y| {
+                let idx = gilbert_curve.index_from_point(x, y);
 
-                let start = selected_window.start() + idx * bin_size;
-                let window = Window::from_start_len(start, bin_size);
+                let (metrics, quality) = stats
+                    .as_ref()
+                    .map(|stats| stats.get_metrics(idx))
+                    .unwrap_or((None, MetricsQuality::Estimated));
 
-                let (metrics, quality) = state.statistics_handler.get_metrics(window);
-
-                if quality.is_estimated() {
+                if quality.is_estimated() || metrics.is_none() {
                     full_quality = false;
                 }
 
@@ -143,10 +146,19 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     state.scroll_state.gilbert_map_hover_cached_image.paint_at(
         ui,
         rect,
-        (state.scroll_state.hover_selection_size, hover_position),
+        (
+            state.scroll_state.hover_selection_size,
+            hover_position,
+            full_quality,
+        ),
         || {
             let image = state.scroll_state.gilbert_map_blurred_image.get(
-                (rect, selected_window, state.settings.linear_byte_colors()),
+                (
+                    rect,
+                    selected_window,
+                    state.settings.linear_byte_colors(),
+                    full_quality,
+                ),
                 |_| {
                     blur_image(
                         state.scroll_state.gilbert_map_cached_image.raw(),

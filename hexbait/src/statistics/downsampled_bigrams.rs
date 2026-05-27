@@ -29,62 +29,6 @@ impl DownsampledBigramStatistics {
         }
     }
 
-    /// Fills the bigram counts with information about the given window.
-    pub fn compute(
-        input: &Input,
-        window: Window,
-    ) -> Result<DownsampledBigramStatistics, io::Error> {
-        let mut follow = Box::new([[0; 16]; 16]);
-
-        const WINDOW_SIZE: usize = 4 * 1024 * 1024;
-
-        let byte_before_window = if window.start().is_start_of_file() {
-            None
-        } else {
-            input
-                .read_at(window.start() - Len::from(1), Len::from(1), None)?
-                .first()
-                .copied()
-        };
-
-        const DEFAULT_PREV_BYTE: u8 = 0;
-
-        let mut buf = Vec::new();
-
-        let mut prev_byte = byte_before_window.unwrap_or(DEFAULT_PREV_BYTE);
-        let mut start = window.start();
-        while start < window.end() {
-            let max_size = std::cmp::min((window.end() - start).as_u64() as usize, WINDOW_SIZE);
-
-            let subwindow = input.read_at(start, Len::from(max_size as u64), Some(&mut buf))?;
-
-            if let Some(&first) = subwindow.first() {
-                follow[(first >> 4) as usize][(prev_byte >> 4) as usize] += 1;
-            }
-            for pair in subwindow.windows(2) {
-                follow[(pair[1] >> 4) as usize][(pair[0] >> 4) as usize] += 1;
-            }
-            prev_byte = subwindow.last().copied().unwrap_or(prev_byte);
-
-            start += Len::from(subwindow.len() as u64);
-
-            if subwindow.is_empty() {
-                break;
-            }
-        }
-        // in case the originally given range was larger than the window
-        let window_size = start - window.start();
-
-        let window = Window::from_start_len(window.start(), window_size);
-        let mut contained_regions = RangeSetBlaze::new();
-        contained_regions.ranges_insert(window.start().as_u64()..=window.end().as_u64() - 1);
-
-        Ok(DownsampledBigramStatistics {
-            follow,
-            contained_regions,
-        })
-    }
-
     /// Returns the number of bytes that the statistics cover.
     pub fn num_covered_bytes(&self) -> u64 {
         self.contained_regions.len() as u64
@@ -184,6 +128,62 @@ impl Statistics for DownsampledBigramStatistics {
 
     fn approximate_memory_usage(&self) -> u64 {
         std::mem::size_of::<[[u64; 256]; 256]>() as u64
+    }
+
+    fn compute(input: &Input, window: Window) -> Result<DownsampledBigramStatistics, io::Error> {
+        let mut follow = Box::new([[0; 16]; 16]);
+
+        const WINDOW_SIZE: usize = 4 * 1024 * 1024;
+
+        let byte_before_window = if window.start().is_start_of_file() {
+            None
+        } else {
+            input
+                .read_at(window.start() - Len::from(1), Len::from(1), None)?
+                .first()
+                .copied()
+        };
+
+        const DEFAULT_PREV_BYTE: u8 = 0;
+
+        let mut buf = Vec::new();
+
+        let mut prev_byte = byte_before_window.unwrap_or(DEFAULT_PREV_BYTE);
+        let mut start = window.start();
+        while start < window.end() {
+            let max_size = std::cmp::min((window.end() - start).as_u64() as usize, WINDOW_SIZE);
+
+            let subwindow = input.read_at(start, Len::from(max_size as u64), Some(&mut buf))?;
+
+            if let Some(&first) = subwindow.first() {
+                follow[(first >> 4) as usize][(prev_byte >> 4) as usize] += 1;
+            }
+            for pair in subwindow.windows(2) {
+                follow[(pair[1] >> 4) as usize][(pair[0] >> 4) as usize] += 1;
+            }
+            prev_byte = subwindow.last().copied().unwrap_or(prev_byte);
+
+            start += Len::from(subwindow.len() as u64);
+
+            if subwindow.is_empty() {
+                break;
+            }
+        }
+        // in case the originally given range was larger than the window
+        let window_size = start - window.start();
+
+        let window = Window::from_start_len(window.start(), window_size);
+        let mut contained_regions = RangeSetBlaze::new();
+        contained_regions.ranges_insert(window.start().as_u64()..=window.end().as_u64() - 1);
+
+        Ok(DownsampledBigramStatistics {
+            follow,
+            contained_regions,
+        })
+    }
+
+    fn contained_regions(&self) -> impl IntoIterator<Item = std::ops::RangeInclusive<u64>> {
+        self.contained_regions.ranges()
     }
 }
 

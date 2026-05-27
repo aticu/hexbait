@@ -20,12 +20,12 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
     let file_size = state.scroll_state.file_size();
     let rect = ui.max_rect().intersect(ui.cursor());
 
-    state
-        .scroll_state
-        .update_parameters(rect.height(), &state.settings);
-
     // be deliberately small to fit more text here
     let size_text_height = state.settings.font_size() * 0.7;
+
+    state
+        .scroll_state
+        .update_parameters(rect.height() - size_text_height, &state.settings);
 
     let total_bytes = state.scroll_state.total_hexdump_bytes();
 
@@ -123,15 +123,29 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
                 state.scroll_state.scrollbars[i].relative_selection_end(window),
             )
         };
-        let hovered_row_window = render_bar(
+
+        let metrics_access = state.statistics_handler.get_bar_metrics_access(
+            i,
+            window,
+            rect.height().trunc() as usize
+                * if state.settings.fine_grained_scrollbars() {
+                    16
+                } else {
+                    1
+                },
+        );
+        render_bar(
             ui,
             &mut state.scroll_state.scrollbars[i],
             &state.settings,
             rect,
             window,
             selected_window,
-            |window| {
-                let (metrics, quality) = state.statistics_handler.get_metrics(window);
+            |index| {
+                let (metrics, quality) = metrics_access
+                    .as_ref()
+                    .map(|metrics| metrics.get_metrics(index))
+                    .unwrap_or((None, MetricsQuality::Estimated));
                 full_quality &= !quality.is_estimated();
                 (metrics, quality)
             },
@@ -184,27 +198,6 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
                 show_hex = true;
                 break;
             }
-        } else if let Some(row_window) = hovered_row_window {
-            Tooltip::always_open(
-                ui.ctx().clone(),
-                ui.layer_id(),
-                "scrollbar_tooltip".into(),
-                PopupAnchor::Pointer,
-            )
-            .show(|ui| {
-                if let (Some(metrics), quality) = state.statistics_handler.get_metrics(row_window) {
-                    if quality.is_estimated() {
-                        ui.label(format!(
-                            "Entropy: {} (estimate based on subsampling)",
-                            metrics.entropy,
-                        ));
-                    } else {
-                        ui.label(format!("Entropy: {}", metrics.entropy));
-                    }
-                } else {
-                    ui.label("Entropy unknown");
-                }
-            });
         }
 
         window = state.scroll_state.scrollbars[i].window(window, total_bytes);
@@ -368,16 +361,10 @@ fn render_bar(
     rect: Rect,
     window: Window,
     selected_window: (f64, f64),
-    mut metrics: impl FnMut(Window) -> (Option<StatisticsMetrics>, MetricsQuality),
-) -> Option<Window> {
-    let total_rows = rect.height().trunc() as u64;
-
+    mut metrics: impl FnMut(usize) -> (Option<StatisticsMetrics>, MetricsQuality),
+) {
     let selection_start = (selected_window.0 * rect.height() as f64).round() as usize;
     let selection_end = (selected_window.1 * rect.height() as f64).round() as usize;
-
-    let bytes_per_row =
-        Len::from((window.size().as_u64() as f64 / total_rows as f64).round() as u64);
-    let bytes_per_square = bytes_per_row / 16;
 
     let side_start = (rect.width() - 2.0) as usize;
     let row_width = side_start / 16;
@@ -404,27 +391,9 @@ fn render_bar(
                     full_quality_row = true;
                 }
 
-                let relative_offset = y as f64 / total_rows as f64;
-                let offset_within_range =
-                    RelativeOffset::from((relative_offset * window.size().as_u64() as f64) as u64);
+                let index = x / row_width + y * 16;
 
-                let window_size = if settings.fine_grained_scrollbars() {
-                    bytes_per_square
-                } else {
-                    bytes_per_row
-                };
-                let column_offset = if settings.fine_grained_scrollbars() {
-                    (x / row_width) as u64 * bytes_per_square
-                } else {
-                    Len::ZERO
-                };
-
-                let window = Window::from_start_len(
-                    window.start() + offset_within_range + column_offset,
-                    window_size,
-                );
-
-                let (metrics, quality) = metrics(window);
+                let (metrics, quality) = metrics(index);
 
                 if quality.is_estimated() {
                     full_quality_scrollbar = false;
@@ -445,13 +414,18 @@ fn render_bar(
             window,
             settings.fine_grained_scrollbars(),
             selected_window,
+            full_quality_scrollbar,
         ),
         || {
-            scrollbar
-                .blurred_image
-                .get((rect, window, settings.fine_grained_scrollbars()), |_| {
-                    blur_image(scrollbar.cached_image.raw(), settings)
-                })
+            scrollbar.blurred_image.get(
+                (
+                    rect,
+                    window,
+                    settings.fine_grained_scrollbars(),
+                    full_quality_scrollbar,
+                ),
+                |_| blur_image(scrollbar.cached_image.raw(), settings),
+            )
         },
         |blurred_image, x, y| {
             if x >= side_start {
@@ -491,17 +465,7 @@ fn render_bar(
         scrollbar.selection_overlay.require_repaint();
     }
 
-    ui.allocate_rect(rect, Sense::hover())
-        .hover_pos()
-        .map(|pos| {
-            let y = (pos.y - rect.min.y) as usize;
-
-            let relative_offset = y as f64 / total_rows as f64;
-            let offset_within_range =
-                RelativeOffset::from((relative_offset * window.size().as_u64() as f64) as u64);
-
-            Window::from_start_len(window.start() + offset_within_range, bytes_per_row)
-        })
+    ui.allocate_rect(rect, Sense::hover());
 }
 
 /// Returns the position of `offset` on the bar spanning `bar_window` displayed in `bar_rect`.

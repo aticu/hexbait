@@ -4,6 +4,7 @@ use std::{
     collections::BTreeMap,
     sync::{
         Arc,
+        atomic::AtomicU32,
         mpsc::{self, RecvError, TryRecvError},
     },
     thread,
@@ -16,8 +17,9 @@ use hexbait_common::{Input, Len};
 use crate::{
     statistics::{
         BigramStatistics, StatisticsMetrics,
+        downsampled_bigrams::DownsampledBigramStatistics,
         handler::{
-            CalculationResult, Request, WindowMetrics,
+            BarResultBuffer, CalculationResult, Request,
             background::{statistics_tree::StatisticsTree, work_phase::WorkPhase},
             compute_bin_size_and_align_window,
         },
@@ -56,9 +58,14 @@ impl BackgroundStatisticsEngine {
     pub fn start(input: Input) -> BackgroundStatisticsEngineStartResult {
         let (send, recv) = mpsc::channel();
         let result = Arc::new(ArcSwap::from_pointee(CalculationResult {
-            metrics: Vec::new(),
             statistics: BigramStatistics::empty(),
             selected_window: Window::ZERO,
+            bar_buffers: Arc::new([]),
+            map_buffer: Arc::new([BarResultBuffer {
+                window: Window::ZERO,
+                bin_size: Len::from(1),
+                buf: Box::new([]),
+            }]),
         }));
         let frontend_result = Arc::clone(&result);
 
@@ -81,20 +88,15 @@ impl BackgroundStatisticsEngine {
 
     /// Publishes work performed by the backend.
     fn publish_work(&mut self) {
-        let metrics = self
-            .computation_state
-            .derived_values
-            .iter()
-            .map(|(&window, &metrics)| WindowMetrics { window, metrics })
-            .collect::<Vec<_>>();
         let (_, selected_window) = self
             .computation_state
             .innermost_bin_size_and_aligned_window();
 
         let result = CalculationResult {
-            metrics,
             statistics: self.computation_state.current_window_statistics.clone(),
             selected_window,
+            bar_buffers: Arc::clone(&self.computation_state.bar_buffers),
+            map_buffer: Arc::clone(&self.computation_state.map_buffer),
         };
 
         self.result.store(Arc::new(result));
@@ -181,10 +183,16 @@ struct ComputationState {
     input: Input,
     /// The latest request for what should be computed.
     latest_request: Option<Request>,
+    /// The buffers where the computation results for the bars are stored.
+    bar_buffers: Arc<[BarResultBuffer]>,
+    /// The buffer where the computation results for the Gilbert map are stored.
+    map_buffer: Arc<[BarResultBuffer]>,
     /// All values derived from statistics.
     derived_values: BTreeMap<Window, StatisticsMetrics>,
     /// The tree of statistics information.
     statistics_tree: StatisticsTree<BigramStatistics>,
+    /// The tree of downsampled statistics information.
+    downsampled_statistics_tree: StatisticsTree<DownsampledBigramStatistics>,
     /// The computed statistics of the current window.
     current_window_statistics: BigramStatistics,
     /// The last time when an update was sent to the frontend.
@@ -197,8 +205,15 @@ impl ComputationState {
         ComputationState {
             input,
             latest_request: None,
+            bar_buffers: Arc::new([]),
+            map_buffer: Arc::new([BarResultBuffer {
+                window: Window::ZERO,
+                bin_size: Len::from(1),
+                buf: Box::new([]),
+            }]),
             derived_values: BTreeMap::new(),
             statistics_tree: StatisticsTree::new(),
+            downsampled_statistics_tree: StatisticsTree::new(),
             current_window_statistics: BigramStatistics::empty(),
             last_yield: Instant::now(),
         }
@@ -208,6 +223,49 @@ impl ComputationState {
     fn reset_for_request(&mut self, request: Request) {
         self.current_window_statistics = BigramStatistics::empty();
         self.last_yield = Instant::now();
+
+        let mut bar_buffers = Vec::with_capacity(request.windows.len());
+        for (i, &window) in request.windows.iter().enumerate() {
+            let (bin_size, window) =
+                compute_bin_size_and_align_window(window, request.bins_per_window);
+
+            let num_bins = request.bins_per_window as usize;
+
+            if let Some(buf) = self.bar_buffers.get(i)
+                && buf.window == window
+                && buf.bin_size == bin_size
+                && buf.buf.len() == num_bins
+            {
+                bar_buffers.push(BarResultBuffer {
+                    window,
+                    bin_size,
+                    buf: (0..num_bins)
+                        .map(|i| {
+                            AtomicU32::new(buf.buf[i].load(std::sync::atomic::Ordering::Relaxed))
+                        })
+                        .collect(),
+                });
+            } else {
+                bar_buffers.push(BarResultBuffer {
+                    window,
+                    bin_size,
+                    buf: (0..num_bins).map(|_| AtomicU32::new(0)).collect(),
+                });
+            }
+        }
+
+        let (bin_size, window) = compute_bin_size_and_align_window(
+            *request.windows.last().unwrap(),
+            request.bins_in_innermost_window,
+        );
+        let num_bins = request.bins_in_innermost_window as usize;
+        self.map_buffer = Arc::new([BarResultBuffer {
+            window,
+            bin_size,
+            buf: (0..num_bins).map(|_| AtomicU32::new(0)).collect(),
+        }]);
+
+        self.bar_buffers = bar_buffers.into();
         self.latest_request = Some(request);
     }
 

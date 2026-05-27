@@ -4,7 +4,7 @@ use hexbait_common::{AbsoluteOffset, Len};
 
 use crate::{
     statistics::{
-        BigramStatistics,
+        BigramStatistics, Statistics as _,
         handler::background::{
             ComputationState,
             statistics_tree::Tier,

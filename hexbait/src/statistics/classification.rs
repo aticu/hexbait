@@ -22,7 +22,11 @@ use std::io;
 
 use hexbait_common::{AbsoluteOffset, Input, Len};
 
-use crate::{state::State, statistics::BigramStatistics, window::Window};
+use crate::{
+    state::State,
+    statistics::{BigramStatistics, Statistics as _},
+    window::Window,
+};
 
 mod builtin;
 
