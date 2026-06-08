@@ -5,6 +5,7 @@ use hexbait_common::Input;
 
 use crate::state::State;
 
+mod bars;
 pub mod classification_info;
 pub mod content;
 pub mod data_inspector;

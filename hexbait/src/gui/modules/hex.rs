@@ -8,6 +8,7 @@ use crate::{
         color,
         highlighting::highlight,
         marking::{MarkedLocation, MarkingKind, render_locations_on_bar},
+        modules::bars::{SIDE_BAR_WIDTH, highest_aligned_value},
         primitives::{render_glyph, render_hex, render_offset},
     },
     state::{ScrollState, SelectionState, State},
@@ -275,7 +276,7 @@ fn render_sidebar(
     let bar_width_multiplier = state.settings.bar_width_multiplier();
 
     let mut rect = ui.max_rect().intersect(ui.cursor());
-    rect.set_width(16.0 * bar_width_multiplier as f32);
+    rect.set_width(16.0 * bar_width_multiplier as f32 + 1.0 + SIDE_BAR_WIDTH as f32);
 
     let num_rows = window.len().div_ceil(16);
     rect.set_height(rect.height().min(num_rows as f32));
@@ -305,7 +306,18 @@ fn render_sidebar(
         || (),
         |_, x, y| {
             let x = x / bar_width_multiplier;
-            if let Some(&byte) = window.get(y * 16 + x) {
+
+            if x == 16 {
+                Color32::BLACK
+            } else if x > 16 {
+                let start_offset = (start + y as u64) * 16;
+                let alignment = highest_aligned_value(start_offset, start_offset + 16);
+
+                state
+                    .settings
+                    .alignment_marker_color(AbsoluteOffset::from(alignment))
+                    .unwrap_or(Color32::BLACK)
+            } else if let Some(&byte) = window.get(y * 16 + x) {
                 if highlight_row_range.contains(&(y as u64)) {
                     state.settings.byte_color(byte)
                 } else {

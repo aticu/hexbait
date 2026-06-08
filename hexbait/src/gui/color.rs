@@ -46,6 +46,16 @@ pub const BYTE_COLORS: [Color32; 256] = {
     out
 };
 
+/// The colors of the alignment markers.
+pub const ALIGNMENT_MARKER_COLORS: [Color32; 6] = [
+    Color32::from_rgb(128, 128, 255),
+    Color32::from_rgb(128, 255, 200),
+    Color32::from_rgb(255, 255, 0),
+    Color32::from_rgb(255, 128, 0),
+    Color32::from_rgb(255, 0, 0),
+    Color32::from_rgb(255, 0, 255),
+];
+
 /// Generates a gradient with the given stops
 const fn generate_color_gradient<const N: usize>(stops: &[(Color32, f64)]) -> [Color32; N] {
     let mut out = [Color32::BLACK; N];

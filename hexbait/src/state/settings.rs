@@ -1,8 +1,9 @@
 //! Handles the user settings.
 
 use egui::{Color32, FontId, TextStyle, Ui};
+use hexbait_common::AbsoluteOffset;
 
-use crate::gui::color::{BYTE_COLORS, ColorMap, LerpStrength};
+use crate::gui::color::{ALIGNMENT_MARKER_COLORS, BYTE_COLORS, ColorMap, LerpStrength};
 
 /// Determine what to show in the main screen.
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
@@ -212,6 +213,18 @@ impl Settings {
     /// The width multiplier of the scrollbars.
     pub fn bar_width_multiplier(&self) -> usize {
         3
+    }
+
+    /// Returns the color for an alignment marker at the given color.
+    pub fn alignment_marker_color(&self, offset: AbsoluteOffset) -> Option<Color32> {
+        let offset = offset.as_u64();
+        let level = (offset.trailing_zeros() / 10) as usize;
+        if level == 0 {
+            return None;
+        }
+
+        let index = (level - 1).min(ALIGNMENT_MARKER_COLORS.len() - 1);
+        Some(ALIGNMENT_MARKER_COLORS[index])
     }
 }
 

@@ -17,12 +17,16 @@ pub fn render_offset(
     rect.max.y = rect.min.y + settings.char_height();
     let painter = ui.painter().with_clip_rect(rect);
 
+    let color = settings
+        .alignment_marker_color(offset)
+        .unwrap_or(Color32::from_rgb(100, 100, 100));
+
     painter.text(
         ui.cursor().min,
         Align2::LEFT_TOP,
         format!("{:016x}", offset.as_u64()),
         settings.hex_font(),
-        Color32::from_rgb(100, 100, 100),
+        color,
     );
 
     ui.allocate_rect(rect, sense)

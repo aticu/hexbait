@@ -9,7 +9,12 @@ use size_format::SizeFormatterBinary;
 
 use crate::{
     IDLE_TIME,
-    gui::{color, image_processing::blur_image, marking::render_locations_on_bar},
+    gui::{
+        color,
+        image_processing::blur_image,
+        marking::render_locations_on_bar,
+        modules::bars::{LARGE_ALIGNMENT_MARKER_DIFF, SIDE_BAR_WIDTH, highest_aligned_value},
+    },
     state::{DisplayType, InteractionState, ScrollState, Scrollbar, Settings, State},
     statistics::{MetricsQuality, StatisticsMetrics},
     window::Window,
@@ -52,7 +57,9 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
 
         let mut rect = ui.max_rect().intersect(ui.cursor());
         rect.min += vec2(0.0, size_text_height);
-        rect.set_width(16.0 * state.settings.bar_width_multiplier() as f32 + 3.0);
+        rect.set_width(
+            16.0 * state.settings.bar_width_multiplier() as f32 + 1.0 + SIDE_BAR_WIDTH as f32,
+        );
         let rect = rect;
 
         ui.painter().text(
@@ -366,11 +373,14 @@ fn render_bar(
     let selection_start = (selected_window.0 * rect.height() as f64).round() as usize;
     let selection_end = (selected_window.1 * rect.height() as f64).round() as usize;
 
-    let side_start = (rect.width() - 2.0) as usize;
+    let side_start = (rect.width() - SIDE_BAR_WIDTH as f32) as usize;
     let row_width = side_start / 16;
 
     let mut full_quality_scrollbar = true;
     let mut full_quality_row = true;
+
+    let elems_per_row = (window.size().as_u64() as f32 / rect.height().trunc()).trunc() as u64;
+    let large_alignment = highest_aligned_value(0, elems_per_row * LARGE_ALIGNMENT_MARKER_DIFF);
 
     scrollbar.cached_image.paint_at(
         ui,
@@ -429,7 +439,22 @@ fn render_bar(
         },
         |blurred_image, x, y| {
             if x >= side_start {
-                return Color32::TRANSPARENT;
+                let y = y as u64;
+                let start = window.start().as_u64() + y * elems_per_row;
+                let end = window.start().as_u64() + (y + 1) * elems_per_row;
+
+                let alignment = highest_aligned_value(start, end);
+                let large_marker = alignment > large_alignment;
+
+                if large_marker || x == side_start + 1 {
+                    return settings
+                        .alignment_marker_color(AbsoluteOffset::from(alignment))
+                        .unwrap_or(Color32::BLACK);
+                } else {
+                    return Color32::BLACK;
+                }
+            } else if x == side_start - 1 {
+                return Color32::BLACK;
             }
             if selection_start < y && y < selection_end {
                 return Color32::TRANSPARENT;
