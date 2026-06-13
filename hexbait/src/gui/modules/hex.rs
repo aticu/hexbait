@@ -174,8 +174,11 @@ fn render_row(ui: &mut Ui, state: &mut State, offset: AbsoluteOffset, row: &[u8]
             if let Some(origin) = ui.input(|input| input.pointer.latest_pos())
                 && response.rect.contains(origin)
             {
-                selection_state
-                    .handle_interaction(offset, ui.input(|input| input.pointer.primary_pressed()));
+                selection_state.handle_interaction(
+                    offset,
+                    ui.input(|input| input.pointer.primary_pressed())
+                        && response.is_pointer_button_down_on(),
+                );
             }
         };
 
@@ -214,7 +217,7 @@ fn render_row(ui: &mut Ui, state: &mut State, offset: AbsoluteOffset, row: &[u8]
 
             let byte_offset = offset + Len::from(i as u64);
 
-            let response = render_hex(ui, &state.settings, Sense::hover(), byte);
+            let response = render_hex(ui, &state.settings, Sense::click(), byte);
             interact_with_offset(ui, byte_offset, &response, &mut state.selection_state);
 
             response.on_hover_ui(|ui| {
