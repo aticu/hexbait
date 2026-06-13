@@ -1,6 +1,6 @@
 //! Implements showing of a parsed value.
 
-use egui::{FontId, Key, Layout, Response, RichText, TextStyle, Ui, UiBuilder};
+use egui::{FontId, Key, Layout, Response, RichText, ScrollArea, TextStyle, Ui, UiBuilder};
 use hexbait_common::{AbsoluteOffset, Input, RelativeOffset};
 use hexbait_lang::{
     ParseErr, ParseErrId, Value, ValueKind, View,
@@ -123,14 +123,20 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     let view = View::from_input(input.clone());
     let view = view.subview(parse_offset.to_relative()..RelativeOffset::from(view.len().as_u64()));
     let result = hexbait_lang::eval_ir(parse_type, view, RelativeOffset::ZERO);
-    let hovered = show_value(
-        ui,
-        state,
-        hexbait_lang::ir::path::Path::new(),
-        None,
-        &result.value,
-        &result.errors,
-    );
+
+    let hovered = ScrollArea::vertical()
+        .auto_shrink([false, true])
+        .show(ui, |ui| {
+            show_value(
+                ui,
+                state,
+                hexbait_lang::ir::path::Path::new(),
+                None,
+                &result.value,
+                &result.errors,
+            )
+        })
+        .inner;
 
     match hovered {
         HoverInfo::Nothing => (),
