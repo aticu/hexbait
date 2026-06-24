@@ -29,6 +29,9 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     let len = Len::from(pixel_budget * OVERSAMPLE).min(selected_window.size());
     let show_byte_colors = selected_window.size().as_u64() <= pixel_budget * OVERSAMPLE;
 
+    let min_hover_selection_size = state.scroll_state.total_hexdump_bytes().as_u64() as f32
+        / selected_window.size().as_u64() as f32;
+
     let gilbert_curve = state
         .scroll_state
         .gilbert_curve
@@ -48,11 +51,22 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     }
 
     if response.hovered() {
-        let scroll_factor = -ui.input(|input| input.smooth_scroll_delta.y);
+        let (scroll_factor, shift_pressed) = ui.input(|input| {
+            (
+                -(input.smooth_scroll_delta.x + input.smooth_scroll_delta.y),
+                input.modifiers.shift,
+            )
+        });
         let scroll_speed = 1.01f32;
+        let scroll_factor = if shift_pressed {
+            scroll_factor * 0.3
+        } else {
+            scroll_factor
+        };
         state.scroll_state.hover_selection_size = (state.scroll_state.hover_selection_size
             * scroll_speed.powf(scroll_factor))
-        .clamp(0.001, 0.35);
+        .clamp(0.001, 0.35)
+        .max(min_hover_selection_size);
     }
 
     let mut full_quality = true;
