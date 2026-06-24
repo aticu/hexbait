@@ -73,7 +73,13 @@ impl MetricComputation {
         computation_state: &mut ComputationState,
     ) -> MetricComputation {
         let window_index = computation_state.last_window_index();
-        let (bin_size, aligned_window) = computation_state.innermost_bin_size_and_aligned_window();
+        let map_info = computation_state.innermost_bin_size_and_aligned_window();
+        let bar_info = computation_state.bin_size_and_aligned_window(window_index);
+
+        let (bin_size, aligned_window) = match mode {
+            ComputationMode::Estimation => bar_info,
+            ComputationMode::FullQuality => map_info,
+        };
 
         MetricComputation {
             mode,
@@ -86,11 +92,7 @@ impl MetricComputation {
             bin_count: 0,
             out_index: 0,
             quality: match mode {
-                ComputationMode::Estimation => estimation_quality_from_bin_size(
-                    computation_state
-                        .bin_size_and_aligned_window(window_index)
-                        .0,
-                ),
+                ComputationMode::Estimation => estimation_quality_from_bin_size(bar_info.0),
                 ComputationMode::FullQuality => MetricsQuality::Accurate,
             },
             map_quality: match mode {
