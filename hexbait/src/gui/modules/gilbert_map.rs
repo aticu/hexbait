@@ -20,8 +20,8 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     }
     let response = ui.allocate_rect(rect, Sense::click());
 
-    let width = rect.width().ceil() as u32;
-    let height = rect.height().ceil() as u32;
+    let width = rect.width().trunc() as u32;
+    let height = rect.height().trunc() as u32;
     let pixel_budget = (width * height) as u64;
     state.scroll_state.gilbert_pixel_budget = pixel_budget;
 
