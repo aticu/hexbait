@@ -19,6 +19,7 @@ multiversion = { version = "0.8.0", default-features = false, features = ["std"]
 aho-corasick = { version = "1.1.4", default-features = false }
 clap = { version = "4.5.51", features = ["derive"] }
 infer = { version = "0.19.0", default-features = false }
+base64 = { version = "0.22.1", default-features = false, features = ["alloc"] }
 hexbait-common = { path = "../hexbait-common" }
 hexbait-lang = { path = "../hexbait-lang" }
 hexbait-builtin-parsers = { path = "../hexbait-builtin-parsers" }

@@ -201,28 +201,59 @@ fn byte_context_menu(ui: &mut Ui, state: &mut State, input: &Input, offset: Abso
         && selected_window.contains(offset)
     {
         let selection = || input.read_at(selected_window.start(), selected_window.size(), None);
+        let render_selection = |render_byte: fn(u8) -> String, separator| {
+            let mut out = String::new();
+            if let Ok(selection) = selection() {
+                let mut first = true;
+                for &byte in &*selection {
+                    if first {
+                        first = false;
+                    } else if let Some(separator) = separator {
+                        out.push_str(separator);
+                    }
+                    out.push_str(&render_byte(byte));
+                }
+            }
+            out
+        };
 
         ui.menu_button("Copy as", |ui| {
+            if let Ok(selection) = selection()
+                && let Ok(as_str) = std::str::from_utf8(&selection)
+                && ui.button("Text").clicked()
+            {
+                ui.ctx().copy_text(as_str.to_string());
+            }
             if ui.button("Escaped hex").clicked() {
-                let mut out = String::new();
-
-                if let Ok(selection) = selection() {
-                    for &byte in &*selection {
-                        match byte {
-                            0x20..=0x7e => {
-                                out.push(byte as char);
-                            }
-                            _ => {
-                                out.push('\\');
-                                out.push('x');
-                                out.push(char::from_digit((byte >> 4) as u32, 16).unwrap());
-                                out.push(char::from_digit((byte & 0xf) as u32, 16).unwrap());
-                            }
+                ui.ctx().copy_text(render_selection(
+                    |byte| match byte {
+                        0x20..=0x7e => format!("{}", byte as char),
+                        _ => {
+                            format!("\\x{byte:02x}")
                         }
-                    }
-                }
-
-                ui.ctx().copy_text(out);
+                    },
+                    None,
+                ));
+            }
+            if ui.button("Spaced hex").clicked() {
+                ui.ctx()
+                    .copy_text(render_selection(|byte| format!("{byte:02x}"), Some(" ")));
+            }
+            if ui.button("Joined hex").clicked() {
+                ui.ctx()
+                    .copy_text(render_selection(|byte| format!("{byte:02x}"), None));
+            }
+            if ui.button("Base 64 (RFC4648)").clicked()
+                && let Ok(selection) = selection()
+            {
+                use base64::prelude::*;
+                ui.ctx().copy_text(BASE64_STANDARD.encode(&*selection));
+            }
+            if ui.button("Base 64 (URL safe)").clicked()
+                && let Ok(selection) = selection()
+            {
+                use base64::prelude::*;
+                ui.ctx().copy_text(BASE64_URL_SAFE.encode(&*selection));
             }
         });
     }
