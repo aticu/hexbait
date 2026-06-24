@@ -117,6 +117,7 @@ impl MarkedLocation {
             MarkingKind::HoveredParsed => Color32::DARK_RED,
             MarkingKind::HoveredParseErr => Color32::WHITE,
             MarkingKind::SearchResult => Color32::BLUE,
+            MarkingKind::UserMark => Color32::WHITE,
         }
     }
 
@@ -127,6 +128,7 @@ impl MarkedLocation {
             MarkingKind::HoveredParsed => Color32::GOLD,
             MarkingKind::HoveredParseErr => Color32::LIGHT_RED,
             MarkingKind::SearchResult => Color32::from_rgb(252, 15, 192),
+            MarkingKind::UserMark => Color32::DARK_RED,
         }
     }
 }
@@ -142,6 +144,8 @@ pub enum MarkingKind {
     HoveredParseErr,
     /// The location is marked, because it was found by a search.
     SearchResult,
+    /// The location is marked, because the user marked it.
+    UserMark,
 }
 
 /// Renders the given marked locations on the given bar window.

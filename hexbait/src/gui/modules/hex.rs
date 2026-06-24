@@ -106,7 +106,14 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
             .skip(state.scroll_state.hex_scroll_offset as usize)
             .take(rows_onscreen as usize + 1)
         {
-            render_row(ui, state, start + Len::from(i as u64 * 16), row, file_size);
+            render_row(
+                ui,
+                state,
+                input,
+                start + Len::from(i as u64 * 16),
+                row,
+                file_size,
+            );
         }
     });
 
@@ -167,8 +174,69 @@ fn handle_scrolling(
     }
 }
 
+/// Renders the context menu for a byte at the given offset.
+fn byte_context_menu(ui: &mut Ui, state: &mut State, input: &Input, offset: AbsoluteOffset) {
+    let is_marked = state
+        .marked_locations
+        .iter_window(Window::from_start_len(offset, Len::from(1)))
+        .any(|mark| mark.kind() == MarkingKind::UserMark && mark.window().start() == offset);
+
+    #[expect(clippy::collapsible_else_if, reason = "code reads cleaner this way")]
+    if is_marked {
+        if ui.button("Unmark").clicked() {
+            state.marked_locations.remove_where(|mark| {
+                mark.kind() == MarkingKind::UserMark && mark.window().start() == offset
+            });
+        }
+    } else {
+        if ui.button("Mark").clicked() {
+            state.marked_locations.add(MarkedLocation::new(
+                Window::from_start_len(offset, Len::from(1)),
+                MarkingKind::UserMark,
+            ));
+        }
+    }
+
+    if let Some(selected_window) = state.selection_state.selected_window()
+        && selected_window.contains(offset)
+    {
+        let selection = || input.read_at(selected_window.start(), selected_window.size(), None);
+
+        ui.menu_button("Copy as", |ui| {
+            if ui.button("Escaped hex").clicked() {
+                let mut out = String::new();
+
+                if let Ok(selection) = selection() {
+                    for &byte in &*selection {
+                        match byte {
+                            0x20..=0x7e => {
+                                out.push(byte as char);
+                            }
+                            _ => {
+                                out.push('\\');
+                                out.push('x');
+                                out.push(char::from_digit((byte >> 4) as u32, 16).unwrap());
+                                out.push(char::from_digit((byte & 0xf) as u32, 16).unwrap());
+                            }
+                        }
+                    }
+                }
+
+                ui.ctx().copy_text(out);
+            }
+        });
+    }
+}
+
 /// Renders a single row in a hexdump.
-fn render_row(ui: &mut Ui, state: &mut State, offset: AbsoluteOffset, row: &[u8], file_size: Len) {
+fn render_row(
+    ui: &mut Ui,
+    state: &mut State,
+    input: &Input,
+    offset: AbsoluteOffset,
+    row: &[u8],
+    file_size: Len,
+) {
     let interact_with_offset =
         |ui: &Ui, offset, response: &egui::Response, selection_state: &mut SelectionState| {
             if let Some(origin) = ui.input(|input| input.pointer.latest_pos())
@@ -220,6 +288,10 @@ fn render_row(ui: &mut Ui, state: &mut State, offset: AbsoluteOffset, row: &[u8]
             let response = render_hex(ui, &state.settings, Sense::click(), byte);
             interact_with_offset(ui, byte_offset, &response, &mut state.selection_state);
 
+            response.context_menu(|ui| {
+                byte_context_menu(ui, state, input, byte_offset);
+            });
+
             response.on_hover_ui(|ui| {
                 render_glyph(ui, &state.settings, Sense::hover(), byte);
                 render_offset_info(ui, byte_offset, state.selection_state.selected_window());
@@ -258,6 +330,10 @@ fn render_row(ui: &mut Ui, state: &mut State, offset: AbsoluteOffset, row: &[u8]
 
             let response = render_glyph(ui, &state.settings, Sense::click(), byte);
             interact_with_offset(ui, byte_offset, &response, &mut state.selection_state);
+
+            response.context_menu(|ui| {
+                byte_context_menu(ui, state, input, byte_offset);
+            });
 
             response.on_hover_ui(|ui| {
                 render_hex(ui, &state.settings, Sense::hover(), byte);
