@@ -29,7 +29,7 @@ pub struct ComputeBin<Statistics> {
 }
 
 impl ComputeBin<BigramStatistics> {
-    /// Creates a new bin computation state.
+    /// Creates a new bin computation state for a full statistics bin.
     pub fn new_full(bin: Window) -> ComputeBin<BigramStatistics> {
         ComputeBin {
             statistics: BigramStatistics::empty(),
@@ -41,7 +41,7 @@ impl ComputeBin<BigramStatistics> {
 }
 
 impl ComputeBin<DownsampledBigramStatistics> {
-    /// Creates a new bin computation state.
+    /// Creates a new bin computation state for a downsampled statistics bin.
     pub fn new_downsampled(bin: Window) -> ComputeBin<DownsampledBigramStatistics> {
         ComputeBin {
             statistics: DownsampledBigramStatistics::empty(),

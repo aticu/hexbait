@@ -35,7 +35,7 @@ impl WorkPhase {
     /// Restarts work from the beginning.
     pub fn from_beginning(computation_state: &mut ComputationState) -> WorkPhase {
         WorkPhase::MetricComputation(MetricComputation::new(
-            ComputationMode::FullQuality,
+            ComputationMode::Estimation,
             computation_state,
         ))
     }
@@ -49,9 +49,15 @@ impl WorkPhase {
                 }
                 WorkPhase::MetricComputation(entropy_estimation) => {
                     entropy_estimation.advance(computation_state)?;
-                    *self = WorkPhase::AccumulateOldStatistics(AccumulateOldStatistics::new(
-                        computation_state,
-                    ));
+
+                    *self = match entropy_estimation.mode() {
+                        ComputationMode::Estimation => WorkPhase::MetricComputation(
+                            MetricComputation::new(ComputationMode::FullQuality, computation_state),
+                        ),
+                        ComputationMode::FullQuality => WorkPhase::AccumulateOldStatistics(
+                            AccumulateOldStatistics::new(computation_state),
+                        ),
+                    };
                     continue;
                 }
                 WorkPhase::AccumulateOldStatistics(accumulate_old_statistics) => {

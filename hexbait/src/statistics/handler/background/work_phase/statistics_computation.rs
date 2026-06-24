@@ -54,38 +54,34 @@ impl StatisticsComputation {
 
     /// Continues the current work.
     pub fn advance(&mut self, computation_state: &mut ComputationState) -> Option<FinishedWork> {
-        loop {
-            while self.window_offset < self.end_offset || self.compute_bin.is_some() {
-                computation_state.maybe_yield()?;
+        while self.window_offset < self.end_offset || self.compute_bin.is_some() {
+            computation_state.maybe_yield()?;
 
-                if let Some(compute_bin) = self.compute_bin.as_mut() {
-                    compute_bin.advance(computation_state)?;
-                    let compute_bin = self.compute_bin.take().unwrap();
-                    let (statistics, bin) = compute_bin.statistics_and_bin();
+            if let Some(compute_bin) = self.compute_bin.as_mut() {
+                compute_bin.advance(computation_state)?;
+                let compute_bin = self.compute_bin.take().unwrap();
+                let (statistics, bin) = compute_bin.statistics_and_bin();
 
-                    computation_state
-                        .derived_values
-                        .insert(bin, statistics.downsampled().metrics());
+                computation_state
+                    .derived_values
+                    .insert(bin, statistics.downsampled().metrics());
 
-                    computation_state.current_window_statistics += &statistics;
-                }
-
-                if self.window_offset >= self.end_offset {
-                    continue;
-                }
-
-                let old_offset = self.window_offset;
-                self.window_offset += self.bin_size;
-
-                if !self.still_needs_bin(computation_state, old_offset) {
-                    continue;
-                }
-
-                let bin = Window::from_start_len(old_offset, self.bin_size);
-                self.compute_bin = Some(ComputeBin::new_full(bin));
+                computation_state.current_window_statistics += &statistics;
             }
 
-            break;
+            if self.window_offset >= self.end_offset {
+                continue;
+            }
+
+            let old_offset = self.window_offset;
+            self.window_offset += self.bin_size;
+
+            if !self.still_needs_bin(computation_state, old_offset) {
+                continue;
+            }
+
+            let bin = Window::from_start_len(old_offset, self.bin_size);
+            self.compute_bin = Some(ComputeBin::new_full(bin));
         }
 
         Some(FinishedWork)

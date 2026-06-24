@@ -57,9 +57,6 @@ pub struct MetricComputation {
     map_out_index: usize,
 }
 
-/// The number of bins to prefetch.
-const PREFETCH_COUNT: usize = 64;
-
 /// Computes the quality from the given bin size.
 fn estimation_quality_from_bin_size(bin_size: Len) -> MetricsQuality {
     if bin_size == MIN_SAMPLE_SIZE {
@@ -78,7 +75,7 @@ impl MetricComputation {
         let window_index = computation_state.last_window_index();
         let (bin_size, aligned_window) = computation_state.innermost_bin_size_and_aligned_window();
 
-        let mut out = MetricComputation {
+        MetricComputation {
             mode,
             window_index,
             bin_size,
@@ -102,9 +99,12 @@ impl MetricComputation {
             },
             is_map: true,
             map_out_index: 0,
-        };
+        }
+    }
 
-        out
+    /// Returns the computation mode of this metrics computation.
+    pub fn mode(&self) -> &ComputationMode {
+        &self.mode
     }
 
     /// Prepares the state for the next window.
@@ -126,7 +126,7 @@ impl MetricComputation {
         self.is_map = false;
     }
 
-    /// Returns an iterator containing bins contained in the bin at `offset`.
+    /// Returns an iterator over sub-bin metrics contained in the bin at `offset`.
     fn contained_bins(
         &self,
         offset: AbsoluteOffset,
@@ -192,11 +192,29 @@ impl MetricComputation {
     }
 
     /// The size to sample at.
-    fn sample_size(&self) -> Len {
+    fn computation_size(&self) -> Len {
         match self.mode {
             ComputationMode::Estimation => MIN_SAMPLE_SIZE,
             ComputationMode::FullQuality => self.bin_size,
         }
+    }
+
+    /// Advances the bin computation if one is happening.
+    fn advance_bin_computation(
+        &mut self,
+        computation_state: &mut ComputationState,
+    ) -> Option<FinishedWork> {
+        if let Some(compute_bin) = self.compute_bin.as_mut() {
+            compute_bin.advance(computation_state)?;
+            let compute_bin = self.compute_bin.take().unwrap();
+            let (statistics, bin) = compute_bin.statistics_and_bin();
+            let metrics = statistics.metrics();
+
+            computation_state.derived_values.insert(bin, metrics);
+            self.write_metrics(metrics, computation_state);
+        }
+
+        Some(FinishedWork)
     }
 
     /// Continues the current work.
@@ -204,16 +222,7 @@ impl MetricComputation {
         loop {
             while self.window_offset < self.end_offset {
                 computation_state.maybe_yield()?;
-
-                if let Some(compute_bin) = self.compute_bin.as_mut() {
-                    compute_bin.advance(computation_state)?;
-                    let compute_bin = self.compute_bin.take().unwrap();
-                    let (statistics, bin) = compute_bin.statistics_and_bin();
-                    let metrics = statistics.metrics();
-
-                    computation_state.derived_values.insert(bin, metrics);
-                    self.write_metrics(metrics, computation_state);
-                }
+                self.advance_bin_computation(computation_state)?;
 
                 let cached_result = self.cached_result(computation_state);
 
@@ -226,21 +235,35 @@ impl MetricComputation {
                     continue;
                 }
 
-                let sample_window = Window::from_start_len(old_offset, self.sample_size());
+                let computation_window =
+                    Window::from_start_len(old_offset, self.computation_size());
 
-                let compute_result =
-                    DownsampledBigramStatistics::compute(&computation_state.input, sample_window);
+                match self.mode {
+                    ComputationMode::Estimation => {
+                        // don't use the compute bin mechanism for estimation to avoid polluting the statistics tree with stray MIN_SAMPLE_SIZE windows that cannot be merged
+                        let compute_result = DownsampledBigramStatistics::compute(
+                            &computation_state.input,
+                            computation_window,
+                        );
 
-                let Ok(statistics) = compute_result else {
-                    continue;
-                };
-                let metrics = statistics.metrics();
-                computation_state
-                    .derived_values
-                    .insert(sample_window, metrics);
+                        let Ok(statistics) = compute_result else {
+                            continue;
+                        };
+                        let metrics = statistics.metrics();
+                        computation_state
+                            .derived_values
+                            .insert(computation_window, metrics);
 
-                self.write_metrics(metrics, computation_state);
+                        self.write_metrics(metrics, computation_state);
+                    }
+                    ComputationMode::FullQuality => {
+                        self.compute_bin = Some(ComputeBin::new_downsampled(computation_window));
+                    }
+                }
             }
+
+            // make sure the final bin is finished
+            self.advance_bin_computation(computation_state)?;
 
             if self.window_index == 0 {
                 break;

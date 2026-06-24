@@ -113,9 +113,11 @@ impl BackgroundStatisticsEngine {
         if let Some(request) = &self.computation_state.latest_request {
             self.computation_state
                 .statistics_tree
-                .garbage_collect(800 * 1024 * 1024, &request.windows);
+                .garbage_collect(500 * 1024 * 1024, &request.windows);
+            self.computation_state
+                .downsampled_statistics_tree
+                .garbage_collect(500 * 1024 * 1024, &request.windows);
         }
-        // TODO: choose a smarter limit
         // TODO: garbage collect scalars as well
     }
 
