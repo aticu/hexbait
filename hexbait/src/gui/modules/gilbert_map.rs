@@ -1,6 +1,6 @@
 //! Implements the byte-view gilbert module.
 
-use egui::{Color32, Sense, Ui};
+use egui::{Color32, Sense, Stroke, Ui, vec2};
 use hexbait_common::{Input, Len, RelativeOffset};
 
 use crate::{
@@ -269,6 +269,15 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
             }
         },
     );
+
+    if let Some(innermost_bar_hover_pos) = state.scroll_state.innermost_bar_hover_position {
+        let pixel_pos = (innermost_bar_hover_pos * (pixel_budget - 1) as f32) as usize;
+        let point = gilbert_curve.point_from_index(pixel_pos.min(pixel_budget as usize - 1));
+        let pos = rect.min + vec2(point.x as f32, point.y as f32);
+
+        ui.painter()
+            .circle(pos, 5.0, Color32::BLACK, Stroke::new(2.0, Color32::WHITE));
+    }
 
     if response.clicked()
         && let Some(hover_position) = hover_position

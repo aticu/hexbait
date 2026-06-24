@@ -1,8 +1,8 @@
 //! Implements scrollbars to zoom in on the content of a file and scroll around in it.
 
 use egui::{
-    Color32, Context, FontId, PointerButton, PopupAnchor, Pos2, Rect, Sense, Shape, Stroke,
-    Tooltip, Ui, pos2, vec2,
+    Color32, Context, FontId, PointerButton, PopupAnchor, Pos2, Rect, Response, Sense, Shape,
+    Stroke, Tooltip, Ui, pos2, vec2,
 };
 use hexbait_common::{AbsoluteOffset, Input, Len, RelativeOffset};
 use size_format::SizeFormatterBinary;
@@ -141,7 +141,7 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
                     1
                 },
         );
-        render_bar(
+        let bar_response = render_bar(
             ui,
             &mut state.scroll_state.scrollbars[i],
             &state.settings,
@@ -157,6 +157,17 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
                 (metrics, quality)
             },
         );
+        if i == state.scroll_state.scrollbars.len() - 1 {
+            if let Some(hover_pos) = bar_response.hover_pos() {
+                let hover_pos = hover_pos - bar_response.rect.min;
+                let hover_pos_px = hover_pos.y * bar_response.rect.width() + hover_pos.x;
+
+                state.scroll_state.innermost_bar_hover_position =
+                    Some((hover_pos_px as f32 / bar_response.rect.area()).clamp(0.0, 1.0));
+            } else {
+                state.scroll_state.innermost_bar_hover_position = None;
+            }
+        }
 
         let selection_start = pos2(
             rect.max.x,
@@ -369,7 +380,7 @@ fn render_bar(
     window: Window,
     selected_window: (f64, f64),
     mut metrics: impl FnMut(usize) -> (Option<StatisticsMetrics>, MetricsQuality),
-) {
+) -> Response {
     let selection_start = (selected_window.0 * rect.height() as f64).round() as usize;
     let selection_end = (selected_window.1 * rect.height() as f64).round() as usize;
 
@@ -490,7 +501,7 @@ fn render_bar(
         scrollbar.selection_overlay.require_repaint();
     }
 
-    ui.allocate_rect(rect, Sense::hover());
+    ui.allocate_rect(rect, Sense::hover())
 }
 
 /// Returns the position of `offset` on the bar spanning `bar_window` displayed in `bar_rect`.

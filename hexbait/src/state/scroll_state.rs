@@ -42,6 +42,8 @@ pub struct ScrollState {
     /// The percentage of the hovered section of the innermost bar.
     pub hover_selection_size: f32,
     /// The currently hovered position on the innermost bar.
+    pub innermost_bar_hover_position: Option<f32>,
+    /// The currently hovered position on the gilbert map.
     pub gilbert_hover_position: Option<f32>,
     /// The pixel budget of the gilbert map.
     pub gilbert_pixel_budget: u64,
@@ -71,6 +73,7 @@ impl ScrollState {
             gilbert_map_hover_cached_image: CachedImage::new(false),
             gilbert_curve: Cached::new(),
             hover_selection_size: 0.25,
+            innermost_bar_hover_position: None,
             gilbert_hover_position: None,
             // start with a non-zero pixel budget just to be safe
             gilbert_pixel_budget: 1,
