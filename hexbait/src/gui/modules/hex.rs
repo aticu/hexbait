@@ -273,10 +273,13 @@ fn render_row(
             if let Some(origin) = ui.input(|input| input.pointer.latest_pos())
                 && response.rect.contains(origin)
             {
+                let (primary_pressed, shift_pressed) =
+                    ui.input(|input| (input.pointer.primary_pressed(), input.modifiers.shift));
+
                 selection_state.handle_interaction(
                     offset,
-                    ui.input(|input| input.pointer.primary_pressed())
-                        && response.is_pointer_button_down_on(),
+                    primary_pressed && response.is_pointer_button_down_on(),
+                    shift_pressed,
                 );
             }
         };

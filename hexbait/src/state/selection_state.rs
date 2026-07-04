@@ -47,11 +47,20 @@ impl SelectionState {
     }
 
     /// Handles an interaction with the given byte.
-    pub fn handle_interaction(&mut self, offset: AbsoluteOffset, clicked: bool) {
+    pub fn handle_interaction(
+        &mut self,
+        offset: AbsoluteOffset,
+        clicked: bool,
+        shift_pressed: bool,
+    ) {
         if self.selecting {
             self.selection = Some(*self.selection.as_ref().unwrap().start()..=offset);
         } else if clicked {
-            self.start_selection(offset);
+            if shift_pressed {
+                self.selection = Some(*self.selection.as_ref().unwrap().start()..=offset);
+            } else {
+                self.start_selection(offset);
+            }
         }
     }
 
