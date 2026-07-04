@@ -1,7 +1,5 @@
 //! Renders hexdumps in the GUI.
 
-use std::ops::ControlFlow;
-
 use egui::{Color32, Rect, Sense, Ui, Vec2};
 use hexbait_common::{AbsoluteOffset, Input, Len};
 
@@ -9,7 +7,7 @@ use crate::{
     gui::{
         color,
         highlighting::highlight,
-        marking::render_locations_on_bar,
+        marking::{hover_marking, render_locations_on_bar},
         modules::bars::{SIDE_BAR_WIDTH, highest_aligned_value},
         primitives::{render_glyph, render_hex, render_offset},
     },
@@ -82,11 +80,11 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
             state.marked_locations.add(selection, MarkType::Selection);
         }
 
-        let _ = state.marked_locations.iter_marks_in_window(
+        state.marked_locations.iter_marks_in_window(
             Window::from_start_len(start, Len::from(window.len() as u64)),
             |mark| {
                 let Some(range) = mark.window.range_inclusive() else {
-                    return ControlFlow::Continue(());
+                    return;
                 };
                 highlight(
                     ui,
@@ -98,7 +96,6 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
                     rows_onscreen,
                     &state.settings,
                 );
-                ControlFlow::Continue(())
             },
         );
 
@@ -178,17 +175,7 @@ fn handle_scrolling(
 
 /// Renders the context menu for a byte at the given offset.
 fn byte_context_menu(ui: &mut Ui, state: &mut State, input: &Input, offset: AbsoluteOffset) {
-    let mut is_marked = false;
-    let _ = state.marked_locations.iter_marks_in_window(
-        Window::from_start_len(offset, Len::from(1)),
-        |mark| {
-            if matches!(mark.ty, MarkType::UserMark { .. }) && mark.window.start() == offset {
-                is_marked = true;
-                return ControlFlow::Break(());
-            }
-            ControlFlow::Continue(())
-        },
-    );
+    let is_marked = state.marked_locations.user_mark_at_pos(offset).is_some();
 
     #[expect(clippy::collapsible_else_if, reason = "code reads cleaner this way")]
     if is_marked {
@@ -201,7 +188,9 @@ fn byte_context_menu(ui: &mut Ui, state: &mut State, input: &Input, offset: Abso
         if ui.button("Mark").clicked() {
             state.marked_locations.add(
                 Window::from_start_len(offset, Len::from(1)),
-                MarkType::UserMark { name: None },
+                MarkType::UserMark {
+                    name: state.marked_locations.current_mark_name.clone(),
+                },
             );
         }
     }
@@ -299,16 +288,18 @@ fn render_row(
         let render_offset_info =
             |ui: &mut Ui, byte_offset: AbsoluteOffset, selection: Option<Window>| {
                 ui.label(format!(
-                    "offset from file start: 0x{:x} ({byte_offset:?})",
+                    "offset from file start: 0x{:x} ({byte_offset:?}, {}B)",
                     byte_offset.as_u64(),
+                    size_format::SizeFormatterBinary::new(byte_offset.as_u64())
                 ));
                 if let Some(selection) = selection {
                     let selection_offset =
                         byte_offset.as_u64() as i64 - selection.start().as_u64() as i64;
                     ui.label(format!(
-                        "offset from selection start: {}0x{:x} ({selection_offset})",
-                        if selection_offset < 0 { "-" } else { "" },
-                        selection_offset.abs()
+                        "offset from selection start: {sign}0x{:x} ({selection_offset}, {sign}{}B)",
+                        selection_offset.unsigned_abs(),
+                        size_format::SizeFormatterBinary::new(selection_offset.unsigned_abs()),
+                        sign = if selection_offset < 0 { "-" } else { "" },
                     ));
                 }
             };
@@ -316,7 +307,11 @@ fn render_row(
         // offset
         render_offset(ui, &state.settings, Sense::hover(), offset).on_hover_ui(|ui| {
             let percentage = offset.as_u64() as f64 / file_size.as_u64() as f64 * 100.0;
-            ui.label(format!("{percentage:.02}% of file"));
+            ui.label(format!(
+                "{} ({}B) {percentage:.02}% of file",
+                offset.as_u64(),
+                size_format::SizeFormatterBinary::new(offset.as_u64())
+            ));
         });
         ui.add_space(state.settings.large_space());
 
@@ -338,6 +333,10 @@ fn render_row(
             response.on_hover_ui(|ui| {
                 render_glyph(ui, &state.settings, Sense::hover(), byte);
                 render_offset_info(ui, byte_offset, state.selection_state.selected_window());
+                if let Some(mark) = state.marked_locations.mark_at_pos(byte_offset) {
+                    ui.separator();
+                    hover_marking(ui, mark);
+                }
             });
 
             if i < 15 {
@@ -381,6 +380,10 @@ fn render_row(
             response.on_hover_ui(|ui| {
                 render_hex(ui, &state.settings, Sense::hover(), byte);
                 render_offset_info(ui, byte_offset, state.selection_state.selected_window());
+                if let Some(mark) = state.marked_locations.mark_at_pos(byte_offset) {
+                    ui.separator();
+                    hover_marking(ui, mark);
+                }
             });
         }
     });

@@ -1,17 +1,50 @@
 //! Implements marking of locations.
 
-use std::{collections::BTreeMap, ops::ControlFlow};
+use std::collections::BTreeMap;
 
-use egui::{Color32, Rect, Stroke, Ui, pos2};
+use egui::{Color32, Rect, RichText, Stroke, Ui, pos2};
 use hexbait_common::Len;
 
 use crate::{
     gui::{highlighting::trace_path, modules::scrollbars::offset_on_bar},
-    marking::MarkStore,
+    marking::{MarkRef, MarkStore, MarkType},
     window::Window,
 };
 
 use super::color;
+
+/// Shows the hover overlay for a marked location.
+pub fn hover_marking(ui: &mut Ui, mark: MarkRef) {
+    let description = match &mark.ty {
+        MarkType::SearchResult => "Search result",
+        MarkType::UserMark { .. } => "User mark",
+        MarkType::Selection => "Selection",
+        MarkType::HoveredParsed => "Hovered parsed value",
+        MarkType::HoveredParseErr => "Hovered parsing error",
+    };
+
+    ui.label(description);
+    if let MarkType::UserMark { name } = &mark.ty {
+        if name.is_empty() {
+            ui.label(RichText::new("unnamed").italics());
+        } else {
+            ui.label(name);
+        }
+    }
+
+    ui.label(format!(
+        "Offset: {} ({}B)",
+        mark.window.start().as_u64(),
+        size_format::SizeFormatterBinary::new(mark.window.start().as_u64())
+    ));
+    if mark.window.size() > Len::from(1) {
+        ui.label(format!(
+            "Length: {} ({}B)",
+            mark.window.size().as_u64(),
+            size_format::SizeFormatterBinary::new(mark.window.size().as_u64())
+        ));
+    }
+}
 
 /// Renders the given marked locations on the given bar window.
 pub fn render_locations_on_bar(
@@ -32,7 +65,7 @@ pub fn render_locations_on_bar(
     let bar_start = offset_on_bar(bar_rect, bar_window, bar_window.start()).unwrap();
     let bar_end = offset_on_bar(bar_rect, bar_window, bar_window.end() - Len::from(1)).unwrap();
 
-    let _ = marked_locations.iter_marks_in_window(bar_window, |mark| {
+    marked_locations.iter_marks_in_window(bar_window, |mark| {
         let start_pos = offset_on_bar(bar_rect, bar_window, mark.window.start());
         let end_pos = offset_on_bar(bar_rect, bar_window, mark.window.end());
 
@@ -40,7 +73,7 @@ pub fn render_locations_on_bar(
         let bin_size_x = bar_rect.width() / 16.0;
 
         match (start_pos, end_pos) {
-            (None, None) => return ControlFlow::Continue(()),
+            (None, None) => return,
             (Some(start), None) => {
                 draw_range = start..bar_end;
             }
@@ -55,7 +88,7 @@ pub fn render_locations_on_bar(
                     }
 
                     location_dots_by_y_bins.entry(bin).or_default().push(mark);
-                    return ControlFlow::Continue(());
+                    return;
                 } else {
                     draw_range = start..end;
                 }
@@ -107,8 +140,6 @@ pub fn render_locations_on_bar(
         points.push(top_rect.left_bottom());
 
         trace_path(ui.painter(), &points, 1.0, 0.0, mark.ty.border_color());
-
-        ControlFlow::Continue(())
     });
 
     let mut mark_location = None;

@@ -12,7 +12,7 @@ use crate::{
     gui::{
         color,
         image_processing::blur_image,
-        marking::render_locations_on_bar,
+        marking::{hover_marking, render_locations_on_bar},
         modules::bars::{LARGE_ALIGNMENT_MARKER_DIFF, SIDE_BAR_WIDTH, highest_aligned_value},
     },
     state::{DisplayType, InteractionState, ScrollState, Scrollbar, Settings, State},
@@ -201,7 +201,6 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
                     .unwrap_or(false)
             })
         {
-            let offset = mark.window.start();
             Tooltip::always_open(
                 ui.ctx().clone(),
                 ui.layer_id(),
@@ -209,10 +208,12 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
                 PopupAnchor::Pointer,
             )
             .show(|ui| {
-                ui.label(format!("{}", offset.as_u64()));
+                hover_marking(ui, mark.as_ref());
             });
             if ui.input(|input| input.pointer.primary_clicked()) {
-                state.scroll_state.rearrange_bars_for_point(i, offset);
+                state
+                    .scroll_state
+                    .rearrange_bars_for_point(i, mark.window.start());
                 show_hex = true;
                 break;
             }

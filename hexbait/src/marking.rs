@@ -3,6 +3,7 @@
 use std::{collections::BTreeMap, ops::ControlFlow};
 
 use egui::Color32;
+use hexbait_common::{AbsoluteOffset, Len};
 
 use crate::{marking::store::SingleTypeStore, window::Window};
 
@@ -36,6 +37,16 @@ pub struct Mark {
     pub ty: MarkType,
 }
 
+impl Mark {
+    /// Returns this mark as a reference.
+    pub fn as_ref(&self) -> MarkRef<'_> {
+        MarkRef {
+            window: self.window,
+            ty: &self.ty,
+        }
+    }
+}
+
 impl PartialEq<Mark> for MarkRef<'_> {
     fn eq(&self, other: &Mark) -> bool {
         self.window == other.window && self.ty == &other.ty
@@ -56,7 +67,7 @@ pub enum MarkType {
     /// A location marked by a user.
     UserMark {
         /// The name of the marked location.
-        name: Option<String>,
+        name: String,
     },
     /// A user selection.
     Selection,
@@ -98,6 +109,8 @@ pub struct MarkStore {
     hovered_location: Option<Mark>,
     /// The new location that was hovered this frame.
     new_hovered_location: Option<Mark>,
+    /// The name of the current mark.
+    pub current_mark_name: String,
 }
 
 impl MarkStore {
@@ -107,6 +120,7 @@ impl MarkStore {
             per_type: BTreeMap::new(),
             hovered_location: None,
             new_hovered_location: None,
+            current_mark_name: String::new(),
         }
     }
 
@@ -152,13 +166,59 @@ impl MarkStore {
     pub fn iter_marks_in_window<'store>(
         &'store self,
         window: Window,
-        mut out: impl FnMut(MarkRef<'store>) -> ControlFlow<()>,
-    ) -> ControlFlow<()> {
+        mut out: impl FnMut(MarkRef<'store>),
+    ) {
         for (ty, store) in &self.per_type {
-            store.query_window(window, |window| out(MarkRef { window, ty }))?;
+            let _ = store.query_window(window, |window| {
+                out(MarkRef { window, ty });
+                ControlFlow::Continue(())
+            });
+        }
+    }
+
+    /// Returns the "best" mark at the position.
+    ///
+    /// The exact algorithm used is unspecified and may change in the future.
+    pub fn mark_at_pos<'store>(&'store self, offset: AbsoluteOffset) -> Option<MarkRef<'store>> {
+        let mut out = None;
+
+        let key =
+            |mark: MarkRef<'store>| (std::cmp::Reverse(mark.window.size()), mark.ty, mark.window);
+
+        for (ty, store) in &self.per_type {
+            let _ = store.query_window(Window::from_start_len(offset, Len::from(1)), |window| {
+                let mark = MarkRef { window, ty };
+                match out {
+                    Some(current_out) if key(mark) > key(current_out) => out = Some(mark),
+                    None => out = Some(mark),
+                    _ => (),
+                }
+                ControlFlow::Continue(())
+            });
         }
 
-        ControlFlow::Continue(())
+        out
+    }
+
+    /// Returns the mark at the given position.
+    pub fn user_mark_at_pos(&self, offset: AbsoluteOffset) -> Option<MarkRef<'_>> {
+        let mut out = None;
+
+        for (ty, store) in &self.per_type {
+            if !matches!(ty, MarkType::UserMark { .. }) {
+                continue;
+            }
+
+            let _ = store.query_window(Window::from_start_len(offset, Len::from(1)), |window| {
+                out = Some(MarkRef { window, ty });
+                ControlFlow::Break(())
+            });
+            if out.is_some() {
+                return out;
+            }
+        }
+
+        out
     }
 
     /// Returns the number of marks with the given type.

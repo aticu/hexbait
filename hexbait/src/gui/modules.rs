@@ -12,6 +12,7 @@ pub mod data_inspector;
 pub mod gilbert_map;
 pub mod hex;
 pub mod inspector;
+pub mod marking;
 pub mod parsed_value;
 pub mod scrollbars;
 pub mod search;
@@ -36,6 +37,8 @@ pub enum TabType {
     Search,
     /// Shows the classification info module.
     ClassificationInfo,
+    /// Shows the marking menu.
+    Marking,
 }
 
 /// The context for the hexbait application.
@@ -63,6 +66,7 @@ impl egui_dock::TabViewer for Context {
             TabType::Settings => settings::show,
             TabType::Search => search::show,
             TabType::ClassificationInfo => classification_info::show,
+            TabType::Marking => marking::show,
         };
 
         show_fn(ui, &mut self.state, &self.input);
@@ -96,7 +100,7 @@ pub fn hex_dock_state() -> DockState<TabType> {
 
     surface.set_focused_node(parsed_value);
     surface.push_to_focused_leaf(TabType::Search);
-    surface.push_to_focused_leaf(TabType::ClassificationInfo);
+    surface.push_to_focused_leaf(TabType::Marking);
     surface.set_active_tab(parsed_value, 0);
 
     dock_state

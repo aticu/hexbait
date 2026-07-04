@@ -103,6 +103,7 @@ impl eframe::App for HexbaitApp {
                         TabType::Settings,
                         TabType::Search,
                         TabType::ClassificationInfo,
+                        TabType::Marking,
                     ] {
                         let open = self.dock_state.find_tab(tab).is_some();
 
