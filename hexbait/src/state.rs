@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 pub use classification_state::ClassificationState;
 use hexbait_common::{Endianness, Input};
-pub use parse_state::ParseState;
+pub use parse_state::{ParseState, ParseType};
 pub use scroll_state::{InteractionState, ScrollState, Scrollbar};
 pub use search_state::SearchState;
 pub use selection_state::SelectionState;
@@ -50,14 +50,14 @@ pub struct State {
 
 impl State {
     /// Creates new state for the hexbait application.
-    pub fn new(input: &Input, custom_parser: Option<PathBuf>) -> State {
+    pub fn new(input: &Input, custom_parsers: Vec<PathBuf>) -> State {
         State {
             settings: Settings::new(),
             search: SearchState::new(input),
             scroll_state: ScrollState::new(input),
             selection_state: SelectionState::new(),
             statistics_display_state: StatisticsDisplayState::new(),
-            parse_state: ParseState::new(custom_parser),
+            parse_state: ParseState::new(custom_parsers),
             classification_state: ClassificationState::new(),
             statistics_handler: StatisticsHandler::new(input.clone()),
             marked_locations: MarkedLocations::new(),

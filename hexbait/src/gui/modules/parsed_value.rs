@@ -12,7 +12,7 @@ use hexbait_lang::{
 
 use crate::{
     gui::marking::{MarkedLocation, MarkingKind},
-    state::State,
+    state::{ParseType, State},
 };
 
 /// Shows the parsed value module.
@@ -20,23 +20,34 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     ui.horizontal(|ui| {
         ui.label("Parse as:");
         egui::ComboBox::new("parse_type", "")
-            .selected_text(state.parse_state.parse_type)
+            .selected_text(state.parse_state.parse_type.as_str())
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut state.parse_state.parse_type, "none", "none");
-                if state.parse_state.custom_parser.is_some() {
+                ui.selectable_value(
+                    &mut state.parse_state.parse_type,
+                    ParseType::None,
+                    ParseType::None.as_str(),
+                );
+                for path in &state.parse_state.custom_parsers {
+                    let value = ParseType::Custom(path.clone());
                     ui.selectable_value(
                         &mut state.parse_state.parse_type,
-                        "custom parser",
-                        "custom parser",
+                        value.clone(),
+                        value.as_str(),
                     );
                 }
                 for description in state.parse_state.built_in_format_descriptions.keys() {
+                    let value = ParseType::Builtin(description);
                     ui.selectable_value(
                         &mut state.parse_state.parse_type,
-                        description,
-                        *description,
+                        value.clone(),
+                        value.as_str(),
                     );
                 }
+            });
+
+        ui.label(RichText::new("⚠").color(ui.visuals().warn_fg_color))
+            .on_hover_ui(|ui| {
+                ui.label("Parsed value definitions are in beta and may not treat all cases correctly. Treat with care.");
             });
     });
 
@@ -82,32 +93,25 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     });
 
     let ir;
-    let parse_type = if state.parse_state.parse_type == "custom parser" {
-        'parse_type: {
-            let Ok(content) = std::fs::read_to_string(
-                state
-                    .parse_state
-                    .custom_parser
-                    .as_ref()
-                    .expect("if a custom parser is selected it should also exist"),
-            ) else {
-                break 'parse_type None;
-            };
-
-            let parse = hexbait_lang::parse(&content);
-            if !parse.errors.is_empty() {
-                break 'parse_type None;
+    let parse_type = 'parse_type: {
+        match &state.parse_state.parse_type {
+            ParseType::None => None,
+            ParseType::Builtin(builtin) => {
+                state.parse_state.built_in_format_descriptions.get(builtin)
             }
+            ParseType::Custom(path) => {
+                let Ok(content) = std::fs::read_to_string(path) else {
+                    break 'parse_type None;
+                };
+                let parse = hexbait_lang::parse(&content);
+                if !parse.errors.is_empty() {
+                    break 'parse_type None;
+                }
+                ir = hexbait_lang::ir::lower_file(parse.ast);
 
-            ir = hexbait_lang::ir::lower_file(parse.ast);
-
-            Some(&ir)
+                Some(&ir)
+            }
         }
-    } else {
-        state
-            .parse_state
-            .built_in_format_descriptions
-            .get(state.parse_state.parse_type)
     };
 
     let Some(parse_type) = parse_type else { return };

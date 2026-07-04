@@ -40,7 +40,7 @@ struct Config {
     file: Option<PathBuf>,
     /// A parser definition file to supply additional parsers
     #[arg(short, long)]
-    parser_definition: Option<PathBuf>,
+    parser_definitions: Vec<PathBuf>,
 }
 
 /// The main entry point for the application.
@@ -71,7 +71,7 @@ fn main() -> eframe::Result {
             Ok(Box::new(HexbaitApp {
                 frame_time: std::time::Duration::ZERO,
                 context: Context {
-                    state: State::new(&input, config.parser_definition),
+                    state: State::new(&input, config.parser_definitions),
                     input,
                 },
                 dock_state: hex_dock_state(),
