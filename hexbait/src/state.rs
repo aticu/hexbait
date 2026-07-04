@@ -12,7 +12,7 @@ pub use settings::{Settings, ViewKind};
 pub use statistics_display_state::StatisticsDisplayState;
 
 use crate::{
-    gui::marking::{MarkedLocation, MarkedLocations, MarkingKind},
+    marking::{MarkStore, MarkType},
     statistics::{StatisticsHandler, classification::classify_selected_window},
 };
 
@@ -43,7 +43,7 @@ pub struct State {
     /// The statistics handler used to collect statistics about the input.
     pub statistics_handler: StatisticsHandler,
     /// The marked locations.
-    pub marked_locations: MarkedLocations,
+    pub marked_locations: MarkStore,
     /// The currently selected endianness.
     pub endianness: Endianness,
 }
@@ -60,7 +60,7 @@ impl State {
             parse_state: ParseState::new(custom_parsers),
             classification_state: ClassificationState::new(),
             statistics_handler: StatisticsHandler::new(input.clone()),
-            marked_locations: MarkedLocations::new(),
+            marked_locations: MarkStore::new(),
             endianness: Endianness::native(),
         }
     }
@@ -70,12 +70,10 @@ impl State {
         self.statistics_handler
             .end_of_frame(&self.settings, &self.scroll_state);
 
-        self.marked_locations
-            .remove_where(|loc| loc.kind() == MarkingKind::SearchResult);
-        for result in self.search.searcher.results().iter() {
-            self.marked_locations
-                .add(MarkedLocation::new(*result, MarkingKind::SearchResult));
-        }
+        self.marked_locations.batch_add(
+            std::mem::take(&mut *self.search.searcher.results()).into_iter(),
+            MarkType::SearchResult,
+        );
         self.marked_locations.end_of_frame();
 
         if self.parse_state.sync_parse_offset_to_selection_start

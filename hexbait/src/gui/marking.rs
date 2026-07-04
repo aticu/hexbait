@@ -1,159 +1,24 @@
 //! Implements marking of locations.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::ControlFlow};
 
 use egui::{Color32, Rect, Stroke, Ui, pos2};
-use hexbait_common::{AbsoluteOffset, Len};
+use hexbait_common::Len;
 
 use crate::{
     gui::{highlighting::trace_path, modules::scrollbars::offset_on_bar},
+    marking::MarkStore,
     window::Window,
 };
 
 use super::color;
-
-/// Stores the marked locations to highlight.
-pub struct MarkedLocations {
-    /// The locations that should be highlighted.
-    locations: BTreeMap<AbsoluteOffset, Vec<MarkedLocation>>,
-    /// The currently hovered location.
-    hovered_location: Option<MarkedLocation>,
-    /// The location that was hovered this frame.
-    new_hovered_location: Option<MarkedLocation>,
-}
-
-impl MarkedLocations {
-    /// Creates a new empty list of marked locations.
-    pub fn new() -> MarkedLocations {
-        MarkedLocations {
-            locations: BTreeMap::new(),
-            hovered_location: None,
-            new_hovered_location: None,
-        }
-    }
-
-    /// Adds a new marked location to be displayed.
-    pub fn add(&mut self, marked_location: MarkedLocation) {
-        self.locations
-            .entry(marked_location.window.start())
-            .or_default()
-            .push(marked_location);
-    }
-
-    /// Remove marked locations that match the given filter.
-    pub fn remove_where(&mut self, mut filter: impl FnMut(&MarkedLocation) -> bool) {
-        for location_list in self.locations.values_mut() {
-            location_list.retain(|location| !filter(location));
-        }
-    }
-
-    /// Iterates over all marked locations that overlap with the given window in no specific order.
-    pub fn iter_window(&self, window: Window) -> impl Iterator<Item = &MarkedLocation> {
-        self.locations
-            .iter()
-            .flat_map(|(_, locations_at_start)| locations_at_start.iter())
-            .filter(move |marked_location| marked_location.window().overlaps(window))
-    }
-
-    /// The currently hovered location.
-    pub fn hovered(&self) -> Option<&MarkedLocation> {
-        if let Some(location) = &self.hovered_location {
-            self.locations
-                .get(&location.window().start())
-                .unwrap()
-                .iter()
-                .find(|&loc| location == loc)
-        } else {
-            None
-        }
-    }
-
-    /// Returns a mutable reference to the currently hovered location.
-    pub fn mark_hovered(&mut self, location: MarkedLocation) {
-        self.new_hovered_location = Some(location);
-    }
-
-    /// Marks the end of the frame, updating the marked location.
-    pub fn end_of_frame(&mut self) {
-        self.hovered_location = self.new_hovered_location.take();
-    }
-}
-
-impl Default for MarkedLocations {
-    fn default() -> Self {
-        MarkedLocations::new()
-    }
-}
-
-/// A marked location.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MarkedLocation {
-    /// The window that this location refers to.
-    window: Window,
-    /// The kind of the marked location.
-    kind: MarkingKind,
-}
-
-impl MarkedLocation {
-    /// Creates a new marked location on the given window.
-    pub fn new(window: Window, kind: MarkingKind) -> MarkedLocation {
-        MarkedLocation { window, kind }
-    }
-
-    /// The window covered by this marked location.
-    pub fn window(&self) -> Window {
-        self.window
-    }
-
-    /// The kind of the marked location.
-    pub fn kind(&self) -> MarkingKind {
-        self.kind
-    }
-
-    /// The inner color of this marked location.
-    pub fn inner_color(&self) -> Color32 {
-        match self.kind() {
-            MarkingKind::Selection => Color32::WHITE,
-            MarkingKind::HoveredParsed => Color32::DARK_RED,
-            MarkingKind::HoveredParseErr => Color32::WHITE,
-            MarkingKind::SearchResult => Color32::BLUE,
-            MarkingKind::UserMark => Color32::WHITE,
-        }
-    }
-
-    /// The border color of this marked location.
-    pub fn border_color(&self) -> Color32 {
-        match self.kind() {
-            MarkingKind::Selection => Color32::WHITE,
-            MarkingKind::HoveredParsed => Color32::GOLD,
-            MarkingKind::HoveredParseErr => Color32::LIGHT_RED,
-            MarkingKind::SearchResult => Color32::from_rgb(252, 15, 192),
-            MarkingKind::UserMark => Color32::DARK_RED,
-        }
-    }
-}
-
-/// The kind of marked location.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MarkingKind {
-    /// The location is marked, because the user selected it.
-    Selection,
-    /// The location is marked, because the user hovered the parsed value.
-    HoveredParsed,
-    /// The location is marked, because the user hovered a parsing error.
-    HoveredParseErr,
-    /// The location is marked, because it was found by a search.
-    SearchResult,
-    /// The location is marked, because the user marked it.
-    UserMark,
-}
 
 /// Renders the given marked locations on the given bar window.
 pub fn render_locations_on_bar(
     ui: &mut Ui,
     bar_rect: Rect,
     bar_window: Window,
-    marked_locations: &mut MarkedLocations,
+    marked_locations: &mut MarkStore,
 ) {
     // first bin locations to similar y offsets, so that they don't overlap
     let mut location_dots_by_y_bins = BTreeMap::<u32, Vec<_>>::new();
@@ -167,15 +32,15 @@ pub fn render_locations_on_bar(
     let bar_start = offset_on_bar(bar_rect, bar_window, bar_window.start()).unwrap();
     let bar_end = offset_on_bar(bar_rect, bar_window, bar_window.end() - Len::from(1)).unwrap();
 
-    for location in marked_locations.iter_window(bar_window) {
-        let start_pos = offset_on_bar(bar_rect, bar_window, location.window.start());
-        let end_pos = offset_on_bar(bar_rect, bar_window, location.window.end());
+    let _ = marked_locations.iter_marks_in_window(bar_window, |mark| {
+        let start_pos = offset_on_bar(bar_rect, bar_window, mark.window.start());
+        let end_pos = offset_on_bar(bar_rect, bar_window, mark.window.end());
 
         let draw_range;
         let bin_size_x = bar_rect.width() / 16.0;
 
         match (start_pos, end_pos) {
-            (None, None) => continue,
+            (None, None) => return ControlFlow::Continue(()),
             (Some(start), None) => {
                 draw_range = start..bar_end;
             }
@@ -189,11 +54,8 @@ pub fn render_locations_on_bar(
                         bin += BIN_SIZE;
                     }
 
-                    location_dots_by_y_bins
-                        .entry(bin)
-                        .or_default()
-                        .push(location);
-                    continue;
+                    location_dots_by_y_bins.entry(bin).or_default().push(mark);
+                    return ControlFlow::Continue(());
                 } else {
                     draw_range = start..end;
                 }
@@ -226,7 +88,7 @@ pub fn render_locations_on_bar(
             ui.painter().rect_filled(
                 rect,
                 0.0,
-                color::lerp(location.inner_color(), Color32::TRANSPARENT, TRANSPARENCY),
+                color::lerp(mark.ty.inner_color(), Color32::TRANSPARENT, TRANSPARENCY),
             );
         }
 
@@ -244,13 +106,15 @@ pub fn render_locations_on_bar(
         points.push(middle_rect.left_top());
         points.push(top_rect.left_bottom());
 
-        trace_path(ui.painter(), &points, 1.0, 0.0, location.border_color());
-    }
+        trace_path(ui.painter(), &points, 1.0, 0.0, mark.ty.border_color());
+
+        ControlFlow::Continue(())
+    });
 
     let mut mark_location = None;
 
     for (y, mut locations) in location_dots_by_y_bins {
-        locations.sort_by_key(|location| (location.window().start(), location.window().end()));
+        locations.sort_by_key(|location| (location.window.start(), location.window.end()));
 
         for (i, location) in locations.iter().enumerate() {
             let center = pos2(
@@ -259,7 +123,9 @@ pub fn render_locations_on_bar(
                 y as f32,
             );
 
-            let is_hovered = Some(*location) == marked_locations.hovered();
+            let is_hovered = marked_locations
+                .hovered()
+                .is_some_and(|hovered| hovered == location);
             let radius = if is_hovered {
                 bar_rect.width() / 8.0
             } else {
@@ -269,8 +135,12 @@ pub fn render_locations_on_bar(
             ui.painter().circle(
                 center,
                 radius,
-                color::lerp(location.inner_color(), Color32::TRANSPARENT, TRANSPARENCY),
-                Stroke::new(radius / 4.0, location.border_color()),
+                color::lerp(
+                    location.ty.inner_color(),
+                    Color32::TRANSPARENT,
+                    TRANSPARENCY,
+                ),
+                Stroke::new(radius / 4.0, location.ty.border_color()),
             );
 
             let hovered = ui
@@ -278,12 +148,12 @@ pub fn render_locations_on_bar(
                 .map(|pos| (pos - center).length() < radius)
                 .unwrap_or(false);
             if hovered {
-                mark_location = Some((*location).clone());
+                mark_location = Some(*location);
             }
         }
     }
 
     if let Some(mark_location) = mark_location {
-        marked_locations.mark_hovered(mark_location);
+        marked_locations.mark_hovered(mark_location.to_owned());
     }
 }

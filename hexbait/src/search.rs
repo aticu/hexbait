@@ -2,7 +2,7 @@
 
 use std::{
     collections::BTreeSet,
-    sync::{Arc, RwLock, RwLockReadGuard, mpsc},
+    sync::{Arc, Mutex, MutexGuard, RwLock, mpsc},
 };
 
 use hexbait_common::Input;
@@ -19,7 +19,7 @@ pub struct Searcher {
     /// The progress of the current search.
     progress: Arc<RwLock<f32>>,
     /// The search results.
-    results: Arc<RwLock<BTreeSet<Window>>>,
+    current_results: Arc<Mutex<BTreeSet<Window>>>,
     /// The requests for new searches to run.
     requests: mpsc::Sender<Option<SearchRequest>>,
 }
@@ -31,14 +31,14 @@ impl Searcher {
 
         Searcher {
             progress: background.progress,
-            results: background.results,
+            current_results: Arc::new(Mutex::new(BTreeSet::new())),
             requests: background.requests,
         }
     }
 
     /// Starts a new search.
     pub fn start_new_search(
-        &self,
+        &mut self,
         content: &[u8],
         ascii_case_insensitive: bool,
         include_utf16: bool,
@@ -57,11 +57,14 @@ impl Searcher {
             search_sequences.push(be);
         }
 
+        self.current_results = Arc::new(Mutex::new(BTreeSet::new()));
+
         self.requests
             .send(Some(SearchRequest {
                 content: search_sequences,
                 ascii_case_insensitive,
                 window,
+                results: Arc::clone(&self.current_results),
             }))
             .unwrap();
     }
@@ -77,7 +80,7 @@ impl Searcher {
     }
 
     /// The current search results.
-    pub fn results(&self) -> RwLockReadGuard<'_, BTreeSet<Window>> {
-        self.results.read().unwrap()
+    pub fn results(&self) -> MutexGuard<'_, BTreeSet<Window>> {
+        self.current_results.lock().unwrap()
     }
 }

@@ -11,7 +11,7 @@ use hexbait_lang::{
 };
 
 use crate::{
-    gui::marking::{MarkedLocation, MarkingKind},
+    marking::MarkType,
     state::{ParseType, State},
 };
 
@@ -87,10 +87,12 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
         "Sync parse offset to selection start",
     );
 
-    state.marked_locations.remove_where(|location| {
-        location.kind() == MarkingKind::HoveredParsed
-            || location.kind() == MarkingKind::HoveredParseErr
-    });
+    state
+        .marked_locations
+        .clear_marks_of_type(MarkType::HoveredParsed);
+    state
+        .marked_locations
+        .clear_marks_of_type(MarkType::HoveredParseErr);
 
     let ir;
     let parse_type = 'parse_type: {
@@ -147,21 +149,21 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
         HoverInfo::Value { path } => {
             if let Some(value) = result.value.subvalue_at_path(&path) {
                 for range in value.provenance.byte_ranges() {
-                    state.marked_locations.add(MarkedLocation::new(
+                    state.marked_locations.add(
                         (AbsoluteOffset::from(*range.start())..=AbsoluteOffset::from(*range.end()))
                             .into(),
-                        MarkingKind::HoveredParsed,
-                    ));
+                        MarkType::HoveredParsed,
+                    );
                 }
             }
         }
         HoverInfo::Error { id } => {
             for range in result.errors[id.raw_idx()].provenance.byte_ranges() {
-                state.marked_locations.add(MarkedLocation::new(
+                state.marked_locations.add(
                     (AbsoluteOffset::from(*range.start())..=AbsoluteOffset::from(*range.end()))
                         .into(),
-                    MarkingKind::HoveredParseErr,
-                ));
+                    MarkType::HoveredParseErr,
+                );
             }
         }
     }

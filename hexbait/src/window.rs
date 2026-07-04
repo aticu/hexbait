@@ -8,6 +8,8 @@ use size_format::SizeFormatterBinary;
 /// Represents a region of the input.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Window {
+    // The field order of `start` first is required by several parts of the code in the `Ord` impl.
+    // Don't change it!
     /// The index of the first byte in the region.
     start: AbsoluteOffset,
     /// The index one past the last byte in the region.

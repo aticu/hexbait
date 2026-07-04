@@ -3,7 +3,7 @@
 use egui::{Button, Checkbox, Key, RichText, Ui};
 use hexbait_common::{AbsoluteOffset, Input};
 
-use crate::{state::State, window::Window};
+use crate::{marking::MarkType, state::State, window::Window};
 
 /// Shows the search screen in the GUI.
 pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
@@ -70,16 +70,27 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
                 state.search.search_utf16 && valid_utf8,
                 window,
             );
+            state
+                .marked_locations
+                .clear_marks_of_type(MarkType::SearchResult);
         }
 
         if state.search.searcher.progress() < 1.0 && ui.button("end search").clicked() {
             state.search.searcher.stop_search();
         }
 
+        if state.marked_locations.count_of_type(MarkType::SearchResult) != 0
+            && ui.button("clear results").clicked()
+        {
+            state
+                .marked_locations
+                .clear_marks_of_type(MarkType::SearchResult);
+        }
+
         ui.label(format!(
             "search {:.02}% complete ({} results)",
             state.search.searcher.progress() * 100.0,
-            state.search.searcher.results().len()
+            state.marked_locations.count_of_type(MarkType::SearchResult)
         ));
     });
 }

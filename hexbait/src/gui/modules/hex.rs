@@ -1,5 +1,7 @@
 //! Renders hexdumps in the GUI.
 
+use std::ops::ControlFlow;
+
 use egui::{Color32, Rect, Sense, Ui, Vec2};
 use hexbait_common::{AbsoluteOffset, Input, Len};
 
@@ -7,10 +9,11 @@ use crate::{
     gui::{
         color,
         highlighting::highlight,
-        marking::{MarkedLocation, MarkingKind, render_locations_on_bar},
+        marking::render_locations_on_bar,
         modules::bars::{SIDE_BAR_WIDTH, highest_aligned_value},
         primitives::{render_glyph, render_hex, render_offset},
     },
+    marking::MarkType,
     state::{ScrollState, SelectionState, State},
     window::Window,
 };
@@ -74,31 +77,30 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
 
         state
             .marked_locations
-            .remove_where(|location| location.kind() == MarkingKind::Selection);
+            .clear_marks_of_type(MarkType::Selection);
         if let Some(selection) = state.selection_state.selected_window() {
-            state
-                .marked_locations
-                .add(MarkedLocation::new(selection, MarkingKind::Selection));
+            state.marked_locations.add(selection, MarkType::Selection);
         }
 
-        for location in state.marked_locations.iter_window(Window::from_start_len(
-            start,
-            Len::from(window.len() as u64),
-        )) {
-            let Some(range) = location.window().range_inclusive() else {
-                continue;
-            };
-            highlight(
-                ui,
-                range,
-                location.inner_color(),
-                location.border_color(),
-                file_size,
-                start_row + state.scroll_state.hex_scroll_offset,
-                rows_onscreen,
-                &state.settings,
-            );
-        }
+        let _ = state.marked_locations.iter_marks_in_window(
+            Window::from_start_len(start, Len::from(window.len() as u64)),
+            |mark| {
+                let Some(range) = mark.window.range_inclusive() else {
+                    return ControlFlow::Continue(());
+                };
+                highlight(
+                    ui,
+                    range,
+                    mark.ty.inner_color(),
+                    mark.ty.border_color(),
+                    file_size,
+                    start_row + state.scroll_state.hex_scroll_offset,
+                    rows_onscreen,
+                    &state.settings,
+                );
+                ControlFlow::Continue(())
+            },
+        );
 
         for (i, row) in window
             .chunks(16)
@@ -176,24 +178,31 @@ fn handle_scrolling(
 
 /// Renders the context menu for a byte at the given offset.
 fn byte_context_menu(ui: &mut Ui, state: &mut State, input: &Input, offset: AbsoluteOffset) {
-    let is_marked = state
-        .marked_locations
-        .iter_window(Window::from_start_len(offset, Len::from(1)))
-        .any(|mark| mark.kind() == MarkingKind::UserMark && mark.window().start() == offset);
+    let mut is_marked = false;
+    let _ = state.marked_locations.iter_marks_in_window(
+        Window::from_start_len(offset, Len::from(1)),
+        |mark| {
+            if matches!(mark.ty, MarkType::UserMark { .. }) && mark.window.start() == offset {
+                is_marked = true;
+                return ControlFlow::Break(());
+            }
+            ControlFlow::Continue(())
+        },
+    );
 
     #[expect(clippy::collapsible_else_if, reason = "code reads cleaner this way")]
     if is_marked {
         if ui.button("Unmark").clicked() {
-            state.marked_locations.remove_where(|mark| {
-                mark.kind() == MarkingKind::UserMark && mark.window().start() == offset
+            state.marked_locations.remove_where(None, |mark| {
+                matches!(mark.ty, MarkType::UserMark { .. }) && mark.window.start() == offset
             });
         }
     } else {
         if ui.button("Mark").clicked() {
-            state.marked_locations.add(MarkedLocation::new(
+            state.marked_locations.add(
                 Window::from_start_len(offset, Len::from(1)),
-                MarkingKind::UserMark,
-            ));
+                MarkType::UserMark { name: None },
+            );
         }
     }
 

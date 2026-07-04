@@ -3,7 +3,7 @@
 use std::{
     collections::BTreeSet,
     sync::{
-        Arc, RwLock,
+        Arc, Mutex, RwLock,
         mpsc::{self, RecvError, TryRecvError},
     },
 };
@@ -17,8 +17,6 @@ use crate::window::Window;
 pub(crate) struct BackgroundSearcherStartResult {
     /// The progress of the current search.
     pub(crate) progress: Arc<RwLock<f32>>,
-    /// The search results.
-    pub(crate) results: Arc<RwLock<BTreeSet<Window>>>,
     /// The requests for new searches to run.
     pub(crate) requests: mpsc::Sender<Option<SearchRequest>>,
 }
@@ -31,6 +29,8 @@ pub(crate) struct SearchRequest {
     pub(crate) ascii_case_insensitive: bool,
     /// The window to search.
     pub(crate) window: Window,
+    /// The results buffer to use.
+    pub(crate) results: Arc<Mutex<BTreeSet<Window>>>,
 }
 
 /// The search state of the background searcher.
@@ -38,7 +38,7 @@ pub(crate) struct BackgroundSearcher {
     /// The progress of the current search.
     progress: Arc<RwLock<f32>>,
     /// The search results.
-    results: Arc<RwLock<BTreeSet<Window>>>,
+    results: Arc<Mutex<BTreeSet<Window>>>,
     /// The current offset at which the search happens.
     current_offset: AbsoluteOffset,
     /// The window that is searched.
@@ -64,14 +64,14 @@ impl BackgroundSearcher {
     /// Starts a background searcher thread.
     pub(crate) fn start(input: &Input) -> BackgroundSearcherStartResult {
         let progress = Arc::new(RwLock::new(1.0));
-        let results = Arc::new(RwLock::new(BTreeSet::new()));
+        let results = Arc::new(Mutex::new(BTreeSet::new()));
         let (sender, receiver) = mpsc::channel();
 
         let source = input.clone();
 
         let searcher = BackgroundSearcher {
             progress: Arc::clone(&progress),
-            results: Arc::clone(&results),
+            results,
             current_offset: AbsoluteOffset::ZERO,
             search_window: Window::from_start_len(AbsoluteOffset::ZERO, input.len()),
             searcher: None,
@@ -88,7 +88,6 @@ impl BackgroundSearcher {
 
         BackgroundSearcherStartResult {
             progress,
-            results,
             requests: sender,
         }
     }
@@ -129,7 +128,7 @@ impl BackgroundSearcher {
         }
 
         *self.progress.write().unwrap() = 0.0;
-        self.results.write().unwrap().clear();
+        self.results = request.results;
 
         self.current_offset = request.window.start();
         self.search_window = request.window;
@@ -194,7 +193,7 @@ impl BackgroundSearcher {
                 start + Len::from(u64::try_from(result.start()).expect("read buffer must fit u64"));
             let len = Len::from(u64::try_from(result.len()).expect("search string must fit u64"));
             let window = Window::from_start_len(offset, len);
-            self.results.write().unwrap().insert(window);
+            self.results.lock().unwrap().insert(window);
         }
 
         if start + buf_len == self.search_window.end() {

@@ -192,7 +192,7 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
 
         render_locations_on_bar(ui, rect, window, &mut state.marked_locations);
 
-        if let Some(location) = state.marked_locations.hovered()
+        if let Some(mark) = state.marked_locations.hovered()
             && ui.input(|input| {
                 input
                     .pointer
@@ -201,7 +201,7 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
                     .unwrap_or(false)
             })
         {
-            let offset = location.window().start();
+            let offset = mark.window.start();
             Tooltip::always_open(
                 ui.ctx().clone(),
                 ui.layer_id(),
