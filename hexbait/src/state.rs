@@ -13,10 +13,12 @@ pub use statistics_display_state::StatisticsDisplayState;
 
 use crate::{
     marking::{MarkStore, MarkType},
+    state::format_discovery_state::FormatDiscoveryState,
     statistics::{StatisticsHandler, classification::classify_selected_window},
 };
 
 mod classification_state;
+mod format_discovery_state;
 mod parse_state;
 mod scroll_state;
 mod search_state;
@@ -44,6 +46,8 @@ pub struct State {
     pub statistics_handler: StatisticsHandler,
     /// The marked locations.
     pub marked_locations: MarkStore,
+    /// The format discovery mode state.
+    pub format_discovery: FormatDiscoveryState,
     /// The currently selected endianness.
     pub endianness: Endianness,
 }
@@ -61,6 +65,7 @@ impl State {
             classification_state: ClassificationState::new(),
             statistics_handler: StatisticsHandler::new(input.clone()),
             marked_locations: MarkStore::new(),
+            format_discovery: FormatDiscoveryState::new(),
             endianness: Endianness::native(),
         }
     }

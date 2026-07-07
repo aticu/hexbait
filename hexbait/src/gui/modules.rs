@@ -9,6 +9,7 @@ mod bars;
 pub mod classification_info;
 pub mod content;
 pub mod data_inspector;
+pub mod format_discovery;
 pub mod gilbert_map;
 pub mod hex;
 pub mod inspector;

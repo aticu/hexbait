@@ -1,6 +1,6 @@
 //! Renders hexdumps in the GUI.
 
-use egui::{Color32, Rect, Sense, Ui, Vec2};
+use egui::{Color32, Rect, RichText, Sense, Ui, Vec2};
 use hexbait_common::{AbsoluteOffset, Input, Len};
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
         primitives::{render_glyph, render_hex, render_offset},
     },
     marking::MarkType,
-    state::{ScrollState, SelectionState, State},
+    state::{ScrollState, State},
     window::Window,
 };
 
@@ -195,6 +195,10 @@ fn byte_context_menu(ui: &mut Ui, state: &mut State, input: &Input, offset: Abso
         }
     }
 
+    if ui.button("Copy offset").clicked() {
+        ui.ctx().copy_text(format!("{}", offset.as_u64()));
+    }
+
     if let Some(selected_window) = state.selection_state.selected_window()
         && selected_window.contains(offset)
     {
@@ -266,21 +270,61 @@ fn render_row(
     row: &[u8],
     file_size: Len,
 ) {
-    let interact_with_offset =
-        |ui: &Ui, offset, response: &egui::Response, selection_state: &mut SelectionState| {
-            if let Some(origin) = ui.input(|input| input.pointer.latest_pos())
-                && response.rect.contains(origin)
-            {
-                let (primary_pressed, shift_pressed) =
-                    ui.input(|input| (input.pointer.primary_pressed(), input.modifiers.shift));
+    let interact_with_offset = |ui: &Ui, offset, response: &egui::Response, state: &mut State| {
+        if let Some(origin) = ui.input(|input| input.pointer.latest_pos())
+            && response.rect.contains(origin)
+        {
+            let (primary_pressed, shift_pressed, ctrl_pressed) = ui.input(|input| {
+                (
+                    input.pointer.primary_pressed(),
+                    input.modifiers.shift,
+                    input.modifiers.ctrl,
+                )
+            });
 
-                selection_state.handle_interaction(
-                    offset,
-                    primary_pressed && response.is_pointer_button_down_on(),
-                    shift_pressed,
-                );
+            let primary_pressed = primary_pressed && response.is_pointer_button_down_on();
+
+            if ctrl_pressed {
+                let is_marked = state.marked_locations.user_mark_at_pos(offset).is_some();
+
+                if is_marked {
+                    if primary_pressed {
+                        state.marked_locations.remove_where(None, |mark| {
+                            matches!(mark.ty, MarkType::UserMark { .. })
+                                && mark.window.start() == offset
+                        });
+                    } else {
+                        response.clone().on_hover_ui(|ui| {
+                            ui.label("unmark");
+                        });
+                    }
+                } else if primary_pressed {
+                    state.marked_locations.add(
+                        Window::from_start_len(offset, Len::from(1)),
+                        MarkType::UserMark {
+                            name: state.marked_locations.current_mark_name.clone(),
+                        },
+                    );
+                } else {
+                    response.clone().on_hover_ui(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = 0.0;
+                            ui.label("mark as ");
+                            if state.marked_locations.current_mark_name.is_empty() {
+                                ui.label(RichText::new("unnamed").italics());
+                            } else {
+                                ui.label(state.marked_locations.current_mark_name.clone());
+                            }
+                        });
+                    });
+                }
+            } else {
+                state
+                    .selection_state
+                    .handle_interaction(offset, primary_pressed, shift_pressed);
             }
-        };
+        }
+    };
 
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing = Vec2::ZERO;
@@ -324,7 +368,7 @@ fn render_row(
             let byte_offset = offset + Len::from(i as u64);
 
             let response = render_hex(ui, &state.settings, Sense::click(), byte);
-            interact_with_offset(ui, byte_offset, &response, &mut state.selection_state);
+            interact_with_offset(ui, byte_offset, &response, state);
 
             response.context_menu(|ui| {
                 byte_context_menu(ui, state, input, byte_offset);
@@ -371,7 +415,7 @@ fn render_row(
             let byte_offset = offset + Len::from(i as u64);
 
             let response = render_glyph(ui, &state.settings, Sense::click(), byte);
-            interact_with_offset(ui, byte_offset, &response, &mut state.selection_state);
+            interact_with_offset(ui, byte_offset, &response, state);
 
             response.context_menu(|ui| {
                 byte_context_menu(ui, state, input, byte_offset);

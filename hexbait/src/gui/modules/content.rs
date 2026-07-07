@@ -15,20 +15,24 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
             .max_rect(ui.max_rect().intersect(ui.cursor()))
             .layout(Layout::left_to_right(Align::Min)),
         |ui| {
-            modules::scrollbars::show(ui, state, input);
+            if state.format_discovery.is_in_format_discovery_mode() {
+                modules::format_discovery::show(ui, state, input);
+            } else {
+                modules::scrollbars::show(ui, state, input);
 
-            let display_type = match state.settings.view_kind() {
-                ViewKind::Auto => state.scroll_state.display_suggestion,
-                ViewKind::ForceHex => DisplayType::Hexview,
-                ViewKind::ForceOverview => DisplayType::Overview,
-            };
+                let display_type = match state.settings.view_kind() {
+                    ViewKind::Auto => state.scroll_state.display_suggestion,
+                    ViewKind::ForceHex => DisplayType::Hexview,
+                    ViewKind::ForceOverview => DisplayType::Overview,
+                };
 
-            let display_fn = match display_type {
-                DisplayType::Overview => modules::gilbert_map::show,
-                DisplayType::Hexview => modules::hex::show,
-            };
+                let display_fn = match display_type {
+                    DisplayType::Overview => modules::gilbert_map::show,
+                    DisplayType::Hexview => modules::hex::show,
+                };
 
-            display_fn(ui, state, input);
+                display_fn(ui, state, input);
+            }
         },
     );
 }

@@ -176,6 +176,16 @@ impl MarkStore {
         }
     }
 
+    /// Iterates over all marks of the given type.
+    pub fn iter_marks_of_type<'store, 'ty: 'store>(
+        &'store self,
+        ty: &'ty MarkType,
+    ) -> Option<impl Iterator<Item = MarkRef<'store>>> {
+        let store = self.per_type.get(ty)?;
+
+        Some(store.iter().map(|window| MarkRef { window, ty }))
+    }
+
     /// Returns the "best" mark at the position.
     ///
     /// The exact algorithm used is unspecified and may change in the future.

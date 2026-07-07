@@ -53,6 +53,11 @@ impl SingleTypeStore {
         }
     }
 
+    /// An iterator over all contained marks.
+    pub fn iter(&self) -> impl Iterator<Item = Window> {
+        self.marks.iter().copied()
+    }
+
     /// Queries the given window for marks that overlap with it.
     ///
     /// The behavior is unspecified for empty windows (both as query and in the marks).
