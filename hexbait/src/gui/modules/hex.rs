@@ -175,6 +175,7 @@ fn handle_scrolling(
 
 /// Renders the context menu for a byte at the given offset.
 fn byte_context_menu(ui: &mut Ui, state: &mut State, input: &Input, offset: AbsoluteOffset) {
+    ui.set_min_width(100.0);
     let is_marked = state.marked_locations.user_mark_at_pos(offset).is_some();
 
     #[expect(clippy::collapsible_else_if, reason = "code reads cleaner this way")]
