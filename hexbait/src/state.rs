@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 pub use classification_state::ClassificationState;
+pub use format_discovery_state::{ColumnInfo, ColumnType, FormatDiscoveryState};
 use hexbait_common::{Endianness, Input};
 pub use parse_state::{ParseState, ParseType};
 pub use scroll_state::{InteractionState, ScrollState, Scrollbar};
@@ -13,7 +14,6 @@ pub use statistics_display_state::StatisticsDisplayState;
 
 use crate::{
     marking::{MarkStore, MarkType},
-    state::format_discovery_state::FormatDiscoveryState,
     statistics::{StatisticsHandler, classification::classify_selected_window},
 };
 

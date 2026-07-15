@@ -226,6 +226,16 @@ impl Settings {
         let index = (level - 1).min(ALIGNMENT_MARKER_COLORS.len() - 1);
         Some(ALIGNMENT_MARKER_COLORS[index])
     }
+
+    /// The color for a column background in format discovery mode.
+    pub fn format_discovery_column_background_color(&self) -> Color32 {
+        Color32::BLACK
+    }
+
+    /// The color for a column border in format discovery mode.
+    pub fn format_discovery_column_border_color(&self) -> Color32 {
+        Color32::YELLOW
+    }
 }
 
 impl Default for Settings {
