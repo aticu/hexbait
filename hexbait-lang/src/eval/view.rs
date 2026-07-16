@@ -6,12 +6,16 @@ use hexbait_common::{Input, Len, ReadBytes, RelativeOffset};
 
 use super::provenance::Provenance;
 
+/// A view is the input to the parser.
 #[derive(Debug, Clone)]
 pub struct View(Arc<ViewType>);
 
 /// A view describes a source that can be parsed from.
 #[derive(Debug, Clone)]
 enum ViewType {
+    /// Parses out of the raw given input.
+    ///
+    /// This is the root-level view.
     Input(Input),
     /// Parses out of a subview of a larger view.
     Subview {
@@ -32,10 +36,24 @@ impl View {
     ///
     /// This function does not check any bounds, so the view may be invalid.
     pub fn subview(&self, range: Range<RelativeOffset>) -> View {
-        View(Arc::new(ViewType::Subview {
-            view: self.clone(),
-            valid_range: range,
-        }))
+        if let ViewType::Subview { view, valid_range } = &*self.0 {
+            // avoid long chains of sub-views to improve read performance
+            let offset = Len::from(valid_range.start.as_u64());
+
+            let start = range.start + offset;
+            let end = std::cmp::min(range.end + offset, valid_range.end);
+            let valid_range = start..end;
+
+            View(Arc::new(ViewType::Subview {
+                view: view.clone(),
+                valid_range,
+            }))
+        } else {
+            View(Arc::new(ViewType::Subview {
+                view: self.clone(),
+                valid_range: range,
+            }))
+        }
     }
 
     /// Returns the length of the view in bytes.
