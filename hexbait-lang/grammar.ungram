@@ -37,6 +37,7 @@ Declaration =
 | SeekByDeclaration
 | SeekToDeclaration
 | ScopeAtDeclaration
+| ScopeInDeclaration
 | IfDeclaration
 | AssertDeclaration
 | WarnIfDeclaration
@@ -62,9 +63,15 @@ SeekToDeclaration =
 // Declares a new scope in the parser.
 // The scope starts at the offset `start` in the current scope and optionally ends at the offset `end` in the current scope.
 // The parser continues parsing in the sub-scope at the offset `0` (which corresponds to `start` in the current scope).
-// Reading past the offset of the scope from within it will result in an error.
+// Reading past the end of the scope from within it will result in an error.
 ScopeAtDeclaration =
   '!' 'scope' 'at' start:Expr ('until' end:Expr)? StructBlock
+
+// Declares a new scope in the parser.
+// The parser continues parsing in the value of the bytes expression as a sub-scope at the offset `0`.
+// Reading past the end of the scope from within it will result in an error.
+ScopeInDeclaration =
+  '!' 'scope' 'in' bytes:Expr StructBlock
 
 // Parses the contained fields only if a condition is true.
 IfDeclaration = 

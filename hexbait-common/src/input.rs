@@ -230,6 +230,13 @@ impl Input {
 /// when this type is obtained), it should be pronounced as such.
 pub struct ReadBytes<'buf>(ReadBytesInner<'buf>);
 
+impl<'buf> ReadBytes<'buf> {
+    /// Creates a read value from a buffer.
+    pub fn from_buf(buf: &'buf [u8]) -> ReadBytes<'buf> {
+        ReadBytes(ReadBytesInner::ByRef { buf })
+    }
+}
+
 /// The number of bytes that can be stored inline in a `ReadBytes`.
 const READ_BYTES_INLINE_LEN: usize = 22;
 

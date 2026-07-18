@@ -135,6 +135,8 @@ pub enum NodeKind {
     SeekByDeclaration,
     /// A declaration that parsing should continue in another scope that starts at a given offset.
     ScopeAtDeclaration,
+    /// A declaration that parsing should continue in another scope that is defined by parsed bytes.
+    ScopeInDeclaration,
     /// A declaration to parse contained fields only if a condition is true.
     IfDeclaration,
     /// A declaration asserting that an expression is true like `!assert size > 4`.

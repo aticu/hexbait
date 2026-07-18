@@ -4,6 +4,8 @@ use std::{io, ops::Range, sync::Arc};
 
 use hexbait_common::{Input, Len, ReadBytes, RelativeOffset};
 
+use crate::BytesValue;
+
 use super::provenance::Provenance;
 
 /// A view is the input to the parser.
@@ -24,12 +26,19 @@ enum ViewType {
         /// The range of the parent view that is valid.
         valid_range: Range<RelativeOffset>,
     },
+    /// Parses out of the given bytes.
+    Bytes(BytesValue),
 }
 
 impl View {
     /// Creates a view of the input.
     pub fn from_input(input: Input) -> View {
         View(Arc::new(ViewType::Input(input)))
+    }
+
+    /// Creates a view from bytes.
+    pub fn from_bytes(bytes: BytesValue) -> View {
+        View(Arc::new(ViewType::Bytes(bytes)))
     }
 
     /// Creates a subview with the given range in the current view.
@@ -73,6 +82,7 @@ impl View {
                     )
                 }
             }
+            ViewType::Bytes(bytes) => Len::from(bytes.len() as u64),
         }
     }
 
@@ -92,6 +102,7 @@ impl View {
             ViewType::Subview { view, valid_range } => {
                 view.read_at(valid_range.start + Len::from(offset.as_u64()), len)?
             }
+            ViewType::Bytes(bytes) => bytes.value()?,
         };
 
         Ok(out_buf)
@@ -107,6 +118,12 @@ impl View {
                 range.start + Len::from(valid_range.start.as_u64())
                     ..range.end + Len::from(valid_range.start.as_u64()),
             ),
+            ViewType::Bytes(bytes) => match bytes {
+                BytesValue::Lit(_) => Provenance::empty(),
+                BytesValue::FromView {
+                    view, start, len, ..
+                } => view.provenance_from_range(*start..*start + *len),
+            },
         }
     }
 }

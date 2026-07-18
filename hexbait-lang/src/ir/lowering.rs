@@ -4,7 +4,7 @@ use crate::{
     Int,
     ast::{self, AstNode as _},
     int_from_str,
-    ir::{ElsePart, IfChain, ParseTypeKind},
+    ir::{ElsePart, IfChain, ParseTypeKind, ScopeKind},
     lexer::TokenKind,
     span::Span,
 };
@@ -464,6 +464,9 @@ impl LoweringCtx {
             ast::Declaration::ScopeAtDeclaration(scope_at) => {
                 self.lower_scope_at_declaration(scope_at)
             }
+            ast::Declaration::ScopeInDeclaration(scope_in) => {
+                self.lower_scope_in_declaration(scope_in)
+            }
             ast::Declaration::IfDeclaration(if_decl) => self.lower_if_declaration(if_decl),
             ast::Declaration::AssertDeclaration(assert) => self.lower_assert_declaration(assert),
             ast::Declaration::WarnIfDeclaration(warn_if) => self.lower_warn_if_declaration(warn_if),
@@ -542,9 +545,32 @@ impl LoweringCtx {
             content.push(self.lower_struct_content(single_content));
         }
 
-        Some(Declaration::ScopeAt {
-            start,
-            end,
+        Some(Declaration::Scope {
+            kind: ScopeKind::At { start, end },
+            content,
+        })
+    }
+
+    /// Lowers the given AST `scope in` declaration to IR.
+    fn lower_scope_in_declaration(
+        &mut self,
+        scope_in: ast::ScopeInDeclaration,
+    ) -> Option<Declaration> {
+        let bytes = self.lower_expr(
+            required_field!(scope_in => bytes ? self: "expected scope bytes expression" => None),
+        );
+        let mut content = Vec::new();
+
+        for single_content in scope_in
+            .struct_block()
+            .iter()
+            .flat_map(|block| block.struct_content())
+        {
+            content.push(self.lower_struct_content(single_content));
+        }
+
+        Some(Declaration::Scope {
+            kind: ScopeKind::In { bytes },
             content,
         })
     }

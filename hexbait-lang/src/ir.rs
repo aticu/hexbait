@@ -105,6 +105,23 @@ pub struct LetStatement {
     pub expr: Expr,
 }
 
+/// A `scope` kind.
+#[derive(Debug)]
+pub enum ScopeKind {
+    /// Defines a scope by a start and an optional end offset in the current scope.
+    At {
+        /// The start offset of the scope relative to the current parent.
+        start: Expr,
+        /// The end offset of the scope relative to the current parent.
+        end: Option<Expr>,
+    },
+    /// Defines a scope by the bytes which make up the content of the scope.
+    In {
+        /// The bytes used for parsing.
+        bytes: Expr,
+    },
+}
+
 /// A declaration found in a `struct`.
 #[derive(Debug)]
 pub enum Declaration {
@@ -117,11 +134,9 @@ pub enum Declaration {
     /// Seeks to a specified position.
     SeekTo(Expr),
     /// Parses the contained fields in a separate scope.
-    ScopeAt {
-        /// The start offset of the scope relative to the current parent.
-        start: Expr,
-        /// The end offset of the scope relative to the current parent.
-        end: Option<Expr>,
+    Scope {
+        /// The kind of the scope.
+        kind: ScopeKind,
         /// The content of the scope.
         content: Vec<StructContent>,
     },

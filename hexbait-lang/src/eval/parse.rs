@@ -7,7 +7,7 @@ use crate::{
     eval::parse::diagnostics::ParseErrWithMaybePartialResult,
     ir::{
         BinOp, Declaration, ElsePart, Expr, ExprKind, File, IfChain, LetStatement, Lit, ParseType,
-        ParseTypeKind, RepeatKind, StructContent, StructField, Symbol, UnOp,
+        ParseTypeKind, RepeatKind, ScopeKind, StructContent, StructField, Symbol, UnOp,
     },
 };
 
@@ -500,52 +500,61 @@ impl Scope {
                         .into());
                 }
             }
-            Declaration::ScopeAt {
-                start,
-                end,
-                content,
-            } => {
-                let start_expr =
-                    self.eval_expr(start, struct_ctx, parse_ctx, Default::default())?;
+            Declaration::Scope { kind, content } => {
+                let view = match kind {
+                    ScopeKind::At { start, end } => {
+                        let start_expr =
+                            self.eval_expr(start, struct_ctx, parse_ctx, Default::default())?;
 
-                let start = if let Ok(start) = u64::try_from(start_expr.kind.expect_int())
-                    && Len::from(start) <= self.view.len()
-                {
-                    RelativeOffset::from(start)
-                } else {
-                    return Err(parse_ctx
-                        .new_err(ParseErr {
-                            message: "scope start exceeded the end of the current scope".into(),
-                            kind: ParseErrKind::InputTooShort,
-                            provenance: start_expr.provenance.clone(),
-                            span: start.span,
-                        })
-                        .into());
-                };
+                        let start = if let Ok(start) = u64::try_from(start_expr.kind.expect_int())
+                            && Len::from(start) <= self.view.len()
+                        {
+                            RelativeOffset::from(start)
+                        } else {
+                            return Err(parse_ctx
+                                .new_err(ParseErr {
+                                    message: "scope start exceeded the end of the current scope"
+                                        .into(),
+                                    kind: ParseErrKind::InputTooShort,
+                                    provenance: start_expr.provenance.clone(),
+                                    span: start.span,
+                                })
+                                .into());
+                        };
 
-                let end = if let Some(end) = end {
-                    let end_expr =
-                        self.eval_expr(end, struct_ctx, parse_ctx, Default::default())?;
+                        let end = if let Some(end) = end {
+                            let end_expr =
+                                self.eval_expr(end, struct_ctx, parse_ctx, Default::default())?;
 
-                    if let Ok(end) = u64::try_from(end_expr.kind.expect_int())
-                        && Len::from(end) <= self.view.len()
-                    {
-                        RelativeOffset::from(end)
-                    } else {
-                        return Err(parse_ctx
-                            .new_err(ParseErr {
-                                message: "scope end exceeded the end of the current scope".into(),
-                                kind: ParseErrKind::InputTooShort,
-                                provenance: end_expr.provenance.clone(),
-                                span: end.span,
-                            })
-                            .into());
+                            if let Ok(end) = u64::try_from(end_expr.kind.expect_int())
+                                && Len::from(end) <= self.view.len()
+                            {
+                                RelativeOffset::from(end)
+                            } else {
+                                return Err(parse_ctx
+                                    .new_err(ParseErr {
+                                        message: "scope end exceeded the end of the current scope"
+                                            .into(),
+                                        kind: ParseErrKind::InputTooShort,
+                                        provenance: end_expr.provenance.clone(),
+                                        span: end.span,
+                                    })
+                                    .into());
+                            }
+                        } else {
+                            RelativeOffset::from(self.view.len().as_u64())
+                        };
+
+                        self.view.subview(start..end)
                     }
-                } else {
-                    RelativeOffset::from(self.view.len().as_u64())
+                    ScopeKind::In { bytes } => {
+                        let bytes_expr =
+                            self.eval_expr(bytes, struct_ctx, parse_ctx, Default::default())?;
+
+                        View::from_bytes(bytes_expr.kind.expect_bytes_take())
+                    }
                 };
 
-                let view = self.view.subview(start..end);
                 let mut scope =
                     self.child_with_view_and_offset(view, ByteOffset(RelativeOffset::ZERO));
 
@@ -678,50 +687,33 @@ impl Scope {
         span: Span,
         parse_ctx: &mut ParseContext,
     ) -> Result<Value, ParseErrWithMaybePartialResult> {
-        let (bytes, provenance) = if count > BytesValue::INLINE_LEN as u64 {
-            let convert_read_bytes = |read_bytes: ReadBytes| {
-                let mut buf = [0; 8];
-                buf.copy_from_slice(&read_bytes);
-                buf
-            };
+        let start = self.offset.0;
+        let len = Len::from(count);
+        let mut buf = [0; BytesValue::INLINE_LEN];
+        let provenance = self.view.provenance_from_range(start..start + len);
 
-            let start = self.offset.0;
-            let (prefix, _) = self.read_bytes(Len::from(8), span, parse_ctx)?;
-            let prefix = convert_read_bytes(prefix);
-            self.offset.0 += Len::from(count - (8 + 8));
-            let (suffix, _) = self.read_bytes(Len::from(8), span, parse_ctx)?;
-            let suffix = convert_read_bytes(suffix);
+        if count > BytesValue::INLINE_LEN as u64 {
+            let prefix_suffix_len = Len::from(BytesValue::PREFIX_SUFFIX_LEN as u64);
 
-            let provenance = self
-                .view
-                .provenance_from_range(start..start + Len::from(count));
+            let (prefix, _) = self.read_bytes(prefix_suffix_len, span, parse_ctx)?;
+            buf[..BytesValue::PREFIX_SUFFIX_LEN].copy_from_slice(&prefix);
 
-            (
-                BytesValue::FromView {
-                    view: self.view.clone(),
-                    start,
-                    len: Len::from(count),
-                    prefix,
-                    suffix,
-                },
-                provenance,
-            )
+            self.offset.0 += Len::from(count) - prefix_suffix_len * 2;
+
+            let (suffix, _) = self.read_bytes(prefix_suffix_len, span, parse_ctx)?;
+            buf[BytesValue::PREFIX_SUFFIX_LEN..].copy_from_slice(&suffix);
         } else {
-            let (bytes, provenance) = self.read_bytes(Len::from(count), span, parse_ctx)?;
-            let mut buf = [0; BytesValue::INLINE_LEN];
+            let (bytes, _) = self.read_bytes(Len::from(count), span, parse_ctx)?;
             buf[..bytes.len()].copy_from_slice(&bytes);
-
-            (
-                BytesValue::Inline {
-                    buf,
-                    len: bytes.len() as u8,
-                },
-                provenance,
-            )
         };
 
         Ok(Value {
-            kind: ValueKind::Bytes(bytes),
+            kind: ValueKind::Bytes(BytesValue::FromView {
+                view: self.view.clone(),
+                start,
+                len,
+                buf,
+            }),
             provenance,
         })
     }

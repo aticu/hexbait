@@ -146,12 +146,13 @@ fn decl<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
             p.bump();
             let kind = match p.expect_and_bump_contextual_kw() {
                 Some("at") => NodeKind::ScopeAtDeclaration,
+                Some("in") => NodeKind::ScopeInDeclaration,
                 _ => todo!("error"),
             };
 
             expr(p);
 
-            if p.at_contextual_kw("until") {
+            if kind == NodeKind::ScopeAtDeclaration && p.at_contextual_kw("until") {
                 p.bump();
                 expr(p);
             }
