@@ -21,7 +21,7 @@ use crate::span::Span;
 pub enum TokenKind {
     // Trivia
     /// A comment on a single line.
-    #[regex("//[^\n]*\n?")]
+    #[regex("//[^\n]*\n?", allow_greedy = true)]
     LineComment,
     /// A block comment.
     // Note that this only matches the start in logos. The rest of the parsing is implemented

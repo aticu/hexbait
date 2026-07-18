@@ -1,6 +1,6 @@
 //! Implements rendering of the inspector window for bytes.
 
-use egui::{Color32, Rect, RichText, Sense, Ui, vec2};
+use egui::{Color32, Rect, RichText, Sense, Ui, scroll_area::DragScroll, vec2};
 use hexbait_common::{Endianness, Input};
 
 use crate::state::State;
@@ -204,7 +204,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
         .id_salt("inspector")
         .column(Column::exact(state.settings.font_size() * 11.0))
         .column(Column::remainder())
-        .drag_to_scroll(false)
+        .drag_to_scroll(DragScroll::OnTouch)
         .header(row_height * 1.5, |mut header| {
             header.col(|ui| {
                 ui.heading(RichText::new("Type").heading());

@@ -236,7 +236,7 @@ pub fn blur_image(image: &ColorImage, settings: &Settings) -> ColorImage {
                         let kernel_weight = KERNEL[yi + KERNEL_RADIUS - y];
                         let pixel = scratch[ring_offset(yi, w) + x];
 
-                        for (out, channel) in rgb.iter_mut().zip(pixel.into_iter()) {
+                        for (out, channel) in rgb.iter_mut().zip(pixel) {
                             *out += channel * kernel_weight;
                         }
 

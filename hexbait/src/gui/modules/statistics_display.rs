@@ -92,6 +92,11 @@ fn render(
     let side_len_y = (rect.height().trunc() / 256.0).trunc();
     let side_len = side_len_x.min(side_len_y);
 
+    if side_len == 0.0 {
+        // no need to render any further if there is no image
+        return;
+    }
+
     let rect = Rect::from_min_size(
         ui.cursor().left_top(),
         vec2(side_len * 256.0, side_len * 256.0),

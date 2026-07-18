@@ -123,12 +123,7 @@ fn expr_bp<'p, 'src>(p: &'p mut Parser<'src>, min_bp: u8) -> CompletedMarker {
     }
 
     // infix loop
-    loop {
-        let Some(op) = InfixOp::peek(p) else {
-            // no infix operator upcoming -> no more expression to parse
-            break;
-        };
-
+    while let Some(op) = InfixOp::peek(p) {
         let (l_bp, r_bp) = op.binding_power();
         if l_bp < min_bp {
             break;

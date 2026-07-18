@@ -12,9 +12,9 @@ macro_rules! classification_data {
             mod $name;
         )*
 
-        pub static $classification_data: &[(&str, ClassificationData)] = &[
+        pub static $classification_data: &[(&str, &ClassificationData)] = &[
             $(
-                ($name::NAME, $name::CLASSIFICATION_DATA),
+                ($name::NAME, &$name::CLASSIFICATION_DATA),
             )*
         ];
     };

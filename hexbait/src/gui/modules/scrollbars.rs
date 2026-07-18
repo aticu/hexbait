@@ -163,7 +163,7 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
                 let hover_pos_px = hover_pos.y * bar_response.rect.width() + hover_pos.x;
 
                 state.scroll_state.innermost_bar_hover_position =
-                    Some((hover_pos_px as f32 / bar_response.rect.area()).clamp(0.0, 1.0));
+                    Some((hover_pos_px / bar_response.rect.area()).clamp(0.0, 1.0));
             } else {
                 state.scroll_state.innermost_bar_hover_position = None;
             }

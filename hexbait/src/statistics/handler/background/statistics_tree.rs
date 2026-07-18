@@ -135,10 +135,7 @@ impl<Statistics: crate::statistics::Statistics> StatisticsTree<Statistics> {
     ///
     /// Returns the window of the newly promoted node, if it exists.
     fn try_promote(&mut self, offset: AbsoluteOffset) -> Option<Window> {
-        let tier = match self.nodes.get(&offset) {
-            Some(node) => node.tier,
-            None => return None,
-        };
+        let tier = self.nodes.get(&offset)?.tier;
         let parent_tier = tier.next();
 
         let size = tier.size();

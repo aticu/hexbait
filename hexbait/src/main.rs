@@ -8,7 +8,7 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use egui::{CentralPanel, Frame, MenuBar, TextStyle, TopBottomPanel};
+use egui::{CentralPanel, Frame, MenuBar, Panel, TextStyle, Ui};
 use egui_dock::{DockArea, DockState, SurfaceIndex};
 use hexbait::{
     gui::modules::{Context, TabType, hex_dock_state},
@@ -91,10 +91,10 @@ struct HexbaitApp {
 }
 
 impl eframe::App for HexbaitApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let start = std::time::Instant::now();
 
-        TopBottomPanel::top("menubar").show(ctx, |ui| {
+        Panel::top("menubar").show(ui, |ui| {
             self.context.state.settings.apply_settings_to_ui(ui);
             MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("Tabs", |ui| {
@@ -132,8 +132,8 @@ impl eframe::App for HexbaitApp {
         });
 
         CentralPanel::default()
-            .frame(Frame::central_panel(&ctx.style()).inner_margin(0.0))
-            .show(ctx, |ui| {
+            .frame(Frame::central_panel(ui.style()).inner_margin(0.0))
+            .show(ui, |ui| {
                 self.context.state.settings.apply_settings_to_ui(ui);
                 DockArea::new(&mut self.dock_state)
                     .show_leaf_collapse_buttons(false)

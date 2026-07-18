@@ -103,7 +103,7 @@ fn main() -> io::Result<()> {
         out_str.push_str(&format!("/// The classification data for {name}\n"));
         out_str.push_str("#[rustfmt::skip]\n");
         out_str.push_str("#[allow(clippy::excessive_precision)]\n");
-        out_str.push_str("pub const CLASSIFICATION_DATA: ClassificationData = ");
+        out_str.push_str("pub static CLASSIFICATION_DATA: ClassificationData = ");
         out_str.push_str(&classification_data.as_rust_src_str());
         out_str.push_str(";\n");
 

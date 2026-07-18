@@ -1008,7 +1008,7 @@ impl Scope {
                     parse_err: parse_ctx.new_err(ParseErr {
                         message: format!(
                             "field expectation failed: {:?} != {:?}",
-                            &expected.kind, &value.kind
+                            expected.kind, value.kind
                         ),
                         kind: ParseErrKind::ExpectationFailure,
                         provenance: &value.provenance + &expected.provenance,
