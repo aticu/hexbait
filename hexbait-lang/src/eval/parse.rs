@@ -6,8 +6,8 @@ use crate::{
     BytesValue, Int, Span,
     eval::parse::diagnostics::ParseErrWithMaybePartialResult,
     ir::{
-        BinOp, Declaration, ElsePart, Expr, ExprKind, File, IfChain, LetStatement, Lit, ParseType,
-        ParseTypeKind, RepeatKind, ScopeKind, StructContent, StructField, Symbol, UnOp,
+        BinOp, ConcatArg, Declaration, ElsePart, Expr, ExprKind, File, IfChain, LetStatement, Lit,
+        ParseType, ParseTypeKind, RepeatKind, ScopeKind, StructContent, StructField, Symbol, UnOp,
     },
 };
 
@@ -345,6 +345,7 @@ impl Scope {
                     BinOp::Sub => OpKind::IntOp(|x, y| x - y),
                     BinOp::Mul => OpKind::IntOp(|x, y| x * y),
                     BinOp::Div => OpKind::IntOp(|x, y| x / y),
+                    BinOp::Mod => OpKind::IntOp(|x, y| x % y),
                     BinOp::Eq => OpKind::Eq,
                     BinOp::Neq => OpKind::Neq,
                     BinOp::Gt => OpKind::CmpOp(|x, y| x > y),
@@ -441,6 +442,36 @@ impl Scope {
                 scope
                     .eval_parse_type(ty, struct_ctx, parse_ctx)
                     .map_err(|err| err.parse_err)
+            }
+            ExprKind::Concat { args } => {
+                let mut parts = Vec::new();
+                let mut provenance = Provenance::empty();
+
+                for arg in args {
+                    let (expr, expand) = match arg {
+                        ConcatArg::Direct(expr) => (expr, false),
+                        ConcatArg::Expanding(expr) => (expr, true),
+                    };
+
+                    let expr = self.eval_expr(expr, struct_ctx, parse_ctx, additional_ctx)?;
+
+                    provenance += &expr.provenance;
+                    if expand {
+                        parts.extend(
+                            expr.kind
+                                .expect_array_take()
+                                .into_iter()
+                                .map(|val| val.kind.expect_bytes_take()),
+                        );
+                    } else {
+                        parts.push(expr.kind.expect_bytes_take());
+                    }
+                }
+
+                Ok(Value {
+                    kind: ValueKind::Bytes(BytesValue::Concat { parts }),
+                    provenance,
+                })
             }
             ExprKind::Error => impossible!(),
         }

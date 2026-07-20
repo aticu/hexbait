@@ -102,7 +102,13 @@ impl View {
             ViewType::Subview { view, valid_range } => {
                 view.read_at(valid_range.start + Len::from(offset.as_u64()), len)?
             }
-            ViewType::Bytes(bytes) => bytes.value()?,
+            ViewType::Bytes(bytes) => {
+                let mut out = vec![0; len.as_u64() as usize];
+
+                bytes.fill_buf_at(offset.as_u64() as usize, &mut out)?;
+
+                ReadBytes::from_vec(out)
+            }
         };
 
         Ok(out_buf)
@@ -118,12 +124,7 @@ impl View {
                 range.start + Len::from(valid_range.start.as_u64())
                     ..range.end + Len::from(valid_range.start.as_u64()),
             ),
-            ViewType::Bytes(bytes) => match bytes {
-                BytesValue::Lit(_) => Provenance::empty(),
-                BytesValue::FromView {
-                    view, start, len, ..
-                } => view.provenance_from_range(*start..*start + *len),
-            },
+            ViewType::Bytes(bytes) => bytes.provenance_range(range),
         }
     }
 }

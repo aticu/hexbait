@@ -235,6 +235,11 @@ impl<'buf> ReadBytes<'buf> {
     pub fn from_buf(buf: &'buf [u8]) -> ReadBytes<'buf> {
         ReadBytes(ReadBytesInner::ByRef { buf })
     }
+
+    /// Creates a read value from a vector.
+    pub fn from_vec(vec: Vec<u8>) -> ReadBytes<'static> {
+        ReadBytes(ReadBytesInner::Owned { buf: vec.into() })
+    }
 }
 
 /// The number of bytes that can be stored inline in a `ReadBytes`.

@@ -102,7 +102,7 @@ fn value_to_json(value: &Value) -> serde_json::Value {
             .unwrap_or(serde_json::Value::Null),
         hexbait_lang::ValueKind::Bytes(val) => {
             let mut as_str = String::new();
-            for byte in &val.as_vec().unwrap() {
+            for byte in &*val.value().unwrap() {
                 for bit in (0..8).step_by(4).rev() {
                     let nibble = (byte >> bit) & 0xf;
                     let c = char::from_digit(nibble as u32, 16).unwrap();

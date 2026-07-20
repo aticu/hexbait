@@ -41,6 +41,8 @@ pub enum BinOp {
     Mul,
     /// The division operator: `/`.
     Div,
+    /// The modulo operator: `%`.
+    Mod,
     /// The equality operator: `==`.
     Eq,
     /// The inequality operator: `!=`.
@@ -123,6 +125,20 @@ pub enum ExprKind {
         /// Where to parse the given type.
         offset: Option<Box<Expr>>,
     },
+    /// A `concat` expression that concatenates multiple `bytes`.
+    Concat {
+        /// The arguments that should be concatenated.
+        args: Vec<ConcatArg>,
+    },
     /// An expression that contained an error during parsing.
     Error,
+}
+
+/// An argument to a `concat` expression.
+#[derive(Debug)]
+pub enum ConcatArg {
+    /// The concatenation works directly on the given `bytes` expression.
+    Direct(Expr),
+    /// The concatenation works on an array of `bytes` expressions.
+    Expanding(Expr),
 }

@@ -4,7 +4,7 @@ use crate::{
     Int,
     ast::{self, AstNode as _},
     int_from_str,
-    ir::{ElsePart, IfChain, ParseTypeKind, ScopeKind},
+    ir::{ConcatArg, ElsePart, IfChain, ParseTypeKind, ScopeKind},
     lexer::TokenKind,
     span::Span,
 };
@@ -322,6 +322,7 @@ impl LoweringCtx {
             ast::Expr::InfixExpr(infix_expr) => self.lower_infix_expr(infix_expr),
             ast::Expr::FieldAccess(field_access) => self.lower_field_access(field_access),
             ast::Expr::PeekExpr(peek_expr) => self.lower_peek_expr(peek_expr),
+            ast::Expr::ConcatExpr(concat_expr) => self.lower_concat_expr(concat_expr),
         }
     }
 
@@ -399,6 +400,7 @@ impl LoweringCtx {
             "-" => BinOp::Sub,
             "*" => BinOp::Mul,
             "/" => BinOp::Div,
+            "%" => BinOp::Mod,
             "==" => BinOp::Eq,
             "!=" => BinOp::Neq,
             ">" => BinOp::Gt,
@@ -448,6 +450,28 @@ impl LoweringCtx {
             )),
             offset
         }
+    }
+
+    /// Lowers the given AST `concat` expression to IR.
+    fn lower_concat_expr(&mut self, concat_expr: ast::ConcatExpr) -> ExprKind {
+        let mut args = Vec::new();
+
+        for arg in concat_expr.args() {
+            let arg = match arg {
+                ast::ConcatArg::ConcatArgDirect(concat_arg_direct) => {
+                    let expr = required_field!(concat_arg_direct => expr ? self: "expected expression" => ExprKind::Error);
+                    ConcatArg::Direct(self.lower_expr(expr))
+                }
+                ast::ConcatArg::ConcatArgExpanding(concat_arg_expanding) => {
+                    let expr = required_field!(concat_arg_expanding => expr ? self: "expected expression" => ExprKind::Error);
+                    ConcatArg::Expanding(self.lower_expr(expr))
+                }
+            };
+
+            args.push(arg);
+        }
+
+        ExprKind::Concat { args }
     }
 
     /// Lowers the given AST declaration to IR.

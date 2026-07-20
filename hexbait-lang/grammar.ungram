@@ -198,6 +198,7 @@ Expr =
 | InfixExpr
 | FieldAccess
 | PeekExpr
+| ConcatExpr
 
 // An atomic expression.
 // This includes literals (such as `42`, `true` and `"hi"`) and field names of the currently parsed `struct`.
@@ -225,7 +226,7 @@ Metavar =
 // Decimal literals and identifiers are only accepted here for technical reasons (because `10` lexes as a decimal literal and `a0` as an identifier, but they are still valid hex values).
 // Only hex values between `00` and `ff` and string literals are accepted here.
 ByteConcat =
-  '<' ( 'byte_lit' | 'dec_lit' | 'ident' | 'str_lit')* '>'
+  '<' ( 'byte_lit' | 'dec_lit' | 'ident' | 'str_lit' )* '>'
 
 // An expression that is surrounded by parenthesis.
 ParenExpr =
@@ -246,6 +247,7 @@ PrefixExpr =
 // - '-' (integer subtraction)
 // - '*' (integer multiplication)
 // - '/' (integer division)
+// - '%' (integer modulo)
 // - '==' (equality comparison)
 // - '!=' (inequality comparison)
 // - '>' (greater than comparison)
@@ -271,6 +273,23 @@ FieldAccess =
 PeekExpr =
   'peek' '(' ParseType ('at' offset:Expr)? ')'
 
+// Concatenates multiple `bytes` values at runtime.
+ConcatExpr =
+  'concat' '(' ( args:ConcatArg ','? )* ')'
+
+// An argument may either be a single direct `bytes` value or be preceded by `..` to expand an array of `bytes` values.
+ConcatArg =
+  ConcatArgDirect
+| ConcatArgExpanding
+
+// A concat argument of type `bytes` that is directly fed into the concatenation.
+ConcatArgDirect =
+  Expr
+
+// Expands an array of `bytes` and concatenates them together.
+ConcatArgExpanding =
+  '..' Expr
+
 // An operator used for expressions with operators.
 // Operator precedence is defined as it is in [Rust](https://doc.rust-lang.org/reference/expressions.html#r-expr.precedence).
 Op =
@@ -278,6 +297,7 @@ Op =
 | '-'
 | '*'
 | '/'
+| '%'
 | '=='
 | '!='
 | '>'

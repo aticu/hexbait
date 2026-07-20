@@ -14,15 +14,16 @@ header {
     entry_flags u16;
     used_entry_size u32;
     total_entry_size u32;
-    file_reference u64;
+    base_record_file_reference u64;
     first_attribute_identifier u16;
 
     !seek to 44;
     entry_index u32;
 };
 
-!assert header.first_attribute_identifier < header.used_entry_size;
+!assert header.first_attribute < header.used_entry_size;
 !assert header.used_entry_size <= header.total_entry_size;
+!assert header.total_entry_size % 512 == 0;
 !assert header.num_fixup_values == (header.total_entry_size / 512) + 1;
 
 // entry sizes larger than 4096 are very uncommon
@@ -37,114 +38,128 @@ let fixup_values = peek([bytes len 2] len header.num_fixup_values - 1 at header.
 // check that the fixup values are correct
 !scope at 0 until header.total_entry_size {
     _chunks [{
-        before_fixup bytes len 510;
+        !seek by 510;
         fixup_bytes bytes len 2;
 
         !warn if fixup_bytes != $parent.fixup_value;
     }] len header.total_entry_size / 512;
 }
 
-!seek to header.first_attribute;
-attributes [{
-    // attributes are 8 byte aligned
-    !align 8;
+// assemble the entry with applied fixup values
+// this is a hack that hard-codes an entry length of 1024, but works with the currently implemented features
+!assert header.total_entry_size == 1024;
+!scope at 0 until header.total_entry_size {
+    _first_chunk bytes len 510;
+    let _first_fixup = peek(bytes len 2 at header.fixup_value_offset + 2);
+    !seek by 2;
+    _second_chunk bytes len 510;
+    let _second_fixup = peek(bytes len 2 at header.fixup_value_offset + 4);
+    let _parse_buf = concat(_first_chunk, _first_fixup, _second_chunk, _second_fixup);
+}
 
-    // parse the size first, so the scope and recovery can be defined
-    let _size = peek(u32 at $offset + 4);
-    !recover at _size;
+!scope in _parse_buf {
+    !seek to header.first_attribute;
+    attributes [{
+        // attributes are 8 byte aligned
+        !align 8;
 
-    !scope at $offset until $offset + _size {
-        type u32;
-        size u32;
-        nonresident u8;
-        name_size u8;
-        name_offset u16;
-        let name = peek(bytes len name_size * 2 at name_offset);
-        attribute_data_flags u16;
-        attribute_identifier u16;
+        // parse the size first, so the scope and recovery can be defined
+        let _size = peek(u32 at $offset + 4);
+        !recover at _size;
 
-        content switch nonresident {
-            0 => {
-                data_size u32;
-                data_offset u16;
-                indexed_flag u8;
-                padding bytes = <00>;
+        !scope at $offset until $offset + _size {
+            type u32;
+            size u32;
+            nonresident u8;
+            name_size u8;
+            name_offset u16;
+            let name = peek(bytes len name_size * 2 at name_offset);
+            attribute_data_flags u16;
+            attribute_identifier u16;
 
-                !scope at data_offset until data_offset + data_size {
-                    content switch $parent.type {
-                        0x10 => {
-                            creation_time u64;
-                            modification_time u64;
-                            changed_time u64;
-                            access_time u64;
-                            file_attribute_flags u32;
-                            maximum_number_of_versions u32;
-                            version_number u32;
-                            class_identifier u32;
+            content switch nonresident {
+                0 => {
+                    data_size u32;
+                    data_offset u16;
+                    indexed_flag u8;
+                    padding bytes = <00>;
 
-                            // some $STANDARD_INFORMATION attributes are 48 bytes and some 72 bytes
-                            !if $parent.data_size > 48 {
-                                owner_identifier u32;
-                                security_descriptor_identifier u32;
-                                quota_charged u64;
-                                update_sequence_number u64;
-                            }
-                        },
-                        0x30 => {
-                            parent_file_reference u64;
-                            creation_time u64;
-                            modification_time u64;
-                            changed_time u64;
-                            access_time u64;
-                            allocated_file_size u64;
-                            file_size u64;
-                            file_attribute_flags u32;
-                            extended_data u32;
-                            name_string_size u8;
-                            namespace u8;
-                            name bytes len name_string_size * 2;
-                        },
-                        0x90 => {
-                            attribute_type u32;
-                            collation_type u32;
-                            index_entry_size u32;
-                            index_entry_number_of_cluster_blocks u32;
-                            index_node_header {
-                                index_values_offset u32;
-                                index_node_size u32;
-                                allocated_index_node_size u32;
-                                index_node_flags u32;
-                            };
-                        },
-                        _ => bytes len data_size,
-                    };
-                }
-            },
-            _ => {
-                first_virtual_cluster_number u64;
-                last_virtual_cluster_number u64;
-                data_runs_offset u16;
-                compression_unit_size u16;
-                padding bytes = <00 00 00 00>;
-                allocated_data_size u64;
-                data_size u64;
-                valid_data_size u64;
-                !if compression_unit_size > 0 {
-                    total_allocated_size u64;
-                }
+                    !scope at data_offset until data_offset + data_size {
+                        content switch $parent.type {
+                            0x10 => {
+                                creation_time u64;
+                                modification_time u64;
+                                changed_time u64;
+                                access_time u64;
+                                file_attribute_flags u32;
+                                maximum_number_of_versions u32;
+                                version_number u32;
+                                class_identifier u32;
 
-                !seek to data_runs_offset;
-                data_runs [{
-                    _counts_byte u8;
+                                // some $STANDARD_INFORMATION attributes are 48 bytes and some 72 bytes
+                                !if $parent.data_size > 48 {
+                                    owner_identifier u32;
+                                    security_descriptor_identifier u32;
+                                    quota_charged u64;
+                                    update_sequence_number u64;
+                                }
+                            },
+                            0x30 => {
+                                parent_file_reference u64;
+                                creation_time u64;
+                                modification_time u64;
+                                changed_time u64;
+                                access_time u64;
+                                allocated_file_size u64;
+                                file_size u64;
+                                file_attribute_flags u32;
+                                extended_data u32;
+                                name_string_size u8;
+                                namespace u8;
+                                name bytes len name_string_size * 2;
+                            },
+                            0x90 => {
+                                attribute_type u32;
+                                collation_type u32;
+                                index_entry_size u32;
+                                index_entry_number_of_cluster_blocks u32;
+                                index_node_header {
+                                    index_values_offset u32;
+                                    index_node_size u32;
+                                    allocated_index_node_size u32;
+                                    index_node_flags u32;
+                                };
+                            },
+                            _ => bytes len data_size,
+                        };
+                    }
+                },
+                _ => {
+                    first_virtual_cluster_number u64;
+                    last_virtual_cluster_number u64;
+                    data_runs_offset u16;
+                    compression_unit_size u16;
+                    padding bytes = <00 00 00 00>;
+                    allocated_data_size u64;
+                    data_size u64;
+                    valid_data_size u64;
+                    !if compression_unit_size > 0 {
+                        total_allocated_size u64;
+                    }
 
-                    let num_blocks_bytes = _counts_byte & 0xf;
-                    let block_num_bytes = (_counts_byte >> 4) & 0xf;
+                    !seek to data_runs_offset;
+                    data_runs [{
+                        _counts_byte u8;
 
-                    num_blocks u(num_blocks_bytes * 8);
-                    block_num i(block_num_bytes * 8);
-                }] while peek(u8) != 0;
-            },
-        };
-    }
-    !seek by size;
-}] while peek(bytes len 4) != <ff ff ff ff>;
+                        let num_blocks_bytes = _counts_byte & 0xf;
+                        let block_num_bytes = (_counts_byte >> 4) & 0xf;
+
+                        num_blocks u(num_blocks_bytes * 8);
+                        block_num i(block_num_bytes * 8);
+                    }] while peek(u8) != 0;
+                },
+            };
+        }
+        !seek by size;
+    }] while peek(bytes len 4) != <ff ff ff ff>;
+}

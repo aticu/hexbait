@@ -230,8 +230,11 @@ fn show_value(
                 let hex_font = FontId::monospace(font_size);
 
                 handle_response(ui.label(format!("{name_prefix}<")));
-                match bytes.preview_slice() {
-                    Ok(slice) => {
+                let mut preview_buf = [0; _];
+                match bytes.preview_slice(&mut preview_buf) {
+                    Some(len) => {
+                        let slice = &preview_buf[..len];
+
                         for (i, byte) in slice.iter().enumerate() {
                             handle_response(
                                 ui.label(
@@ -247,7 +250,9 @@ fn show_value(
                             }
                         }
                     }
-                    Err((prefix, suffix)) => {
+                    None => {
+                        let (prefix, suffix) = preview_buf.split_at(preview_buf.len() / 2);
+
                         for byte in prefix {
                             handle_response(
                                 ui.label(

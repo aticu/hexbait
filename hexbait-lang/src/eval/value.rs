@@ -1,6 +1,6 @@
 //! Implements the values parsed by the language.
 
-use std::{fmt, io, sync::Arc};
+use std::{fmt, io, ops::Range, sync::Arc};
 
 use hexbait_common::{Len, ReadBytes, RelativeOffset};
 
@@ -83,27 +83,35 @@ impl fmt::Debug for ValueKind {
                 }
             }
             Self::Float(float) => float.fmt(f),
-            Self::Bytes(bytes) => match bytes.preview_slice() {
-                Ok(&[]) => write!(f, "[]"),
-                Ok(slice) => {
-                    write!(f, "[{:02x}", slice[0])?;
-                    for byte in &slice[1..] {
-                        write!(f, " {byte:02x}")?;
+            Self::Bytes(bytes) => {
+                let mut buf = [0; _];
+
+                match bytes.preview_slice(&mut buf) {
+                    Some(0) => write!(f, "[]"),
+                    Some(len) => {
+                        let slice = &buf[..len];
+
+                        write!(f, "[{:02x}", slice[0])?;
+                        for byte in &slice[1..] {
+                            write!(f, " {byte:02x}")?;
+                        }
+                        write!(f, "]")
                     }
-                    write!(f, "]")
+                    None => {
+                        let (prefix, suffix) = buf.split_at(buf.len() / 2);
+
+                        write!(f, "[{:02x}", prefix[0])?;
+                        for byte in &prefix[1..] {
+                            write!(f, " {byte:02x}")?;
+                        }
+                        write!(f, " ...")?;
+                        for byte in suffix {
+                            write!(f, " {byte:02x}")?;
+                        }
+                        write!(f, "]")
+                    }
                 }
-                Err((prefix, suffix)) => {
-                    write!(f, "[{:02x}", prefix[0])?;
-                    for byte in &prefix[1..8] {
-                        write!(f, " {byte:02x}")?;
-                    }
-                    write!(f, " ...")?;
-                    for byte in suffix {
-                        write!(f, " {byte:02x}")?;
-                    }
-                    write!(f, "]")
-                }
-            },
+            }
             Self::Struct { fields, error } => {
                 let mut debug_struct = f.debug_struct("struct");
                 for (name, value) in fields {
@@ -213,6 +221,18 @@ impl ValueKind {
             _ => unreachable!("expected an array value"),
         }
     }
+
+    /// Expects the value to be an array, panicking if this is false.
+    ///
+    /// # Panics
+    /// This function will panic if the value is not an array.
+    #[track_caller]
+    pub fn expect_array_take(self) -> Vec<Value> {
+        match self {
+            ValueKind::Array { items, .. } => items,
+            _ => unreachable!("expected an array value"),
+        }
+    }
 }
 
 impl Value {
@@ -298,6 +318,11 @@ pub enum BytesValue {
         /// If `len > Self::INLINE_LEN` the first half of this buffer stores a prefix of the slice and the second half a suffix.
         buf: [u8; Self::INLINE_LEN],
     },
+    /// The bytes are a concatenation of other bytes.
+    Concat {
+        /// The parts that are concatenated together.
+        parts: Vec<BytesValue>,
+    },
 }
 
 impl BytesValue {
@@ -327,41 +352,100 @@ impl BytesValue {
                 len,
                 buf: _,
             } => view.read_at(*start, *len),
-        }
-    }
+            BytesValue::Concat { parts } => {
+                let mut out = Vec::new();
+                for part in parts {
+                    out.extend_from_slice(&part.value()?);
+                }
 
-    /// Converts the bytes into a [`Vec`] containing the bytes.
-    pub fn as_vec(&self) -> io::Result<Vec<u8>> {
-        match self {
-            BytesValue::Lit(lit) => Ok(lit.to_vec()),
-            BytesValue::FromView {
-                view, start, len, ..
-            } => Ok(view.read_at(*start, *len)?.into()),
+                Ok(ReadBytes::from_vec(out))
+            }
         }
     }
 
     /// Returns the bytes as a slice for preview.
     ///
-    /// If they are not fully stored inline, instead a prefix and a suffix are returned.
-    pub fn preview_slice(&self) -> Result<&[u8], (&[u8], &[u8])> {
+    /// If they fit in the `buf` `Some(len)` is returned and `buf[..len]` is filled.
+    /// If they do not fit in the `buf` the first half of the buffer is filled with a prefix and the second half with a suffix and `None` is returned.
+    pub fn preview_slice(&self, buf: &mut [u8; Self::INLINE_LEN]) -> Option<usize> {
         match self {
             BytesValue::Lit(lit) => {
-                if lit.len() <= 16 {
-                    Ok(lit)
+                if lit.len() <= Self::INLINE_LEN {
+                    buf[..lit.len()].copy_from_slice(lit);
+
+                    Some(lit.len())
                 } else {
-                    Err((&lit[..8], &lit[lit.len() - 8..]))
+                    buf[..Self::PREFIX_SUFFIX_LEN].copy_from_slice(&lit[..Self::PREFIX_SUFFIX_LEN]);
+                    buf[Self::PREFIX_SUFFIX_LEN..]
+                        .copy_from_slice(&lit[lit.len() - Self::PREFIX_SUFFIX_LEN..]);
+
+                    None
                 }
             }
-            BytesValue::FromView { len, buf, .. }
-                if let len = len.as_u64() as usize
-                    && len < Self::INLINE_LEN =>
+            BytesValue::FromView {
+                len, buf: inline, ..
+            } if let len = len.as_u64() as usize
+                && len <= Self::INLINE_LEN =>
             {
-                Ok(&buf[..len])
+                buf[..len].copy_from_slice(&inline[..len]);
+                Some(len)
             }
-            BytesValue::FromView { buf, .. } => Err((
-                &buf[..Self::PREFIX_SUFFIX_LEN],
-                &buf[Self::PREFIX_SUFFIX_LEN..],
-            )),
+            BytesValue::FromView { buf: inner_buf, .. } => {
+                buf.copy_from_slice(inner_buf);
+                None
+            }
+            BytesValue::Concat { parts } => {
+                let mut fill = 0;
+                let mut tmp_buf = [0; Self::INLINE_LEN];
+                let mut needs_split = false;
+
+                for part in parts {
+                    match part.preview_slice(&mut tmp_buf) {
+                        Some(len) if len + fill <= Self::INLINE_LEN => {
+                            buf[fill..][..len].copy_from_slice(&tmp_buf[..len]);
+                            fill += len;
+                        }
+                        _ => {
+                            if fill < Self::PREFIX_SUFFIX_LEN {
+                                buf[fill..Self::PREFIX_SUFFIX_LEN]
+                                    .copy_from_slice(&tmp_buf[..Self::PREFIX_SUFFIX_LEN - fill]);
+                            }
+
+                            needs_split = true;
+                            fill = Self::PREFIX_SUFFIX_LEN;
+                            break;
+                        }
+                    }
+                }
+
+                if needs_split {
+                    let mut placed = 0;
+                    for part in parts.iter().rev() {
+                        let needed = Self::PREFIX_SUFFIX_LEN - placed;
+                        let end = Self::INLINE_LEN - placed;
+
+                        match part.preview_slice(&mut tmp_buf) {
+                            Some(len) if len < needed => {
+                                buf[end - len..end].copy_from_slice(&tmp_buf[..len]);
+                                placed += len;
+                            }
+                            Some(len) => {
+                                buf[end - needed..end].copy_from_slice(&tmp_buf[len - needed..len]);
+                                break;
+                            }
+                            None => {
+                                buf[end - needed..end]
+                                    .copy_from_slice(&tmp_buf[Self::INLINE_LEN - needed..]);
+                                break;
+                            }
+                        }
+                    }
+
+                    None
+                } else {
+                    Some(fill)
+                }
+            }
         }
     }
 
@@ -370,12 +454,124 @@ impl BytesValue {
         match self {
             BytesValue::Lit(lit) => lit.len(),
             BytesValue::FromView { len, .. } => len.as_u64() as usize,
+            BytesValue::Concat { parts } => parts.iter().map(|part| part.len()).sum(),
         }
     }
 
     /// Whether or not the bytes are empty.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// Fills the given buffer from bytes at the given offset.
+    pub fn fill_buf_at(&self, offset: usize, buf: &mut [u8]) -> io::Result<()> {
+        match self {
+            BytesValue::Lit(lit) => {
+                let end = offset.checked_add(buf.len());
+                let slice = end.and_then(|end| lit.get(offset..end)).ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "bytes value literal too short",
+                    )
+                })?;
+                buf.copy_from_slice(slice);
+            }
+            BytesValue::FromView {
+                view,
+                start,
+                len,
+                buf: _,
+            } => {
+                // This could optionally be optimized to use the cached inline values in buf if possible.
+                // That would however increase implementation complexity, so for now this is fine and correct.
+                let read_offset = *start + Len::from(offset as u64);
+                let out_len = Len::from(buf.len() as u64);
+                if Len::from(offset as u64) + out_len > *len {
+                    return Err(io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "bytes value from view too short",
+                    ));
+                }
+
+                let slice = view.read_at(read_offset, out_len)?;
+                buf.copy_from_slice(&slice);
+            }
+            BytesValue::Concat { parts } => {
+                let mut to_skip = offset;
+                let mut buf = buf;
+
+                for part in parts {
+                    let part_len = part.len();
+                    if to_skip >= part_len {
+                        to_skip -= part_len;
+                        continue;
+                    }
+
+                    let covered_len = part_len - to_skip;
+                    if covered_len > buf.len() {
+                        return part.fill_buf_at(to_skip, buf);
+                    }
+
+                    let (part_buf, rest_buf) = buf.split_at_mut(covered_len);
+                    part.fill_buf_at(to_skip, part_buf)?;
+                    buf = rest_buf;
+                    to_skip = 0;
+                }
+
+                if !buf.is_empty() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "concatenated bytes value too short",
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Returns the provenance of the bytes of the given range.
+    pub fn provenance_range(&self, range: Range<RelativeOffset>) -> Provenance {
+        match self {
+            BytesValue::Lit(_) => Provenance::empty(),
+            BytesValue::FromView {
+                view, start, len, ..
+            } => {
+                let clamp = |off: RelativeOffset| std::cmp::min(Len::from(off.as_u64()), *len);
+
+                view.provenance_from_range(*start + clamp(range.start)..*start + clamp(range.end))
+            }
+            BytesValue::Concat { parts } => {
+                let mut provenance = Provenance::empty();
+                let mut offset = 0;
+
+                let range = range.start.as_u64() as usize..range.end.as_u64() as usize;
+
+                for part in parts {
+                    let part_start = offset;
+                    let len = part.len();
+                    offset += len;
+
+                    if offset <= range.start {
+                        continue;
+                    }
+
+                    let provenance_start = RelativeOffset::from(
+                        (std::cmp::max(part_start, range.start) - part_start) as u64,
+                    );
+                    let provenance_end = RelativeOffset::from(
+                        (std::cmp::min(offset, range.end) - part_start) as u64,
+                    );
+                    provenance += &part.provenance_range(provenance_start..provenance_end);
+
+                    if offset >= range.end {
+                        break;
+                    }
+                }
+
+                provenance
+            }
+        }
     }
 }
 

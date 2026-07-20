@@ -165,6 +165,16 @@ pub enum NodeKind {
     FieldAccess,
     /// A `peek(type, at = offset)` expression.
     PeekExpr,
+    /// A `concat(val1, val2, ..val3)` expression.
+    ConcatExpr,
+
+    // Concatenation helpers
+    /// An argument to a `concat` expression.
+    ConcatArg,
+    /// A direct `bytes` argument to a concat expression.
+    ConcatArgDirect,
+    /// A `..val` array of `bytes` argument to a concate expression.
+    ConcatArgExpanding,
 
     /// Contains unrecognized syntax.
     Error,

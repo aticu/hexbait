@@ -40,6 +40,47 @@ fn atom<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
 
             (NodeKind::PeekExpr, TokenKind::RParen)
         }
+        Some(TokenKind::ConcatKw) => {
+            p.expect(TokenKind::ConcatKw);
+            p.expect(TokenKind::LParen);
+
+            let mut needs_comma = false;
+            loop {
+                if needs_comma {
+                    match p.cur() {
+                        Some(TokenKind::Comma) => {
+                            p.expect(TokenKind::Comma);
+                        }
+                        Some(TokenKind::RParen) => break,
+                        _ => {
+                            p.expect_error(vec!["`,`", "`)`"]);
+                            break;
+                        }
+                    }
+                }
+
+                match p.cur() {
+                    Some(TokenKind::RParen) => break,
+                    Some(TokenKind::Dot) => {
+                        let arg_ty = p.start();
+
+                        p.expect(TokenKind::Dot);
+                        p.expect(TokenKind::Dot);
+
+                        expr(p).and_complete(arg_ty, NodeKind::ConcatArgExpanding);
+                    }
+                    _ => {
+                        let arg_ty = p.start();
+
+                        expr(p).and_complete(arg_ty, NodeKind::ConcatArgDirect);
+                    }
+                }
+
+                needs_comma = true;
+            }
+
+            (NodeKind::ConcatExpr, TokenKind::RParen)
+        }
         Some(TokenKind::LAngle) => {
             p.expect(TokenKind::LAngle);
             loop {
@@ -68,7 +109,8 @@ fn atom<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
             p.expect_error(vec![
                 "identifier",
                 "literal",
-                "`parse`",
+                "`peek`",
+                "`concat`",
                 "`$`",
                 "`<`",
                 "`(`",
@@ -199,6 +241,8 @@ enum InfixOp {
     Mul,
     /// `/`
     Div,
+    /// `%`
+    Mod,
     /// `==`
     Eq,
     /// `!=`
@@ -270,6 +314,7 @@ impl InfixOp {
             (Some((_, TokenKind::Minus)), _) => Some(InfixOp::Sub),
             (Some((_, TokenKind::Star)), _) => Some(InfixOp::Mul),
             (Some((_, TokenKind::Slash)), _) => Some(InfixOp::Div),
+            (Some((_, TokenKind::Percent)), _) => Some(InfixOp::Mod),
             (Some((_, TokenKind::RAngle)), _) => Some(InfixOp::Gt),
             (Some((_, TokenKind::LAngle)), _) => Some(InfixOp::Lt),
             (Some((_, TokenKind::Ampersand)), _) => Some(InfixOp::BitAnd),
@@ -288,6 +333,7 @@ impl InfixOp {
             InfixOp::Sub => TokenKind::Minus,
             InfixOp::Mul => TokenKind::Star,
             InfixOp::Div => TokenKind::Slash,
+            InfixOp::Mod => TokenKind::Percent,
             InfixOp::Eq => {
                 p.expect(TokenKind::Equals);
                 TokenKind::Equals
@@ -334,7 +380,7 @@ impl InfixOp {
     fn binding_power(&self) -> (u8, u8) {
         match self {
             InfixOp::Add | InfixOp::Sub => (15, 16),
-            InfixOp::Mul | InfixOp::Div => (17, 18),
+            InfixOp::Mul | InfixOp::Div | InfixOp::Mod => (17, 18),
             InfixOp::Eq
             | InfixOp::Neq
             | InfixOp::Gt
