@@ -629,7 +629,7 @@ impl Scope {
             Declaration::WarnIf { condition, message } => {
                 let condition_value =
                     self.eval_expr(condition, struct_ctx, parse_ctx, Default::default())?;
-                if !condition_value.kind.expect_bool() {
+                if condition_value.kind.expect_bool() {
                     let message = if let Some(message) = message {
                         let message_val =
                             self.eval_expr(message, struct_ctx, parse_ctx, Default::default())?;

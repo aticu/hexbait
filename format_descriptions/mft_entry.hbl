@@ -27,7 +27,7 @@ header {
 !assert header.num_fixup_values == (header.total_entry_size / 512) + 1;
 
 // entry sizes larger than 4096 are very uncommon
-!warn if header.total_entry_size > 4096;
+!warn if header.total_entry_size > 4096: "uncommon header size";
 
 // now that we know the actual entry size, we can recover more precisely
 !recover at header.total_entry_size;
@@ -41,7 +41,7 @@ let fixup_values = peek([bytes len 2] len header.num_fixup_values - 1 at header.
         !seek by 510;
         fixup_bytes bytes len 2;
 
-        !warn if fixup_bytes != $parent.fixup_value;
+        !warn if fixup_bytes != $parent.fixup_value: "fixup value mismatch";
     }] len header.total_entry_size / 512;
 }
 

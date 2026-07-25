@@ -2,13 +2,13 @@
 //!
 //! This also serves as a testing ground for an eventual integration into hexbait itself.
 
-use std::{char, path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use clap::Parser;
 use hexbait_builtin_parsers::built_in_format_descriptions;
 use hexbait_common::{Input, RelativeOffset};
-use hexbait_lang::{Value, View, eval_ir, ir::lower_file, parse};
-use serde_json::Number;
+use hexbait_lang::{View, eval_ir, ir::lower_file, parse};
+use hexbait_parse::result_to_json;
 
 /// hexbait-parser - parses bytes to json according to .hbl-definitions
 #[derive(Parser, Debug)]
@@ -25,6 +25,9 @@ struct Config {
     /// A custom parser to use
     #[arg(short, long)]
     custom: Option<PathBuf>,
+    /// Whether to show more detailed output
+    #[arg(short, long)]
+    detailed: bool,
 }
 
 /// The entry point for the application.
@@ -74,54 +77,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let view = View::from_input(input);
 
-    let result = eval_ir(&parser, view, RelativeOffset::ZERO).value;
-    let as_json = value_to_json(&result);
+    let result = eval_ir(&parser, view, RelativeOffset::ZERO);
+    let as_json = result_to_json(&result, config.detailed);
 
-    println!("{}", as_json);
+    println!("{as_json}");
 
     Ok(())
-}
-
-/// Converts the given parsed value to JSON.
-fn value_to_json(value: &Value) -> serde_json::Value {
-    match &value.kind {
-        hexbait_lang::ValueKind::Boolean(val) => serde_json::Value::Bool(*val),
-        hexbait_lang::ValueKind::Integer(val) => {
-            let num = if let Ok(num) = u128::try_from(val) {
-                Number::from_u128(num)
-            } else if let Ok(num) = i128::try_from(val) {
-                Number::from_i128(num)
-            } else {
-                Number::from_str(&val.to_string()).ok()
-            };
-            num.map(serde_json::Value::Number)
-                .unwrap_or(serde_json::Value::Null)
-        }
-        hexbait_lang::ValueKind::Float(val) => serde_json::Number::from_f64(*val)
-            .map(serde_json::Value::Number)
-            .unwrap_or(serde_json::Value::Null),
-        hexbait_lang::ValueKind::Bytes(val) => {
-            let mut as_str = String::new();
-            for byte in &*val.value().unwrap() {
-                for bit in (0..8).step_by(4).rev() {
-                    let nibble = (byte >> bit) & 0xf;
-                    let c = char::from_digit(nibble as u32, 16).unwrap();
-                    as_str.push(c);
-                }
-            }
-            serde_json::Value::String(as_str)
-        }
-        hexbait_lang::ValueKind::Struct { fields, .. } => {
-            let mut object = serde_json::Map::new();
-
-            for (name, val) in fields {
-                object.insert(name.as_str().to_string(), value_to_json(val));
-            }
-
-            serde_json::Value::Object(object)
-        }
-        hexbait_lang::ValueKind::Array { items, .. } => {
-            serde_json::Value::Array(items.iter().map(value_to_json).collect())
-        }
-    }
 }
