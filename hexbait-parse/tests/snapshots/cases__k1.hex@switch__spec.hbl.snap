@@ -1,0 +1,26 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/switch/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "kind": {
+        "value": 1,
+        "provenance": "0..=0"
+      },
+      "payload": {
+        "value": 170,
+        "provenance": "1..=1"
+      },
+      "tail": {
+        "value": 187,
+        "provenance": "2..=2"
+      }
+    },
+    "provenance": "0..=2"
+  },
+  "errors": [],
+  "warnings": []
+}

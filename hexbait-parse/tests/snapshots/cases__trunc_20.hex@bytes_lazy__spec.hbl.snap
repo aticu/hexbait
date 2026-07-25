@@ -1,0 +1,24 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/bytes_lazy/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "small": {
+        "value": "000102030405060708090a0b0c0d0e0f",
+        "provenance": "0..=15"
+      }
+    },
+    "provenance": "0..=15",
+    "error": "view is too short"
+  },
+  "errors": [
+    {
+      "message": "view is too short",
+      "provenance": "16..=16"
+    }
+  ],
+  "warnings": []
+}

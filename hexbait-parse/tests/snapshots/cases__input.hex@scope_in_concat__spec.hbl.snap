@@ -1,0 +1,30 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/scope_in_concat/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "p1": {
+        "value": "0102",
+        "provenance": "0..=1"
+      },
+      "p2": {
+        "value": "0304",
+        "provenance": "4..=5"
+      },
+      "v": {
+        "value": 67305985,
+        "provenance": "0..=1, 4..=5"
+      },
+      "tail": {
+        "value": 127,
+        "provenance": "6..=6"
+      }
+    },
+    "provenance": "0..=1, 4..=6"
+  },
+  "errors": [],
+  "warnings": []
+}

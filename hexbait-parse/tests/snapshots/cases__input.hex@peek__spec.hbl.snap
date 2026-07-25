@@ -1,0 +1,22 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/peek/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "v": {
+        "value": 67305985,
+        "provenance": "0..=3"
+      },
+      "w": {
+        "value": 1541,
+        "provenance": "4..=5"
+      }
+    },
+    "provenance": "0..=5"
+  },
+  "errors": [],
+  "warnings": []
+}

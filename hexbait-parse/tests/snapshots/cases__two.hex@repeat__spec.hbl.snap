@@ -1,0 +1,69 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/repeat/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "count": {
+        "value": 2,
+        "provenance": "0..=0"
+      },
+      "items": {
+        "value": [
+          {
+            "value": 1,
+            "provenance": "1..=2"
+          },
+          {
+            "value": 2,
+            "provenance": "3..=4"
+          }
+        ],
+        "provenance": "1..=4"
+      },
+      "zeros": {
+        "value": [
+          {
+            "value": 9,
+            "provenance": "5..=5"
+          },
+          {
+            "value": 10,
+            "provenance": "6..=6"
+          },
+          {
+            "value": 0,
+            "provenance": "7..=7"
+          }
+        ],
+        "provenance": "5..=7"
+      },
+      "rest": {
+        "value": [
+          {
+            "value": 0,
+            "provenance": "8..=8"
+          },
+          {
+            "value": 0,
+            "provenance": "9..=9"
+          },
+          {
+            "value": 0,
+            "provenance": "10..=10"
+          },
+          {
+            "value": 0,
+            "provenance": "11..=11"
+          }
+        ],
+        "provenance": "8..=11"
+      }
+    },
+    "provenance": "0..=11"
+  },
+  "errors": [],
+  "warnings": []
+}

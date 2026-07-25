@@ -1,0 +1,26 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/expected/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "magic": {
+        "value": "25504446",
+        "provenance": "0..=3"
+      },
+      "ver": {
+        "value": 1,
+        "provenance": "4..=4"
+      },
+      "tag": {
+        "value": "414200ff",
+        "provenance": "5..=8"
+      }
+    },
+    "provenance": "0..=8"
+  },
+  "errors": [],
+  "warnings": []
+}

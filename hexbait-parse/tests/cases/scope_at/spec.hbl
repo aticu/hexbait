@@ -1,0 +1,9 @@
+!endian le;
+
+!scope at 2 until 6 {
+  x u16;
+  y u16;
+  !assert $offset == 4;
+}
+
+z u8;

@@ -9,3 +9,6 @@ serde_json = { version = "1.0.145", default-features = false, features = ["std",
 hexbait-common = { path = "../hexbait-common" }
 hexbait-lang = { path = "../hexbait-lang" }
 hexbait-builtin-parsers = { path = "../hexbait-builtin-parsers" }
+
+[dev-dependencies]
+insta = { version = "1.48.0", features = ["glob"] }

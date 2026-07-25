@@ -1,0 +1,26 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/scope_at/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "x": {
+        "value": 1,
+        "provenance": "2..=3"
+      },
+      "y": {
+        "value": 2,
+        "provenance": "4..=5"
+      },
+      "z": {
+        "value": 170,
+        "provenance": "0..=0"
+      }
+    },
+    "provenance": "0..=0, 2..=5"
+  },
+  "errors": [],
+  "warnings": []
+}

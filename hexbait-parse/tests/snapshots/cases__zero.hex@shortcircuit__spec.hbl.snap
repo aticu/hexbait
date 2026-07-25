@@ -1,0 +1,22 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/shortcircuit/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": 0,
+        "provenance": "0..=0"
+      },
+      "b": {
+        "value": 17,
+        "provenance": "1..=1"
+      }
+    },
+    "provenance": "0..=1"
+  },
+  "errors": [],
+  "warnings": []
+}

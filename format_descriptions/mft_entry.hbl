@@ -65,7 +65,7 @@ let fixup_values = peek([bytes len 2] len header.num_fixup_values - 1 at header.
 
         // parse the size first, so the scope and recovery can be defined
         let _size = peek(u32 at $offset + 4);
-        !recover at _size;
+        !recover at $offset + _size;
 
         !scope at $offset until $offset + _size {
             type u32;

@@ -1,0 +1,43 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/endian_scope/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": 513,
+        "provenance": "0..=1"
+      },
+      "b": {
+        "value": 772,
+        "provenance": "2..=3"
+      },
+      "inner": {
+        "value": {
+          "c": {
+            "value": 1541,
+            "provenance": "4..=5"
+          }
+        },
+        "provenance": "4..=5"
+      },
+      "d": {
+        "value": 2055,
+        "provenance": "6..=7"
+      },
+      "e_le": {
+        "value": 2569,
+        "provenance": "8..=9"
+      },
+      "e_be": {
+        "value": 2314,
+        "provenance": "8..=9"
+      }
+    },
+    "provenance": "0..=9"
+  },
+  "errors": [],
+  "warnings": []
+}

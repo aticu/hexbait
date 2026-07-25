@@ -1,0 +1,32 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/expected/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "magic": {
+        "value": "25504446",
+        "provenance": "0..=3"
+      },
+      "ver": {
+        "value": 1,
+        "provenance": "4..=4"
+      },
+      "tag": {
+        "value": "414200fe",
+        "provenance": "5..=8"
+      }
+    },
+    "provenance": "0..=8",
+    "error": "field expectation failed: [41 42 00 ff] != [41 42 00 fe]"
+  },
+  "errors": [
+    {
+      "message": "field expectation failed: [41 42 00 ff] != [41 42 00 fe]",
+      "provenance": "5..=8"
+    }
+  ],
+  "warnings": []
+}

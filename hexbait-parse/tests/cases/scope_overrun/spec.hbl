@@ -1,0 +1,7 @@
+!endian le;
+
+!scope at 0 until 4 {
+  x u16;
+  y u16;
+  past u16;
+}

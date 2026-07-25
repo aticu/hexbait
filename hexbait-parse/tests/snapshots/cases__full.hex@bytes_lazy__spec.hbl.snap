@@ -1,0 +1,22 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/bytes_lazy/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "small": {
+        "value": "000102030405060708090a0b0c0d0e0f",
+        "provenance": "0..=15"
+      },
+      "big": {
+        "value": "101112131415161718191a1b1c1d1e1f20",
+        "provenance": "16..=32"
+      }
+    },
+    "provenance": "0..=32"
+  },
+  "errors": [],
+  "warnings": []
+}

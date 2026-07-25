@@ -143,31 +143,32 @@ impl Window {
     ///
     /// ```rust
     /// # use hexbait::window::Window;
+    /// # use hexbait_common::AbsoluteOffset;
     /// assert_eq!(
-    ///     Window::new(3, 25).align(8),
+    ///     Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(25)).align(8),
     ///     Some((
-    ///         Window::new(3, 8),
-    ///         Window::new(8, 24),
-    ///         Window::new(24, 25),
+    ///         Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(8)),
+    ///         Window::new(AbsoluteOffset::from(8), AbsoluteOffset::from(24)),
+    ///         Window::new(AbsoluteOffset::from(24), AbsoluteOffset::from(25)),
     ///     ))
     /// );
     /// assert_eq!(
-    ///     Window::new(3, 8).align(8),
+    ///     Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(8)).align(8),
     ///     Some((
-    ///         Window::new(3, 8),
-    ///         Window::new(8, 8),
-    ///         Window::new(8, 8),
+    ///         Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(8)),
+    ///         Window::new(AbsoluteOffset::from(8), AbsoluteOffset::from(8)),
+    ///         Window::new(AbsoluteOffset::from(8), AbsoluteOffset::from(8)),
     ///     ))
     /// );
     /// assert_eq!(
-    ///     Window::new(7, 11).align(8),
+    ///     Window::new(AbsoluteOffset::from(7), AbsoluteOffset::from(11)).align(8),
     ///     Some((
-    ///         Window::new(7, 8),
-    ///         Window::new(8, 8),
-    ///         Window::new(8, 11),
+    ///         Window::new(AbsoluteOffset::from(7), AbsoluteOffset::from(8)),
+    ///         Window::new(AbsoluteOffset::from(8), AbsoluteOffset::from(8)),
+    ///         Window::new(AbsoluteOffset::from(8), AbsoluteOffset::from(11)),
     ///     ))
     /// );
-    /// assert_eq!(Window::new(3, 25).align(32), None);
+    /// assert_eq!(Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(25)).align(32), None);
     /// ```
     pub fn align(self, align: u64) -> Option<(Window, Window, Window)> {
         let start = self.start().align_up(align);

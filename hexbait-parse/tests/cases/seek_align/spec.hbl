@@ -1,0 +1,12 @@
+!endian le;
+
+a u16;
+!seek by 3;
+b u16;
+!align 8;
+c u8;
+let sum = a + b;
+let lit = 7;
+
+!seek to 8;
+c_again u8;

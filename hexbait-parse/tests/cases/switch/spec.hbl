@@ -1,0 +1,10 @@
+!endian le;
+
+kind u8;
+payload switch kind {
+  1 => u8,
+  2 => u16,
+  3 => [u8] len 3,
+  _ => bytes len 4,
+};
+tail u8;

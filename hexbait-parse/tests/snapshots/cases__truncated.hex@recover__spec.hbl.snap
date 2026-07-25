@@ -1,0 +1,29 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/recover/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "head": {
+        "value": 1,
+        "provenance": "0..=0"
+      },
+      "body": {
+        "value": {},
+        "provenance": "",
+        "error": "recovery offset exceeded the end of the current scope"
+      }
+    },
+    "provenance": "0..=0",
+    "error": "recovery offset exceeded the end of the current scope"
+  },
+  "errors": [
+    {
+      "message": "recovery offset exceeded the end of the current scope",
+      "provenance": ""
+    }
+  ],
+  "warnings": []
+}

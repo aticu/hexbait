@@ -1,0 +1,28 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/scope_overrun/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "x": {
+        "value": 1,
+        "provenance": "0..=1"
+      },
+      "y": {
+        "value": 2,
+        "provenance": "2..=3"
+      }
+    },
+    "provenance": "0..=3",
+    "error": "view is too short"
+  },
+  "errors": [
+    {
+      "message": "view is too short",
+      "provenance": "4..=4"
+    }
+  ],
+  "warnings": []
+}

@@ -1,0 +1,37 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/recover/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "head": {
+        "value": 1,
+        "provenance": "0..=0"
+      },
+      "body": {
+        "value": {
+          "tag": {
+            "value": 187,
+            "provenance": "1..=1"
+          }
+        },
+        "provenance": "1..=1",
+        "error": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
+      },
+      "tail": {
+        "value": 6,
+        "provenance": "6..=6"
+      }
+    },
+    "provenance": "0..=1, 6..=6"
+  },
+  "errors": [
+    {
+      "message": "field expectation failed: 170 (0xaa) != 187 (0xbb)",
+      "provenance": "1..=1"
+    }
+  ],
+  "warnings": []
+}

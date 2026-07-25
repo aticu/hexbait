@@ -1,0 +1,28 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/expected/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "magic": {
+        "value": "25504446",
+        "provenance": "0..=3"
+      },
+      "ver": {
+        "value": 2,
+        "provenance": "4..=4"
+      }
+    },
+    "provenance": "0..=4",
+    "error": "field expectation failed: 1 (0x1) != 2 (0x2)"
+  },
+  "errors": [
+    {
+      "message": "field expectation failed: 1 (0x1) != 2 (0x2)",
+      "provenance": "4..=4"
+    }
+  ],
+  "warnings": []
+}

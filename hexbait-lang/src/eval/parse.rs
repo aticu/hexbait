@@ -655,7 +655,6 @@ impl Scope {
             Declaration::Recover { at } => {
                 let offset = self.eval_expr(at, struct_ctx, parse_ctx, Default::default())?;
                 if let Ok(offset) = u64::try_from(offset.kind.expect_int())
-                    && let Some(offset) = offset.checked_add(struct_ctx.start_offset.0.as_u64())
                     && Len::from(offset) <= self.view.len()
                 {
                     struct_ctx.recovery_strategy = RecoveryStrategy::SkipTo {

@@ -1,0 +1,6 @@
+# input.hex
+01 00        # a = 1          @ 0..=1
+ff ff ff     # skipped by seek
+02 00        # b = 2          @ 5..=6
+ff           # skipped by align
+07           # c              @ 8..=8

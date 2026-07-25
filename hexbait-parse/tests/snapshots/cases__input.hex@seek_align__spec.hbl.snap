@@ -1,0 +1,38 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/seek_align/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": 1,
+        "provenance": "0..=1"
+      },
+      "b": {
+        "value": 2,
+        "provenance": "5..=6"
+      },
+      "c": {
+        "value": 7,
+        "provenance": "8..=8"
+      },
+      "sum": {
+        "value": 3,
+        "provenance": "0..=1, 5..=6"
+      },
+      "lit": {
+        "value": 7,
+        "provenance": ""
+      },
+      "c_again": {
+        "value": 7,
+        "provenance": "8..=8"
+      }
+    },
+    "provenance": "0..=1, 5..=6, 8..=8"
+  },
+  "errors": [],
+  "warnings": []
+}

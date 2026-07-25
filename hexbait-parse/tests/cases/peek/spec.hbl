@@ -1,0 +1,6 @@
+!endian le;
+
+let _p = peek(u32);
+v u32;
+!assert _p == v;
+w u16;

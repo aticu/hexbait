@@ -1,0 +1,5 @@
+!endian le;
+
+a u8;
+!assert a == 0 || peek(u8 at 1000) == 0;
+b u8;

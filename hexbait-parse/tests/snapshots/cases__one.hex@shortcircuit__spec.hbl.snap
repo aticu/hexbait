@@ -1,0 +1,24 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/shortcircuit/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": 1,
+        "provenance": "0..=0"
+      }
+    },
+    "provenance": "0..=0",
+    "error": "new offset did not fit in available space"
+  },
+  "errors": [
+    {
+      "message": "new offset did not fit in available space",
+      "provenance": ""
+    }
+  ],
+  "warnings": []
+}

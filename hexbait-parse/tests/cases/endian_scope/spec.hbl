@@ -1,0 +1,22 @@
+!endian le;
+a u16;
+
+!endian be;
+b u16;
+
+inner {
+  !endian le;
+  c u16;
+};
+
+// parse little endian, because structs don't encapsulate endianness
+d u16;
+
+!endian be;
+!scope at $offset {
+  !endian le;
+  e_le u16;
+}
+
+// parsed as big endian because scopes do encapsulate endianness
+e_be u16;

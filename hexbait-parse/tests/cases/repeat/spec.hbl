@@ -1,0 +1,6 @@
+!endian le;
+
+count u8;
+items [u16] len count;
+zeros [u8] while $len == 0 || $last != 0;
+rest [u8] while $offset < 12;

@@ -1,0 +1,19 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "render(&spec, &input)"
+input_file: hexbait-parse/tests/cases/scope_at/spec.hbl
+---
+{
+  "value": {
+    "value": {},
+    "provenance": "",
+    "error": "scope end exceeded the end of the current scope"
+  },
+  "errors": [
+    {
+      "message": "scope end exceeded the end of the current scope",
+      "provenance": ""
+    }
+  ],
+  "warnings": []
+}

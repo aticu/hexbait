@@ -28,7 +28,7 @@ enum InputType {
     /// The input is the given memory map.
     Memmap(Mmap),
     /// The input was read from stdin.
-    Stdin(Box<[u8]>),
+    Bytes(Box<[u8]>),
 }
 
 impl Input {
@@ -77,7 +77,12 @@ impl Input {
         let mut buf = Vec::new();
         io::Read::read_to_end(&mut io::stdin(), &mut buf)?;
 
-        Ok(Input(Arc::new(InputType::Stdin(buf.into()))))
+        Ok(Input::from_bytes(&buf))
+    }
+
+    /// Creates an input from raw bytes.
+    pub fn from_bytes(bytes: &[u8]) -> Input {
+        Input(Arc::new(InputType::Bytes(bytes.into())))
     }
 
     /// The length of the data.
@@ -88,7 +93,7 @@ impl Input {
                 u64::try_from(mmap.len())
                     .expect("non `u64`-fitting length would not fit into memory"),
             ),
-            InputType::Stdin(stdin) => Len::from(
+            InputType::Bytes(stdin) => Len::from(
                 u64::try_from(stdin.len())
                     .expect("non `u64`-fitting length would not fit into memory"),
             ),
@@ -117,7 +122,7 @@ impl Input {
                 }
             }
             InputType::Memmap(_) => (),
-            InputType::Stdin(_) => (),
+            InputType::Bytes(_) => (),
         }
     }
 
@@ -194,7 +199,7 @@ impl Input {
                     buf: &mmap[offset_usize..offset_usize + output_size],
                 }))
             }
-            InputType::Stdin(stdin) => {
+            InputType::Bytes(stdin) => {
                 let offset_usize: usize = offset
                     .as_u64()
                     .try_into()
