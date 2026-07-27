@@ -1,0 +1,7 @@
+!endian le;
+
+n u8;
+items [{
+  let up_n = $parent.n;
+  v u8;
+}] len 2;

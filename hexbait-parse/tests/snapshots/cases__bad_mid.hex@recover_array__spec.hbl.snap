@@ -1,0 +1,68 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\nhead u8;\nitems [{\n  !recover at $offset + 2;\n  tag u8 = 0xaa;\n  val u8;\n}] len 3;\ntail u8;\n\n\n=== Hex ===\nff  aa 01  bb 02  aa 03  7f\n"
+input_file: hexbait-parse/tests/cases/recover_array/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "head": {
+        "value": 255,
+        "provenance": "0..=0"
+      },
+      "items": {
+        "value": [
+          {
+            "value": {
+              "tag": {
+                "value": 170,
+                "provenance": "1..=1"
+              },
+              "val": {
+                "value": 1,
+                "provenance": "2..=2"
+              }
+            },
+            "provenance": "1..=2"
+          },
+          {
+            "value": {
+              "tag": {
+                "value": 187,
+                "provenance": "3..=3"
+              }
+            },
+            "provenance": "3..=3",
+            "error": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
+          },
+          {
+            "value": {
+              "tag": {
+                "value": 170,
+                "provenance": "5..=5"
+              },
+              "val": {
+                "value": 3,
+                "provenance": "6..=6"
+              }
+            },
+            "provenance": "5..=6"
+          }
+        ],
+        "provenance": "1..=3, 5..=6"
+      },
+      "tail": {
+        "value": 127,
+        "provenance": "7..=7"
+      }
+    },
+    "provenance": "0..=3, 5..=7"
+  },
+  "errors": [
+    {
+      "message": "field expectation failed: 170 (0xaa) != 187 (0xbb)",
+      "provenance": "3..=3"
+    }
+  ],
+  "warnings": []
+}

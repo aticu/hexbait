@@ -1,0 +1,22 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\na u8;\n!seek by 2;\n_hidden u8;\n!seek to 6;\nb u8;\n\n\n=== Hex ===\n01 ff ff 02 ff ff 03 ff\n"
+input_file: hexbait-parse/tests/cases/provenance_hidden/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": 1,
+        "provenance": "0..=0"
+      },
+      "b": {
+        "value": 3,
+        "provenance": "6..=6"
+      }
+    },
+    "provenance": "0..=0, 3..=3, 6..=6"
+  },
+  "errors": [],
+  "warnings": []
+}

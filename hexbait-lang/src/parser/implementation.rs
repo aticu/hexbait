@@ -97,15 +97,12 @@ fn if_chain<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
 
         p.bump();
 
-        let m_else_part = p.start();
-
         if p.at_contextual_kw("if") {
             if_chain(p)
         } else {
             let m_else_block = p.start();
             struct_block(p).and_complete(m_else_block, NodeKind::ElseBlock)
         }
-        .and_complete(m_else_part, NodeKind::ElsePart)
         .and_complete(m, NodeKind::IfChain)
     } else {
         // complete the chain without bumping trivia

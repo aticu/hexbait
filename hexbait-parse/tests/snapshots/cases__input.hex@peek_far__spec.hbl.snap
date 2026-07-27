@@ -1,0 +1,22 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\na u8;\nlet _far = peek(u32 at 8);\nb u8;\n\n\n=== Hex ===\n01 02 ff ff ff ff ff ff 0a 0b 0c 0d\n"
+input_file: hexbait-parse/tests/cases/peek_far/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": 1,
+        "provenance": "0..=0"
+      },
+      "b": {
+        "value": 2,
+        "provenance": "1..=1"
+      }
+    },
+    "provenance": "0..=1, 8..=11"
+  },
+  "errors": [],
+  "warnings": []
+}

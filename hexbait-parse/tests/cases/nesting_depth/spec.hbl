@@ -1,0 +1,12 @@
+!endian le;
+
+n u8;
+outer [{
+  m u8;
+  inner [{
+    v u16;
+    leaf {
+      w u8;
+    };
+  }] len m;
+}] len n;

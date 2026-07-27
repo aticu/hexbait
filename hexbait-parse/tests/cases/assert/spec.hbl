@@ -1,0 +1,7 @@
+!endian le;
+
+a u8;
+!assert a == 1;
+b u8;
+!assert b == 0xff : "b must be 0xff";
+c u8;

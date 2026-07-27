@@ -1,0 +1,10 @@
+!endian le;
+
+a {
+	!recover at 0;
+	!seek by 1;
+};
+
+b {
+	!seek to 1;
+};

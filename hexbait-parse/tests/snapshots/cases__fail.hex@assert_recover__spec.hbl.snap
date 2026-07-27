@@ -1,0 +1,38 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\nhead u8;\nbody {\n  !recover at 5;\n  a u8;\n  !assert a == 1;\n  b u16;\n};\ntail u8;\n\n\n=== Hex ===\nff 09 02 00 07\n"
+input_file: hexbait-parse/tests/cases/assert_recover/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "head": {
+        "value": 255,
+        "provenance": "0..=0"
+      },
+      "body": {
+        "value": {
+          "a": {
+            "value": 9,
+            "provenance": "1..=1"
+          }
+        },
+        "provenance": "1..=1",
+        "error": "assertion failed"
+      }
+    },
+    "provenance": "0..=1",
+    "error": "view is too short"
+  },
+  "errors": [
+    {
+      "message": "assertion failed",
+      "provenance": "1..=1"
+    },
+    {
+      "message": "view is too short",
+      "provenance": "5..=5"
+    }
+  ],
+  "warnings": []
+}

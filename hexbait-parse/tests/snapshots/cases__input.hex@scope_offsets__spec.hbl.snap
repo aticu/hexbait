@@ -1,0 +1,30 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\n!scope at 3 {\n  a u8;\n  !assert $offset == 1;\n  !seek to 4;\n  b u8;\n  !align 8;\n  c u8;\n}\ntail u8;\n\n\n=== Hex ===\n00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f\n"
+input_file: hexbait-parse/tests/cases/scope_offsets/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": 3,
+        "provenance": "3..=3"
+      },
+      "b": {
+        "value": 7,
+        "provenance": "7..=7"
+      },
+      "c": {
+        "value": 11,
+        "provenance": "11..=11"
+      },
+      "tail": {
+        "value": 0,
+        "provenance": "0..=0"
+      }
+    },
+    "provenance": "0..=0, 3..=3, 7..=7, 11..=11"
+  },
+  "errors": [],
+  "warnings": []
+}

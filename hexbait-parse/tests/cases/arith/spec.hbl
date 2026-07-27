@@ -1,0 +1,37 @@
+let a = 7;
+let b = 3;
+let neg = -7;
+
+let add = a + b;
+let sub = a - b;
+let mul = a * b;
+let div = a / b;
+let rem = a % b;
+let ndiv = neg / b;
+let nrem = neg % b;
+
+let prec1 = 2 + 3 * 4;
+let prec2 = (2 + 3) * 4;
+let prec3 = 1 << 2 + 3;
+let prec4 = 1 | 2 ^ 3 & 4;
+let prec5 = -2 * 3;
+
+let not = !true;
+let pos = +5;
+
+let cmp1 = a > b;
+let cmp2 = a == 7 && b == 3;
+let cmp3 = a != 7 || b < 0;
+let cmp4 = a != 7 && b == 3;
+let cmp5 = a >= 7 && b <= 3;
+
+let shl = 1 << 40;
+let shr = 1024 >> 3;
+let band = 0xf0 & 0x3c;
+let bor = 0xf0 | 0x0c;
+let bxor = 0xff ^ 0x0f;
+
+let huge = 1 << 200;
+let lit_hex = 0xff;
+let lit_oct = 0o17;
+let lit_bin = 0b1010;

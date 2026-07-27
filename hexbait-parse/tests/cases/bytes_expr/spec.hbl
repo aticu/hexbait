@@ -1,0 +1,12 @@
+!endian le;
+
+a bytes len 2;
+b bytes len 2;
+parts [bytes len 1] len 3;
+
+let joined = concat(a, b);
+let expanded = concat(..parts);
+let mixed = concat(a, ..parts, b);
+let empty = concat();
+let lit = <"hi" 00 ff>;
+let eq = a == <01 02>;

@@ -1,0 +1,7 @@
+!endian le;
+
+a u8;
+!seek by 2;
+_hidden u8;
+!seek to 6;
+b u8;

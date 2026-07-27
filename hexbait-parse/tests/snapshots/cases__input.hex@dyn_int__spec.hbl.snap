@@ -1,0 +1,42 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "=== Spec ===\n!endian le;\n\nw u8;\nfixed u32;\ndynamic u(32);\nby_field u(w);\nsigned i(16);\nwidth24 u24;\niwidth24 i24;\n\n\n=== Hex ===\n08                # w = 8\n01 00 00 00       # fixed\n02 00 00 00       # dynamic — must equal `fixed`'s treatment\n03                # by_field, width from w\nfe ff             # signed = -2\n04 00 00          # 24-bit unsigned\n00 00 80          # 24-bit signed -> smallest negative value -8388608\n"
+input_file: hexbait-parse/tests/cases/dyn_int/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "w": {
+        "value": 8,
+        "provenance": "0..=0"
+      },
+      "fixed": {
+        "value": 1,
+        "provenance": "1..=4"
+      },
+      "dynamic": {
+        "value": 2,
+        "provenance": "5..=8"
+      },
+      "by_field": {
+        "value": 3,
+        "provenance": "9..=9"
+      },
+      "signed": {
+        "value": -2,
+        "provenance": "10..=11"
+      },
+      "width24": {
+        "value": 4,
+        "provenance": "12..=14"
+      },
+      "iwidth24": {
+        "value": -8388608,
+        "provenance": "15..=17"
+      }
+    },
+    "provenance": "0..=17"
+  },
+  "errors": [],
+  "warnings": []
+}

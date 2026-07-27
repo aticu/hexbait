@@ -1,0 +1,13 @@
+!endian le;
+
+p1 bytes len 4;
+!seek by 4;
+p2 bytes len 4;
+!scope in concat(p1, p2) {
+  a u8;
+  !scope at 3 until 6 {
+    b u16;
+    !assert $offset == 2;
+  }
+  c u16;
+}

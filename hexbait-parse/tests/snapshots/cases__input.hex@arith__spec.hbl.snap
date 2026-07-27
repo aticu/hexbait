@@ -1,0 +1,138 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\nlet a = 7;\nlet b = 3;\nlet neg = -7;\n\nlet add = a + b;\nlet sub = a - b;\nlet mul = a * b;\nlet div = a / b;\nlet rem = a % b;\nlet ndiv = neg / b;\nlet nrem = neg % b;\n\nlet prec1 = 2 + 3 * 4;\nlet prec2 = (2 + 3) * 4;\nlet prec3 = 1 << 2 + 3;\nlet prec4 = 1 | 2 ^ 3 & 4;\nlet prec5 = -2 * 3;\n\nlet not = !true;\nlet pos = +5;\n\nlet cmp1 = a > b;\nlet cmp2 = a == 7 && b == 3;\nlet cmp3 = a != 7 || b < 0;\nlet cmp4 = a != 7 && b == 3;\nlet cmp5 = a >= 7 && b <= 3;\n\nlet shl = 1 << 40;\nlet shr = 1024 >> 3;\nlet band = 0xf0 & 0x3c;\nlet bor = 0xf0 | 0x0c;\nlet bxor = 0xff ^ 0x0f;\n\nlet huge = 1 << 200;\nlet lit_hex = 0xff;\nlet lit_oct = 0o17;\nlet lit_bin = 0b1010;\n\n\n=== Hex ===\n# no input needed\n"
+input_file: hexbait-parse/tests/cases/arith/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": 7,
+        "provenance": ""
+      },
+      "b": {
+        "value": 3,
+        "provenance": ""
+      },
+      "neg": {
+        "value": -7,
+        "provenance": ""
+      },
+      "add": {
+        "value": 10,
+        "provenance": ""
+      },
+      "sub": {
+        "value": 4,
+        "provenance": ""
+      },
+      "mul": {
+        "value": 21,
+        "provenance": ""
+      },
+      "div": {
+        "value": 2,
+        "provenance": ""
+      },
+      "rem": {
+        "value": 1,
+        "provenance": ""
+      },
+      "ndiv": {
+        "value": -2,
+        "provenance": ""
+      },
+      "nrem": {
+        "value": -1,
+        "provenance": ""
+      },
+      "prec1": {
+        "value": 14,
+        "provenance": ""
+      },
+      "prec2": {
+        "value": 20,
+        "provenance": ""
+      },
+      "prec3": {
+        "value": 32,
+        "provenance": ""
+      },
+      "prec4": {
+        "value": 3,
+        "provenance": ""
+      },
+      "prec5": {
+        "value": -6,
+        "provenance": ""
+      },
+      "not": {
+        "value": false,
+        "provenance": ""
+      },
+      "pos": {
+        "value": 5,
+        "provenance": ""
+      },
+      "cmp1": {
+        "value": true,
+        "provenance": ""
+      },
+      "cmp2": {
+        "value": true,
+        "provenance": ""
+      },
+      "cmp3": {
+        "value": false,
+        "provenance": ""
+      },
+      "cmp4": {
+        "value": false,
+        "provenance": ""
+      },
+      "cmp5": {
+        "value": true,
+        "provenance": ""
+      },
+      "shl": {
+        "value": 1099511627776,
+        "provenance": ""
+      },
+      "shr": {
+        "value": 128,
+        "provenance": ""
+      },
+      "band": {
+        "value": 48,
+        "provenance": ""
+      },
+      "bor": {
+        "value": 252,
+        "provenance": ""
+      },
+      "bxor": {
+        "value": 240,
+        "provenance": ""
+      },
+      "huge": {
+        "value": 1606938044258990275541962092341162602522202993782792835301376,
+        "provenance": ""
+      },
+      "lit_hex": {
+        "value": 255,
+        "provenance": ""
+      },
+      "lit_oct": {
+        "value": 15,
+        "provenance": ""
+      },
+      "lit_bin": {
+        "value": 10,
+        "provenance": ""
+      }
+    },
+    "provenance": ""
+  },
+  "errors": [],
+  "warnings": []
+}

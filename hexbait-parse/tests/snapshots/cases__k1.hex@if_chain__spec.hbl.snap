@@ -1,0 +1,26 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\nk u8;\n!if k == 1 {\n  one u8;\n} else if k == 2 {\n  two u16;\n} else {\n  other bytes len 3;\n}\ntail u8;\n\n\n=== Hex ===\n01 07 ff\n"
+input_file: hexbait-parse/tests/cases/if_chain/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "k": {
+        "value": 1,
+        "provenance": "0..=0"
+      },
+      "one": {
+        "value": 7,
+        "provenance": "1..=1"
+      },
+      "tail": {
+        "value": 255,
+        "provenance": "2..=2"
+      }
+    },
+    "provenance": "0..=2"
+  },
+  "errors": [],
+  "warnings": []
+}

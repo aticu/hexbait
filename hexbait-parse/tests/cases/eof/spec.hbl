@@ -1,0 +1,4 @@
+!endian le;
+
+a u16;
+b u16;

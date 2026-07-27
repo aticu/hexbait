@@ -1,0 +1,8 @@
+!endian le;
+
+a i8;
+b i8;
+c i16;
+d i32;
+e i64;
+f u64;

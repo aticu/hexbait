@@ -1,0 +1,11 @@
+!endian le;
+
+!scope at 3 {
+  a u8;
+  !assert $offset == 1;
+  !seek to 4;
+  b u8;
+  !align 8;
+  c u8;
+}
+tail u8;

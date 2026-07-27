@@ -1,0 +1,38 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\na i8;\nb i8;\nc i16;\nd i32;\ne i64;\nf u64;\n\n\n=== Hex ===\nff                        # a = -1\n80                        # b = -128\nff ff                     # c = -1\n00 00 00 80               # d = i32::MIN\n00 00 00 00 00 00 00 80   # e = i64::MIN\nff ff ff ff ff ff ff ff   # f = u64::MAX\n"
+input_file: hexbait-parse/tests/cases/signed_edges/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": -1,
+        "provenance": "0..=0"
+      },
+      "b": {
+        "value": -128,
+        "provenance": "1..=1"
+      },
+      "c": {
+        "value": -1,
+        "provenance": "2..=3"
+      },
+      "d": {
+        "value": -2147483648,
+        "provenance": "4..=7"
+      },
+      "e": {
+        "value": -9223372036854775808,
+        "provenance": "8..=15"
+      },
+      "f": {
+        "value": 18446744073709551615,
+        "provenance": "16..=23"
+      }
+    },
+    "provenance": "0..=23"
+  },
+  "errors": [],
+  "warnings": []
+}

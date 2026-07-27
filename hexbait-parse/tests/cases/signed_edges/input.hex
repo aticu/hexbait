@@ -1,0 +1,6 @@
+ff                        # a = -1
+80                        # b = -128
+ff ff                     # c = -1
+00 00 00 80               # d = i32::MIN
+00 00 00 00 00 00 00 80   # e = i64::MIN
+ff ff ff ff ff ff ff ff   # f = u64::MAX

@@ -1,0 +1,9 @@
+!endian le;
+
+head u8;
+items [{
+  !recover at $offset + 2;
+  tag u8 = 0xaa;
+  val u8;
+}] len 3;
+tail u8;

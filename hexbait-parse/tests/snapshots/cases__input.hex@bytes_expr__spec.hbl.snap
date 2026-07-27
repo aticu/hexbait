@@ -1,0 +1,63 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\na bytes len 2;\nb bytes len 2;\nparts [bytes len 1] len 3;\n\nlet joined = concat(a, b);\nlet expanded = concat(..parts);\nlet mixed = concat(a, ..parts, b);\nlet empty = concat();\nlet lit = <\"hi\" 00 ff>;\nlet eq = a == <01 02>;\n\n\n=== Hex ===\n01 02        # a      @ 0..=1\n03 04        # b      @ 2..=3\naa bb cc     # parts  @ 4..=6\n"
+input_file: hexbait-parse/tests/cases/bytes_expr/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": "0102",
+        "provenance": "0..=1"
+      },
+      "b": {
+        "value": "0304",
+        "provenance": "2..=3"
+      },
+      "parts": {
+        "value": [
+          {
+            "value": "aa",
+            "provenance": "4..=4"
+          },
+          {
+            "value": "bb",
+            "provenance": "5..=5"
+          },
+          {
+            "value": "cc",
+            "provenance": "6..=6"
+          }
+        ],
+        "provenance": "4..=6"
+      },
+      "joined": {
+        "value": "01020304",
+        "provenance": "0..=3"
+      },
+      "expanded": {
+        "value": "aabbcc",
+        "provenance": "4..=6"
+      },
+      "mixed": {
+        "value": "0102aabbcc0304",
+        "provenance": "0..=6"
+      },
+      "empty": {
+        "value": "",
+        "provenance": ""
+      },
+      "lit": {
+        "value": "686900ff",
+        "provenance": ""
+      },
+      "eq": {
+        "value": true,
+        "provenance": "0..=1"
+      }
+    },
+    "provenance": "0..=6"
+  },
+  "errors": [],
+  "warnings": []
+}

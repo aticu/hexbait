@@ -1,0 +1,10 @@
+!endian le;
+
+a u8;
+!warn if a > 0;
+!warn if a > 0 : "a is positive";
+!warn if false : "never fires";
+items [{
+  v u8;
+  !warn if v == 0;
+}] len 3;

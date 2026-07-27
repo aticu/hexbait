@@ -1,0 +1,18 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\nzero_terminated bytes while peek(u8) != 0;\n\n\n=== Hex ===\n01 02 03 00\n"
+input_file: hexbait-parse/tests/cases/repeat_while/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "zero_terminated": {
+        "value": "010203",
+        "provenance": "0..=2"
+      }
+    },
+    "provenance": "0..=2"
+  },
+  "errors": [],
+  "warnings": []
+}

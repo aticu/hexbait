@@ -1,6 +1,6 @@
 ---
 source: hexbait-parse/tests/cases.rs
-expression: "render(&spec, &input)"
+expression: "\n=== Spec ===\n!endian le;\na u16;\n\n!endian be;\nb u16;\n\ninner {\n  !endian le;\n  c u16;\n};\n\n// parse little endian, because structs don't encapsulate endianness\nd u16;\n\n!endian be;\n!scope at $offset {\n  !endian le;\n  e_le i16;\n}\n\n// parsed as big endian because scopes do encapsulate endianness\ne_be i16;\n\n\n=== Hex ===\n01 02 03 04 05 06 07 08 80 00\n"
 input_file: hexbait-parse/tests/cases/endian_scope/spec.hbl
 ---
 {
@@ -28,11 +28,11 @@ input_file: hexbait-parse/tests/cases/endian_scope/spec.hbl
         "provenance": "6..=7"
       },
       "e_le": {
-        "value": 2569,
+        "value": 128,
         "provenance": "8..=9"
       },
       "e_be": {
-        "value": 2314,
+        "value": -32768,
         "provenance": "8..=9"
       }
     },

@@ -23,9 +23,11 @@ fn cases() {
             }
 
             let name = path.file_name().unwrap().to_string_lossy().to_string();
-            let input = parse_hex(&std::fs::read_to_string(&path).unwrap())
-                .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
-            insta::assert_snapshot!(name, render(&spec, &input));
+            let hex_text = std::fs::read_to_string(&path).unwrap();
+            let input =
+                parse_hex(&hex_text).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+            let debug_info = format!("\n=== Spec ===\n{spec}\n\n=== Hex ===\n{hex_text}");
+            insta::assert_snapshot!(name, render(&spec, &input), &debug_info);
 
             tests_run += 1;
         }

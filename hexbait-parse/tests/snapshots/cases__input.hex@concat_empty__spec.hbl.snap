@@ -1,0 +1,24 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\nlet e = concat();\n!scope in e {\n  x u8;\n}\n\n\n=== Hex ===\nff\n"
+input_file: hexbait-parse/tests/cases/concat_empty/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "e": {
+        "value": "",
+        "provenance": ""
+      }
+    },
+    "provenance": "",
+    "error": "view is too short"
+  },
+  "errors": [
+    {
+      "message": "view is too short",
+      "provenance": ""
+    }
+  ],
+  "warnings": []
+}

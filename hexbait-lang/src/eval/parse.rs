@@ -19,6 +19,7 @@ use super::{
 
 pub use diagnostics::{ParseErr, ParseErrId, ParseErrKind, ParseWarning};
 use hexbait_common::{Endianness, Len, ReadBytes, RelativeOffset};
+use num_traits::Zero as _;
 
 mod diagnostics;
 
@@ -300,7 +301,10 @@ impl Scope {
                         kind: operand,
                         provenance,
                     },
-                    UnOp::Not => todo!(),
+                    UnOp::Not => Value {
+                        kind: ValueKind::Boolean(!operand.expect_bool()),
+                        provenance,
+                    },
                 })
             }
             ExprKind::BinOp { op, lhs, rhs } => {
@@ -344,8 +348,20 @@ impl Scope {
                     BinOp::Add => OpKind::IntOp(|x, y| x + y),
                     BinOp::Sub => OpKind::IntOp(|x, y| x - y),
                     BinOp::Mul => OpKind::IntOp(|x, y| x * y),
-                    BinOp::Div => OpKind::IntOp(|x, y| x / y),
-                    BinOp::Mod => OpKind::IntOp(|x, y| x % y),
+                    BinOp::Div => OpKind::FallibleIntOp(|x, y| {
+                        if y.is_zero() {
+                            Err("division by zero".to_string())
+                        } else {
+                            Ok(x / y)
+                        }
+                    }),
+                    BinOp::Mod => OpKind::FallibleIntOp(|x, y| {
+                        if y.is_zero() {
+                            Err("modulo by zero".to_string())
+                        } else {
+                            Ok(x % y)
+                        }
+                    }),
                     BinOp::Eq => OpKind::Eq,
                     BinOp::Neq => OpKind::Neq,
                     BinOp::Gt => OpKind::CmpOp(|x, y| x > y),

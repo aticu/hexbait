@@ -44,6 +44,7 @@ Declaration =
 | RecoveryDeclaration
 
 // Declare the endianness that is used for parsing multi-byte values.
+// Valid kinds are `le` for little endian and `be` for big endian.
 EndiannessDeclaration =
   '!' 'endian' kind:'ident' ';'
 

@@ -1,0 +1,13 @@
+!endian le;
+
+let _size = 4;
+a u8;
+b u16;
+inner {
+  let up_a = $parent.a;
+  let up_hidden = $parent._size;
+  c u8;
+  deeper {
+    let up_c = $parent.c;
+  };
+};

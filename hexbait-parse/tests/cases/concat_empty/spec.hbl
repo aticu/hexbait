@@ -1,0 +1,6 @@
+!endian le;
+
+let e = concat();
+!scope in e {
+  x u8;
+}

@@ -1,0 +1,26 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\na u8;\n!assert a == 1;\nb u8;\n!assert b == 0xff : \"b must be 0xff\";\nc u8;\n\n\n=== Hex ===\n01 ff 07\n"
+input_file: hexbait-parse/tests/cases/assert/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": 1,
+        "provenance": "0..=0"
+      },
+      "b": {
+        "value": 255,
+        "provenance": "1..=1"
+      },
+      "c": {
+        "value": 7,
+        "provenance": "2..=2"
+      }
+    },
+    "provenance": "0..=2"
+  },
+  "errors": [],
+  "warnings": []
+}

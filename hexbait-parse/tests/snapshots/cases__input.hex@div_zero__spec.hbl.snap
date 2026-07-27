@@ -1,0 +1,34 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\ndiv {\n\t!recover at 0;\n\tlet x = 1 / 0;\n};\nmod {\n\tlet y = 1 % 0;\n};\n\n\n=== Hex ===\n"
+input_file: hexbait-parse/tests/cases/div_zero/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "div": {
+        "value": {},
+        "provenance": "",
+        "error": "division by zero"
+      },
+      "mod": {
+        "value": {},
+        "provenance": "",
+        "error": "modulo by zero"
+      }
+    },
+    "provenance": "",
+    "error": "modulo by zero"
+  },
+  "errors": [
+    {
+      "message": "division by zero",
+      "provenance": ""
+    },
+    {
+      "message": "modulo by zero",
+      "provenance": ""
+    }
+  ],
+  "warnings": []
+}

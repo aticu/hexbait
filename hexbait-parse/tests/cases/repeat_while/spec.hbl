@@ -1,0 +1,3 @@
+!endian le;
+
+zero_terminated bytes while peek(u8) != 0;

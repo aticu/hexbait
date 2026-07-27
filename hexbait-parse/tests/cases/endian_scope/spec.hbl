@@ -15,8 +15,8 @@ d u16;
 !endian be;
 !scope at $offset {
   !endian le;
-  e_le u16;
+  e_le i16;
 }
 
 // parsed as big endian because scopes do encapsulate endianness
-e_be u16;
+e_be i16;

@@ -1,0 +1,14 @@
+!endian le;
+
+a {
+	!recover at 0;
+	arr [{
+		tag u8 = 0xaa;
+	}] len 3;
+};
+
+b {
+	arr [{
+		tag u8 = 0xaa;
+	}] while $len < 3;
+};

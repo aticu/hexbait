@@ -1,0 +1,22 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\nw u8;\nx u(w);\n\n\n=== Hex ===\n80 ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff\n"
+input_file: hexbait-parse/tests/cases/dyn_width/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "w": {
+        "value": 128,
+        "provenance": "0..=0"
+      },
+      "x": {
+        "value": 340282366920938463463374607431768211455,
+        "provenance": "1..=16"
+      }
+    },
+    "provenance": "0..=16"
+  },
+  "errors": [],
+  "warnings": []
+}

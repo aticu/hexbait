@@ -1,0 +1,19 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\na u16;\nb u16;\n\n\n=== Hex ===\n\n"
+input_file: hexbait-parse/tests/cases/eof/spec.hbl
+---
+{
+  "value": {
+    "value": {},
+    "provenance": "",
+    "error": "view is too short"
+  },
+  "errors": [
+    {
+      "message": "view is too short",
+      "provenance": "0..=0"
+    }
+  ],
+  "warnings": []
+}

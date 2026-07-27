@@ -1,0 +1,7 @@
+08                # w = 8
+01 00 00 00       # fixed
+02 00 00 00       # dynamic — must equal `fixed`'s treatment
+03                # by_field, width from w
+fe ff             # signed = -2
+04 00 00          # 24-bit unsigned
+00 00 80          # 24-bit signed -> smallest negative value -8388608

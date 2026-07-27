@@ -1,0 +1,34 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\na {\n\t!recover at 0;\n\t!seek by 1;\n};\n\nb {\n\t!seek to 1;\n};\n\n\n=== Hex ===\n\n"
+input_file: hexbait-parse/tests/cases/seek_past_end/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": {},
+        "provenance": "",
+        "error": "new offset did not fit in available space"
+      },
+      "b": {
+        "value": {},
+        "provenance": "",
+        "error": "new offset did not fit in available space"
+      }
+    },
+    "provenance": "",
+    "error": "new offset did not fit in available space"
+  },
+  "errors": [
+    {
+      "message": "new offset did not fit in available space",
+      "provenance": ""
+    },
+    {
+      "message": "new offset did not fit in available space",
+      "provenance": ""
+    }
+  ],
+  "warnings": []
+}

@@ -1,0 +1,105 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\nn u8;\nouter [{\n  m u8;\n  inner [{\n    v u16;\n    leaf {\n      w u8;\n    };\n  }] len m;\n}] len n;\n\n\n=== Hex ===\n02\n02  01 00 aa  02 00 bb\n01  03 00 cc\n"
+input_file: hexbait-parse/tests/cases/nesting_depth/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "n": {
+        "value": 2,
+        "provenance": "0..=0"
+      },
+      "outer": {
+        "value": [
+          {
+            "value": {
+              "m": {
+                "value": 2,
+                "provenance": "1..=1"
+              },
+              "inner": {
+                "value": [
+                  {
+                    "value": {
+                      "v": {
+                        "value": 1,
+                        "provenance": "2..=3"
+                      },
+                      "leaf": {
+                        "value": {
+                          "w": {
+                            "value": 170,
+                            "provenance": "4..=4"
+                          }
+                        },
+                        "provenance": "4..=4"
+                      }
+                    },
+                    "provenance": "2..=4"
+                  },
+                  {
+                    "value": {
+                      "v": {
+                        "value": 2,
+                        "provenance": "5..=6"
+                      },
+                      "leaf": {
+                        "value": {
+                          "w": {
+                            "value": 187,
+                            "provenance": "7..=7"
+                          }
+                        },
+                        "provenance": "7..=7"
+                      }
+                    },
+                    "provenance": "5..=7"
+                  }
+                ],
+                "provenance": "2..=7"
+              }
+            },
+            "provenance": "1..=7"
+          },
+          {
+            "value": {
+              "m": {
+                "value": 1,
+                "provenance": "8..=8"
+              },
+              "inner": {
+                "value": [
+                  {
+                    "value": {
+                      "v": {
+                        "value": 3,
+                        "provenance": "9..=10"
+                      },
+                      "leaf": {
+                        "value": {
+                          "w": {
+                            "value": 204,
+                            "provenance": "11..=11"
+                          }
+                        },
+                        "provenance": "11..=11"
+                      }
+                    },
+                    "provenance": "9..=11"
+                  }
+                ],
+                "provenance": "9..=11"
+              }
+            },
+            "provenance": "8..=11"
+          }
+        ],
+        "provenance": "1..=11"
+      }
+    },
+    "provenance": "0..=11"
+  },
+  "errors": [],
+  "warnings": []
+}
