@@ -1,0 +1,19 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\n!scope at -1 {\n\ta u8;\n}\n\n\n=== Hex ===\n00\n"
+input_file: hexbait-parse/tests/cases/negative_offset/spec.hbl
+---
+{
+  "value": {
+    "value": {},
+    "provenance": "",
+    "error": "scope start exceeded the end of the current scope"
+  },
+  "errors": [
+    {
+      "message": "scope start exceeded the end of the current scope",
+      "provenance": ""
+    }
+  ],
+  "warnings": []
+}
