@@ -1,0 +1,162 @@
+!endian le;
+
+!scope at $offset until 16384 {
+	checksum bytes len 32;
+	fs_uuid bytes len 16;
+	logical_address u64;
+	flags u56;
+	backref u8;
+	chunk_tree_uuid bytes len 16;
+	generation u64;
+	tree_id u64;
+	number_of_items u32;
+	level u8;
+
+	nodes switch level {
+		0 => [{
+			object_id u64;
+			item_ty u8;
+			offset u64;
+			data_offset u32;
+			data_size u32;
+
+			!scope at 0x65 + data_offset until 0x65 + data_offset + data_size {
+				data switch item_ty {
+					0x01 => {
+						generation u64;
+						transid u64;
+						size u64;
+						allocated_size u64;
+						block_group u64;
+						nlink u32;
+						uid u32;
+						gid u32;
+						mode u32;
+						rdev u64;
+						flags u64;
+						sequence u64;
+						reserved bytes len 32;
+						atime u96;
+						ctime u96;
+						mtime u96;
+						otime u96;
+					},
+					0x0c => {
+						index_in_dir u64;
+						name_len u16;
+						name bytes len name_len;
+					},
+					0x18 => {
+						key {
+							object_id u64;
+							ty u8;
+							offset u64;
+						};
+						trans_id u64;
+						data_len u16;
+						name_len u16;
+						ty u8;
+						name bytes len name_len;
+						data bytes len data_len;
+					},
+					0x54 => {
+						key {
+							object_id u64;
+							ty u8;
+							offset u64;
+						};
+						trans_id u64;
+						data_len u16;
+						name_len u16;
+						ty u8;
+						name bytes len name_len;
+						data bytes len data_len;
+					},
+					0x60 => {
+						key {
+							object_id u64;
+							ty u8;
+							offset u64;
+						};
+						trans_id u64;
+						data_len u16;
+						name_len u16;
+						ty u8;
+						name bytes len name_len;
+						data bytes len data_len;
+					},
+					0x6c => {
+						generation u64;
+						size_of_decoded_extent u64;
+						compression u8;
+						encryption u8;
+						other_encoding u16;
+						ty u8;
+						content switch ty {
+							0 => bytes len $parent.data_size - 0x15,
+							_ => {
+								logical_address u64;
+								size_of_extent u64;
+								offset_within_extent u64;
+								logical_number_of_bytes_in_file u64;
+							},
+						};
+					},
+					0x84 => {
+						inode {
+							generation u64;
+							transid u64;
+							size u64;
+							allocated_size u64;
+							block_group u64;
+							nlink u32;
+							uid u32;
+							gid u32;
+							mode u32;
+							rdev u64;
+							flags u64;
+							sequence u64;
+							reserved bytes len 32;
+							atime u96;
+							ctime u96;
+							mtime u96;
+							otime u96;
+						};
+						generation u64;
+						root_dir_id u64;
+						logical_address u64;
+						byte_limit u64;
+						bytes_used u64;
+						last_snapshot u64;
+						flags u64;
+						refs u32;
+					},
+					0xe4 => {
+						size_of_chunk u64;
+						root_ref u64;
+						stripe_len u64;
+						ty u64;
+						optimal_io_align u32;
+						optimal_io_width u32;
+						min_io_size u32;
+						number_of_stripes u16;
+						sub_stripes u16;
+						stripes [{
+							device_id u64;
+							offset u64;
+							device_uuid bytes len 16;
+						}] len number_of_stripes;
+					},
+					_ => bytes len data_size,
+				};
+			}
+		}] len number_of_items,
+		_ => [{
+			object_id u64;
+			item_ty u8;
+			offset u64;
+			block_number u64;
+			generation u64;
+		}] len number_of_items,
+	};
+}
