@@ -99,12 +99,7 @@ impl eframe::App for HexbaitApp {
             MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("Tabs", |ui| {
                     // allow certain tabs to be toggled
-                    for tab in &[
-                        TabType::Settings,
-                        TabType::Search,
-                        TabType::ClassificationInfo,
-                        TabType::Marking,
-                    ] {
+                    for tab in &[TabType::Settings, TabType::Search, TabType::Marking] {
                         let open = self.dock_state.find_tab(tab).is_some();
 
                         if ui.selectable_label(open, format!("{tab:?}")).clicked() {

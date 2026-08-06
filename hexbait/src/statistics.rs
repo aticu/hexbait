@@ -6,7 +6,6 @@ use std::{
 };
 
 mod bigrams;
-pub mod classification;
 mod downsampled_bigrams;
 mod handler;
 

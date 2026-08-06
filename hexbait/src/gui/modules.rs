@@ -6,7 +6,6 @@ use hexbait_common::Input;
 use crate::state::State;
 
 mod bars;
-pub mod classification_info;
 pub mod content;
 pub mod data_inspector;
 pub mod format_discovery;
@@ -36,8 +35,6 @@ pub enum TabType {
     Settings,
     /// Shows search controls.
     Search,
-    /// Shows the classification info module.
-    ClassificationInfo,
     /// Shows the marking menu.
     Marking,
 }
@@ -66,7 +63,6 @@ impl egui_dock::TabViewer for Context {
             TabType::ParsedValue => parsed_value::show,
             TabType::Settings => settings::show,
             TabType::Search => search::show,
-            TabType::ClassificationInfo => classification_info::show,
             TabType::Marking => marking::show,
         };
 
@@ -74,10 +70,7 @@ impl egui_dock::TabViewer for Context {
     }
 
     fn is_closeable(&self, tab: &Self::Tab) -> bool {
-        matches!(
-            tab,
-            TabType::Settings | TabType::Search | TabType::ClassificationInfo
-        )
+        matches!(tab, TabType::Settings | TabType::Search)
     }
 
     fn scroll_bars(&self, tab: &Self::Tab) -> [bool; 2] {

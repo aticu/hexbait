@@ -2,7 +2,6 @@
 
 use std::path::PathBuf;
 
-pub use classification_state::ClassificationState;
 pub use format_discovery_state::{ColumnInfo, ColumnType, FormatDiscoveryState};
 use hexbait_common::{Endianness, Input};
 pub use parse_state::{ParseState, ParseType};
@@ -14,10 +13,9 @@ pub use statistics_display_state::StatisticsDisplayState;
 
 use crate::{
     marking::{MarkStore, MarkType},
-    statistics::{StatisticsHandler, classification::classify_selected_window},
+    statistics::StatisticsHandler,
 };
 
-mod classification_state;
 mod format_discovery_state;
 mod parse_state;
 mod scroll_state;
@@ -40,8 +38,6 @@ pub struct State {
     pub statistics_display_state: StatisticsDisplayState,
     /// The state of the hexbait parser.
     pub parse_state: ParseState,
-    /// The state of the input classifier.
-    pub classification_state: ClassificationState,
     /// The statistics handler used to collect statistics about the input.
     pub statistics_handler: StatisticsHandler,
     /// The marked locations.
@@ -62,7 +58,6 @@ impl State {
             selection_state: SelectionState::new(),
             statistics_display_state: StatisticsDisplayState::new(),
             parse_state: ParseState::new(custom_parsers),
-            classification_state: ClassificationState::new(),
             statistics_handler: StatisticsHandler::new(input.clone()),
             marked_locations: MarkStore::new(),
             format_discovery: FormatDiscoveryState::new(),
@@ -86,8 +81,6 @@ impl State {
         {
             self.parse_state.parse_offset = selection.start().as_u64().to_string();
         }
-
-        classify_selected_window(self);
     }
 }
 
