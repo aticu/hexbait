@@ -1,6 +1,6 @@
 ---
 source: hexbait-parse/tests/cases.rs
-expression: "render(&spec, &input)"
+expression: "\n=== Spec ===\n!endian le;\n\na u8;\n!assert a == 0 || peek(u8 at 1000) == 0;\nb u8;\n\n\n=== Hex ===\n# RHS evaluated, out-of-bounds peek\n01 11\n"
 input_file: hexbait-parse/tests/cases/shortcircuit/spec.hbl
 ---
 {
@@ -12,11 +12,11 @@ input_file: hexbait-parse/tests/cases/shortcircuit/spec.hbl
       }
     },
     "provenance": "0..=0",
-    "error": "new offset did not fit in available space"
+    "error": "could not set cursor during peek: scope end is 2, but new cursor position would be 1000"
   },
   "errors": [
     {
-      "message": "new offset did not fit in available space",
+      "message": "could not set cursor during peek: scope end is 2, but new cursor position would be 1000",
       "provenance": ""
     }
   ],

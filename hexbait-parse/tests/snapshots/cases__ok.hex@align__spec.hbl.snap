@@ -1,0 +1,22 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\na u8;\n!align 4;\nb u8;\n\n\n=== Hex ===\n01 \n00 00 00\n02\n"
+input_file: hexbait-parse/tests/cases/align/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": 1,
+        "provenance": "0..=0"
+      },
+      "b": {
+        "value": 2,
+        "provenance": "4..=4"
+      }
+    },
+    "provenance": "0..=0, 4..=4"
+  },
+  "errors": [],
+  "warnings": []
+}

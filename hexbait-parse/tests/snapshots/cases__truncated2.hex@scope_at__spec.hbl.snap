@@ -1,17 +1,17 @@
 ---
 source: hexbait-parse/tests/cases.rs
-expression: "render(&spec, &input)"
+expression: "\n=== Spec ===\n!endian le;\n\n!scope at 2 until 6 {\n  x u16;\n  y u16;\n  !assert $offset == 4;\n}\n\nz u8;\n\n\n=== Hex ===\n# file is too short for full scope\n00 00 00\n"
 input_file: hexbait-parse/tests/cases/scope_at/spec.hbl
 ---
 {
   "value": {
     "value": {},
     "provenance": "",
-    "error": "scope end exceeded the end of the current scope"
+    "error": "could not set cursor for end of new scope: scope end is 3, but new cursor position would be 6"
   },
   "errors": [
     {
-      "message": "scope end exceeded the end of the current scope",
+      "message": "could not set cursor for end of new scope: scope end is 3, but new cursor position would be 6",
       "provenance": ""
     }
   ],

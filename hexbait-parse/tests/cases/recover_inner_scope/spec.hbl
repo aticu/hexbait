@@ -1,0 +1,13 @@
+!endian le;
+
+!recover at 2;
+
+!scope at 2 {
+    inner {
+        val u32;
+    };
+
+    after_struct u16;
+}
+
+after_scope u16;

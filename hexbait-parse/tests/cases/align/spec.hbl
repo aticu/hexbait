@@ -1,0 +1,5 @@
+!endian le;
+
+a u8;
+!align 4;
+b u8;

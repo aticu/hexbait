@@ -1,0 +1,24 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\na u8;\n!align 4;\nb u8;\n\n\n=== Hex ===\n01\n00\n"
+input_file: hexbait-parse/tests/cases/align/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": 1,
+        "provenance": "0..=0"
+      }
+    },
+    "provenance": "0..=0",
+    "error": "could not set cursor during alignment: scope end is 2, but new cursor position would be 4"
+  },
+  "errors": [
+    {
+      "message": "could not set cursor during alignment: scope end is 2, but new cursor position would be 4",
+      "provenance": ""
+    }
+  ],
+  "warnings": []
+}

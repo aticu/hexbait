@@ -1,6 +1,6 @@
 ---
 source: hexbait-parse/tests/cases.rs
-expression: "render(&spec, &input)"
+expression: "\n=== Spec ===\n!endian le;\n\nhead u8;\nbody {\n  !recover at 6;\n  tag u8 = 0xaa;\n  skipped u16;\n};\ntail u8;\n\n\n=== Hex ===\n# recovery target is past EOF\n01 bb 02\n"
 input_file: hexbait-parse/tests/cases/recover/spec.hbl
 ---
 {
@@ -13,15 +13,15 @@ input_file: hexbait-parse/tests/cases/recover/spec.hbl
       "body": {
         "value": {},
         "provenance": "",
-        "error": "recovery offset exceeded the end of the current scope"
+        "error": "could not set cursor recovery offset: scope end is 3, but new cursor position would be 6"
       }
     },
     "provenance": "0..=0",
-    "error": "recovery offset exceeded the end of the current scope"
+    "error": "could not set cursor recovery offset: scope end is 3, but new cursor position would be 6"
   },
   "errors": [
     {
-      "message": "recovery offset exceeded the end of the current scope",
+      "message": "could not set cursor recovery offset: scope end is 3, but new cursor position would be 6",
       "provenance": ""
     }
   ],

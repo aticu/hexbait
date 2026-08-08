@@ -9,24 +9,24 @@ input_file: hexbait-parse/tests/cases/seek_past_end/spec.hbl
       "a": {
         "value": {},
         "provenance": "",
-        "error": "new offset did not fit in available space"
+        "error": "could not set cursor during seek: scope end is 0, but new cursor position would be 1"
       },
       "b": {
         "value": {},
         "provenance": "",
-        "error": "new offset did not fit in available space"
+        "error": "could not set cursor during seek: scope end is 0, but new cursor position would be 1"
       }
     },
     "provenance": "",
-    "error": "new offset did not fit in available space"
+    "error": "could not set cursor during seek: scope end is 0, but new cursor position would be 1"
   },
   "errors": [
     {
-      "message": "new offset did not fit in available space",
+      "message": "could not set cursor during seek: scope end is 0, but new cursor position would be 1",
       "provenance": ""
     },
     {
-      "message": "new offset did not fit in available space",
+      "message": "could not set cursor during seek: scope end is 0, but new cursor position would be 1",
       "provenance": ""
     }
   ],

@@ -7,11 +7,11 @@ input_file: hexbait-parse/tests/cases/negative_offset/spec.hbl
   "value": {
     "value": {},
     "provenance": "",
-    "error": "scope start exceeded the end of the current scope"
+    "error": "could not set cursor for start of new scope: negative offset"
   },
   "errors": [
     {
-      "message": "scope start exceeded the end of the current scope",
+      "message": "could not set cursor for start of new scope: negative offset",
       "provenance": ""
     }
   ],

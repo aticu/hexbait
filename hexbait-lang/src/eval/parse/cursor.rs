@@ -6,7 +6,7 @@ use hexbait_common::{Endianness, Len, ReadBytes, RelativeOffset};
 
 use crate::{
     ParseErr, ParseErrId, Provenance, Span, View,
-    parse::{ParseContext, ParseErrKind},
+    parse::{ParseContext, ParseErrKind, SeekError},
 };
 
 /// Reads the specified number of bytes without advancing the cursor.
@@ -52,6 +52,34 @@ fn peek_bytes<'view>(
     Ok((buf, provenance))
 }
 
+/// Advances the cursor by the given count.
+pub fn advance_by(
+    offset: &mut RelativeOffset,
+    count: Len,
+    end: RelativeOffset,
+) -> Result<(), SeekError> {
+    if let Some(new_offset) = offset
+        .as_u64()
+        .checked_add(count.as_u64())
+        .map(RelativeOffset::from)
+    {
+        if new_offset <= end {
+            *offset = new_offset;
+            Ok(())
+        } else {
+            Err(SeekError::SeekPastEnd {
+                end,
+                seek_offset: new_offset,
+            })
+        }
+    } else {
+        Err(SeekError::SeekPastEnd {
+            end,
+            seek_offset: RelativeOffset::from(u64::MAX),
+        })
+    }
+}
+
 /// A cursor for parsing.
 #[derive(Debug, Clone)]
 pub struct Cursor {
@@ -65,30 +93,61 @@ pub struct Cursor {
 
 impl Cursor {
     /// Creates a new cursor.
-    pub fn new(view: View, offset: RelativeOffset) -> Cursor {
-        Cursor {
-            // static analysis makes sure that this is set to the correct value before parsing
-            endianness: Endianness::Little,
-            offset,
-            view,
+    pub fn new(view: View, offset: RelativeOffset) -> Result<Cursor, SeekError> {
+        let end = RelativeOffset::from(view.len().as_u64());
+
+        if offset <= end {
+            Ok(Cursor {
+                // static analysis makes sure that this is set to the correct value before parsing
+                endianness: Endianness::Little,
+                offset,
+                view,
+            })
+        } else {
+            Err(SeekError::SeekPastEnd {
+                end,
+                seek_offset: offset,
+            })
         }
     }
 
     /// Creates a new child scope with the given view and offset.
-    pub fn child_with_view_and_offset(&self, view: View, offset: RelativeOffset) -> Cursor {
-        Cursor {
-            endianness: self.endianness,
-            view,
-            offset,
+    pub fn child_with_view_and_offset(
+        &self,
+        view: View,
+        offset: RelativeOffset,
+    ) -> Result<Cursor, SeekError> {
+        let end = RelativeOffset::from(view.len().as_u64());
+
+        if offset <= end {
+            Ok(Cursor {
+                endianness: self.endianness,
+                view,
+                offset,
+            })
+        } else {
+            Err(SeekError::SeekPastEnd {
+                end,
+                seek_offset: offset,
+            })
         }
     }
 
     /// Creates a child cursor in the same view with the given offset.
-    pub fn child_with_same_view(&self, offset: RelativeOffset) -> Cursor {
-        Cursor {
-            endianness: self.endianness,
-            view: self.view.clone(),
-            offset,
+    pub fn child_with_same_view(&self, offset: RelativeOffset) -> Result<Cursor, SeekError> {
+        let end = self.end_offset();
+
+        if offset <= end {
+            Ok(Cursor {
+                endianness: self.endianness,
+                view: self.view.clone(),
+                offset,
+            })
+        } else {
+            Err(SeekError::SeekPastEnd {
+                end,
+                seek_offset: offset,
+            })
         }
     }
 
@@ -97,14 +156,22 @@ impl Cursor {
         self.offset
     }
 
+    /// The maximum offset of the cursor.
+    fn end_offset(&self) -> RelativeOffset {
+        RelativeOffset::from(self.view().len().as_u64())
+    }
+
     /// Advances the cursor by the given count.
-    pub fn advance_by(&mut self, count: Len) {
-        self.offset += count;
+    pub fn advance_by(&mut self, count: Len) -> Result<(), SeekError> {
+        let end = self.end_offset();
+
+        advance_by(&mut self.offset, count, end)
     }
 
     /// Sets the offset the cursor parses at.
-    pub fn set_offset(&mut self, offset: RelativeOffset) {
-        self.offset = offset;
+    pub fn set_offset(&mut self, offset: RelativeOffset) -> Result<(), SeekError> {
+        self.offset = self.probe_seek(offset)?;
+        Ok(())
     }
 
     /// Returns the underlying view.
@@ -140,16 +207,30 @@ impl Cursor {
         span: Span,
         parse_ctx: &mut ParseContext,
     ) -> Result<(ReadBytes<'_>, Provenance), ParseErrId> {
+        let end = self.end_offset();
+
         let result = peek_bytes(&self.view, self.offset(), count, span, parse_ctx)?;
 
-        self.offset += count;
+        advance_by(&mut self.offset, count, end)
+            .map_err(|err| parse_ctx.seek_err(err, &Provenance::empty(), span, "after reading"))?;
 
         Ok(result)
     }
 
-    /// Determines if the given offset would be a valid offset for the cursor.
-    pub fn is_valid_offset(&self, offset: RelativeOffset) -> bool {
-        Len::from(offset.as_u64()) <= self.view.len()
+    /// Checks if a seek to the given offset is possible.
+    ///
+    /// Returns the offset for convenience.
+    pub fn probe_seek(&self, offset: RelativeOffset) -> Result<RelativeOffset, SeekError> {
+        let end = self.end_offset();
+
+        if offset <= end {
+            Ok(offset)
+        } else {
+            Err(SeekError::SeekPastEnd {
+                end,
+                seek_offset: offset,
+            })
+        }
     }
 
     /// Returns the provenance for the given range in the cursor.

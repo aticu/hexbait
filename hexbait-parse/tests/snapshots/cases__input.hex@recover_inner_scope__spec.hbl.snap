@@ -1,0 +1,25 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\n!recover at 2;\n\n!scope at 2 {\n    inner {\n        val u32;\n    };\n\n    after_struct u16;\n}\n\nafter_scope u16;\n\n\n=== Hex ===\n00 00 00 00\n"
+input_file: hexbait-parse/tests/cases/recover_inner_scope/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "inner": {
+        "value": {},
+        "provenance": "",
+        "error": "view is too short"
+      }
+    },
+    "provenance": "",
+    "error": "view is too short"
+  },
+  "errors": [
+    {
+      "message": "view is too short",
+      "provenance": "2..=2"
+    }
+  ],
+  "warnings": []
+}

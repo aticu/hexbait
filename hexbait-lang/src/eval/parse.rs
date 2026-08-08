@@ -38,7 +38,8 @@ pub struct ParseResult {
 /// Evaluates the given IR on the given input.
 pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseResult {
     let mut struct_ctx = StructContext::new();
-    let mut cursor = Cursor::new(view, start_offset);
+    // the start offset should always be valid
+    let mut cursor = Cursor::new(view, start_offset).static_analysis_expect();
 
     let mut parse_ctx = ParseContext {
         errors: Vec::new(),
@@ -87,6 +88,20 @@ enum RecoveryStrategy {
     SkipTo {
         /// The offset to skip to.
         offset: RelativeOffset,
+    },
+}
+
+/// An error that can occur when seeking the input.
+#[derive(Debug)]
+enum SeekError {
+    /// A seek was attempted to a negative offset.
+    NegativeOffset,
+    /// A seek past the end of the current scope.
+    SeekPastEnd {
+        /// The end of the scope.
+        end: RelativeOffset,
+        /// The offset where the seek was attempted.
+        seek_offset: RelativeOffset,
     },
 }
 
@@ -162,6 +177,65 @@ impl<'parent> StructContext<'parent> {
 }
 
 impl ParseContext {
+    /// Creates a parsing error for the given seek error.
+    fn seek_err(
+        &mut self,
+        err: SeekError,
+        provenance: &Provenance,
+        span: Span,
+        context: &str,
+    ) -> ParseErrId {
+        self.new_err(ParseErr {
+            message: format!(
+                "could not set cursor {context}: {}",
+                match err {
+                    SeekError::NegativeOffset => String::from("negative offset"),
+                    SeekError::SeekPastEnd { end, seek_offset } => {
+                        format!(
+                            "scope end is {end}, but new cursor position would be {seek_offset}"
+                        )
+                    }
+                }
+            ),
+            kind: ParseErrKind::InputTooShort,
+            provenance: provenance.clone(),
+            span,
+        })
+    }
+
+    /// Determines if a seek to the given offset is possible.
+    fn probe_seek(
+        &mut self,
+        new_offset: &Int,
+        provenance: &Provenance,
+        span: Span,
+        cursor: &Cursor,
+        context: &str,
+    ) -> Result<RelativeOffset, ParseErrId> {
+        u64::try_from(new_offset)
+            .map(RelativeOffset::from)
+            .map_err(|_| SeekError::NegativeOffset)
+            .and_then(|offset| cursor.probe_seek(offset))
+            .map_err(|err| self.seek_err(err, provenance, span, context))
+    }
+
+    /// Attempts to set the cursor to the given offset.
+    fn set_offset(
+        &mut self,
+        cursor: &mut Cursor,
+        compute_offset: impl FnOnce(RelativeOffset) -> Result<RelativeOffset, SeekError>,
+        provenance: &Provenance,
+        span: Span,
+        context: &str,
+    ) -> Result<(), ParseErrId> {
+        let old_offset = cursor.offset();
+
+        match compute_offset(old_offset).and_then(|new_offset| cursor.set_offset(new_offset)) {
+            Ok(()) => Ok(()),
+            Err(err) => Err(self.seek_err(err, provenance, span, context)),
+        }
+    }
+
     /// Evaluates the given expression.
     fn eval_expr(
         &mut self,
@@ -342,26 +416,24 @@ impl ParseContext {
                     .static_analysis_expect())
             }
             ExprKind::Peek { ty, offset } => {
-                let offset = if let Some(offset_expr) = offset {
+                let mut cursor = if let Some(offset_expr) = offset {
                     let offset = self.eval_expr(offset_expr, cursor, struct_ctx, additional_ctx)?;
 
-                    if let Ok(offset) = u64::try_from(offset.kind.expect_int())
-                        && cursor.is_valid_offset(RelativeOffset::from(offset))
-                    {
-                        RelativeOffset::from(offset)
-                    } else {
-                        return Err(self.new_err(ParseErr {
-                            message: "new offset did not fit in available space".into(),
-                            kind: ParseErrKind::InputTooShort,
-                            provenance: offset.provenance.clone(),
-                            span: expr.span,
-                        }));
-                    }
+                    u64::try_from(offset.kind.expect_int())
+                        .map_err(|_| SeekError::NegativeOffset)
+                        .and_then(|offset| {
+                            cursor.child_with_same_view(RelativeOffset::from(offset))
+                        })
+                        .map_err(|err| {
+                            self.seek_err(err, &offset.provenance, offset_expr.span, "during peek")
+                        })?
                 } else {
-                    cursor.offset()
+                    // the current cursor is valid
+                    cursor
+                        .child_with_same_view(cursor.offset())
+                        .static_analysis_expect()
                 };
 
-                let mut cursor = cursor.child_with_same_view(offset);
                 self.eval_parse_type(ty, &mut cursor, struct_ctx)
                     .map_err(|err| err.parse_err)
             }
@@ -413,106 +485,92 @@ impl ParseContext {
                 let align = value.kind.expect_int();
                 let align = u64::try_from(align).static_analysis_expect();
 
-                cursor.set_offset(cursor.offset().align_up(align));
+                self.set_offset(
+                    cursor,
+                    |offset| Ok(offset.align_up(align)),
+                    &value.provenance,
+                    expr.span,
+                    "during alignment",
+                )?;
             }
             Declaration::SeekBy(expr) => {
                 let value = self.eval_expr(expr, cursor, struct_ctx, Default::default())?;
                 let offset = value.kind.expect_int();
 
-                if let Ok(new_offset) = u64::try_from(offset + Int::from(cursor.offset().as_u64()))
-                    && let new_offset = RelativeOffset::from(new_offset)
-                    && cursor.is_valid_offset(new_offset)
-                {
-                    cursor.set_offset(new_offset);
-                } else {
-                    return Err(self
-                        .new_err(ParseErr {
-                            message: "new offset did not fit in available space".into(),
-                            kind: ParseErrKind::InputTooShort,
-                            provenance: value.provenance.clone(),
-                            span: expr.span,
-                        })
-                        .into());
-                }
+                self.set_offset(
+                    cursor,
+                    |old_offset| {
+                        u64::try_from(offset + Int::from(old_offset.as_u64()))
+                            .map(RelativeOffset::from)
+                            .map_err(|_| SeekError::NegativeOffset)
+                    },
+                    &value.provenance,
+                    expr.span,
+                    "during seek",
+                )?;
             }
             Declaration::SeekTo(expr) => {
                 let value = self.eval_expr(expr, cursor, struct_ctx, Default::default())?;
                 let offset = value.kind.expect_int();
 
-                if let Ok(new_offset) = u64::try_from(offset)
-                    && let new_offset = RelativeOffset::from(new_offset)
-                    && cursor.is_valid_offset(new_offset)
-                {
-                    cursor.set_offset(new_offset);
-                } else {
-                    return Err(self
-                        .new_err(ParseErr {
-                            message: "new offset did not fit in available space".into(),
-                            kind: ParseErrKind::InputTooShort,
-                            provenance: value.provenance.clone(),
-                            span: expr.span,
-                        })
-                        .into());
-                }
+                self.set_offset(
+                    cursor,
+                    |_| {
+                        u64::try_from(offset)
+                            .map(RelativeOffset::from)
+                            .map_err(|_| SeekError::NegativeOffset)
+                    },
+                    &value.provenance,
+                    expr.span,
+                    "during seek",
+                )?;
             }
             Declaration::Scope { kind, content } => {
-                let view = match kind {
+                let (view, span) = match kind {
                     ScopeKind::At { start, end } => {
+                        let span = start.span;
                         let start_expr =
                             self.eval_expr(start, cursor, struct_ctx, Default::default())?;
 
-                        let start = if let Ok(start) = u64::try_from(start_expr.kind.expect_int())
-                            && let start = RelativeOffset::from(start)
-                            && cursor.is_valid_offset(start)
-                        {
-                            start
-                        } else {
-                            return Err(self
-                                .new_err(ParseErr {
-                                    message: "scope start exceeded the end of the current scope"
-                                        .into(),
-                                    kind: ParseErrKind::InputTooShort,
-                                    provenance: start_expr.provenance.clone(),
-                                    span: start.span,
-                                })
-                                .into());
-                        };
+                        let start = self.probe_seek(
+                            start_expr.kind.expect_int(),
+                            &start_expr.provenance,
+                            span,
+                            cursor,
+                            "for start of new scope",
+                        )?;
 
                         let end = if let Some(end) = end {
                             let end_expr =
                                 self.eval_expr(end, cursor, struct_ctx, Default::default())?;
 
-                            if let Ok(end) = u64::try_from(end_expr.kind.expect_int())
-                                && let end = RelativeOffset::from(end)
-                                && cursor.is_valid_offset(end)
-                            {
-                                end
-                            } else {
-                                return Err(self
-                                    .new_err(ParseErr {
-                                        message: "scope end exceeded the end of the current scope"
-                                            .into(),
-                                        kind: ParseErrKind::InputTooShort,
-                                        provenance: end_expr.provenance.clone(),
-                                        span: end.span,
-                                    })
-                                    .into());
-                            }
+                            self.probe_seek(
+                                end_expr.kind.expect_int(),
+                                &end_expr.provenance,
+                                span,
+                                cursor,
+                                "for end of new scope",
+                            )?
                         } else {
                             RelativeOffset::from(cursor.view().len().as_u64())
                         };
 
-                        cursor.view().subview(start..end)
+                        (cursor.view().subview(start..end), span)
                     }
                     ScopeKind::In { bytes } => {
                         let bytes_expr =
                             self.eval_expr(bytes, cursor, struct_ctx, Default::default())?;
 
-                        View::from_bytes(bytes_expr.kind.expect_bytes_take())
+                        (
+                            View::from_bytes(bytes_expr.kind.expect_bytes_take()),
+                            bytes.span,
+                        )
                     }
                 };
 
-                let mut subcursor = cursor.child_with_view_and_offset(view, RelativeOffset::ZERO);
+                let mut subcursor = cursor
+                    .child_with_view_and_offset(view, RelativeOffset::ZERO)
+                    .map_err(|err| self.seek_err(err, &Provenance::empty(), span, "for scope"))?;
 
                 for single_content in content {
                     self.eval_single_struct_content(single_content, &mut subcursor, struct_ctx)?;
@@ -579,21 +637,15 @@ impl ParseContext {
             }
             Declaration::Recover { at } => {
                 let offset = self.eval_expr(at, cursor, struct_ctx, Default::default())?;
-                if let Ok(offset) = u64::try_from(offset.kind.expect_int())
-                    && let offset = RelativeOffset::from(offset)
-                    && cursor.is_valid_offset(offset)
-                {
-                    struct_ctx.recovery_strategy = RecoveryStrategy::SkipTo { offset };
-                } else {
-                    return Err(self
-                        .new_err(ParseErr {
-                            message: "recovery offset exceeded the end of the current scope".into(),
-                            kind: ParseErrKind::InputTooShort,
-                            provenance: offset.provenance.clone(),
-                            span: at.span,
-                        })
-                        .into());
-                }
+                let offset = self.probe_seek(
+                    offset.kind.expect_int(),
+                    &offset.provenance,
+                    at.span,
+                    cursor,
+                    "recovery offset",
+                )?;
+
+                struct_ctx.recovery_strategy = RecoveryStrategy::SkipTo { offset };
             }
         }
 
@@ -655,7 +707,9 @@ impl ParseContext {
             )?;
             buf[BytesValue::PREFIX_SUFFIX_LEN..].copy_from_slice(&suffix);
 
-            cursor.advance_by(len);
+            cursor
+                .advance_by(len)
+                .map_err(|err| self.seek_err(err, &provenance, span, "after reading"))?;
         } else {
             let (bytes, _) = cursor.read_bytes_and_advance(Len::from(count), span, self)?;
             buf[..bytes.len()].copy_from_slice(&bytes);
@@ -1041,7 +1095,8 @@ impl ParseContext {
                     match &struct_ctx.recovery_strategy {
                         RecoveryStrategy::Fallback => return Err(err),
                         RecoveryStrategy::SkipTo { offset } => {
-                            cursor.set_offset(*offset);
+                            // the offset should be checked at the time of use
+                            cursor.set_offset(*offset).static_analysis_expect();
 
                             return Ok(());
                         }

@@ -29,5 +29,6 @@ pub fn check_ir(_file: &File) -> Result<ResolvedNames, AnalysisError> {
     // TODO: ensure sensible behavior about struct nested in scopes and if declarations
     // TODO: ensure u(_) and i(_) parse types contain int expressions
     // TODO: ensure that loops must make progress
+    // TODO: ensure that there is no scope between a `recover` and the struct it references
     Ok(ResolvedNames {})
 }
