@@ -295,9 +295,14 @@ impl Len {
         self.0
     }
 
-    /// Returns this length as an absolute offset from the input start.
+    /// Returns the absolute offset `length` bytes from the input start.
     pub const fn as_offset_from_start(self) -> AbsoluteOffset {
         AbsoluteOffset(self.0)
+    }
+
+    /// Returns the relative offset `length` bytes from the reference offset.
+    pub const fn as_relative_offset(self) -> RelativeOffset {
+        RelativeOffset(self.0)
     }
 
     /// Rounds this length up towards the given alignment.
@@ -352,6 +357,24 @@ impl Mul<Len> for u64 {
     #[track_caller]
     fn mul(self, rhs: Len) -> Self::Output {
         Len(self * rhs.0)
+    }
+}
+
+impl Mul<f32> for Len {
+    type Output = Len;
+
+    #[track_caller]
+    fn mul(self, rhs: f32) -> Self::Output {
+        Len((self.0 as f32 * rhs) as u64)
+    }
+}
+
+impl Mul<Len> for f32 {
+    type Output = Len;
+
+    #[track_caller]
+    fn mul(self, rhs: Len) -> Self::Output {
+        rhs * self
     }
 }
 

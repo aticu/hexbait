@@ -1,7 +1,7 @@
 //! Implements the byte-view gilbert module.
 
 use egui::{Color32, Sense, Stroke, Ui, vec2};
-use hexbait_common::{Input, Len, RelativeOffset};
+use hexbait_common::{Input, Len};
 
 use crate::{
     gui::{color, gilbert_curve::GilbertCurve, image_processing::blur_image},
@@ -283,12 +283,12 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
         && let Some(hover_position) = hover_position
     {
         let last_scrollbar = state.scroll_state.scrollbars.last_mut().unwrap();
-        let len = last_scrollbar.selection_len().as_u64() as f64;
+        let len = last_scrollbar.selection_len();
 
         let relative_start =
             (hover_position - state.scroll_state.hover_selection_size / 2.0).clamp(0.0, 1.0);
-        let start = RelativeOffset::from((relative_start as f64 * len).round() as u64);
-        let len = Len::from((state.scroll_state.hover_selection_size as f64 * len).round() as u64);
+        let start = (relative_start * len).as_relative_offset();
+        let len = state.scroll_state.hover_selection_size * len;
 
         last_scrollbar.set_selection(start, len);
         state.scroll_state.scrollbars.push(Scrollbar::new(len));

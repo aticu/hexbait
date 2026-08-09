@@ -283,9 +283,7 @@ fn handle_interactions(
                     // continue ongoing selection
                     if let Some(pos) = input.pointer.latest_pos() {
                         let current = (pos.y - rect.min.y) / rect.height();
-                        let current = RelativeOffset::from(
-                            (current as f64 * window.size().as_u64() as f64) as u64,
-                        );
+                        let current = (current * window.size()).as_relative_offset();
                         *end = current;
 
                         let (start, len) = selection(*start, *end);
@@ -312,10 +310,9 @@ fn handle_interactions(
                     if let Some(pos) = input.pointer.latest_pos()
                         && rect.expand2(vec2(f32::INFINITY, 0.0)).contains(pos)
                     {
-                        let current = (pos.y - rect.min.y).clamp(0.0, rect.height()) as f64
-                            / rect.height() as f64;
-                        let center =
-                            RelativeOffset::from((current * window.size().as_u64() as f64) as u64);
+                        let current =
+                            (pos.y - rect.min.y).clamp(0.0, rect.height()) / rect.height();
+                        let center = (current * window.size()).as_relative_offset();
 
                         scrollbar.center_around(center, window);
                     }
@@ -332,9 +329,7 @@ fn handle_interactions(
                 {
                     // Starting a new selection
                     let current = (pos.y - rect.min.y) / rect.height();
-                    let current = RelativeOffset::from(
-                        (current as f64 * window.size().as_u64() as f64) as u64,
-                    );
+                    let current = (current * window.size()).as_relative_offset();
                     scroll_state.interaction_state = InteractionState::WindowSelection {
                         start: current,
                         end: current,

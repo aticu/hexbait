@@ -237,10 +237,7 @@ impl ScrollState {
         }
 
         while window.size() > total_bytes_in_hexview {
-            let selection_len = std::cmp::max(
-                Len::from((0.05f64 * window.size().as_u64() as f64) as u64),
-                total_bytes_in_hexview,
-            );
+            let selection_len = std::cmp::max(0.05 * window.size(), total_bytes_in_hexview);
 
             let mut bar = Scrollbar::new(window.size());
             bar.selection_len = selection_len;
