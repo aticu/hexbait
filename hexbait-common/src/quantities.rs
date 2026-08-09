@@ -62,6 +62,11 @@ impl AbsoluteOffset {
     pub const fn to_relative(self) -> RelativeOffset {
         RelativeOffset(self.0)
     }
+
+    /// Returns the length of bytes between the beginning of the input and this offset.
+    pub const fn as_len(self) -> Len {
+        Len(self.0)
+    }
 }
 
 impl fmt::Debug for AbsoluteOffset {
@@ -197,6 +202,11 @@ impl RelativeOffset {
     /// This is valid if the base that the offset is relative to is the beginning of the input.
     pub const fn to_absolute(self) -> AbsoluteOffset {
         AbsoluteOffset(self.0)
+    }
+
+    /// Returns the length of bytes between the beginning of the relative base and this offset.
+    pub const fn as_len(self) -> Len {
+        Len(self.0)
     }
 }
 
@@ -391,6 +401,24 @@ impl Div<u64> for Len {
     #[track_caller]
     fn div(self, rhs: u64) -> Self::Output {
         Len(self.0 / rhs)
+    }
+}
+
+impl Div<f32> for Len {
+    type Output = Len;
+
+    #[track_caller]
+    fn div(self, rhs: f32) -> Self::Output {
+        Len((self.0 as f32 / rhs) as u64)
+    }
+}
+
+impl Div<Len> for Len {
+    type Output = f32;
+
+    #[track_caller]
+    fn div(self, rhs: Len) -> Self::Output {
+        self.0 as f32 / rhs.0 as f32
     }
 }
 

@@ -205,9 +205,8 @@ impl BackgroundSearcher {
 
         self.current_offset += buf_len - current_overlap;
 
-        let fraction_completed = ((self.current_offset - self.search_window.start()).as_u64()
-            as f32)
-            / (self.search_window.size().as_u64() as f32);
+        let fraction_completed =
+            (self.current_offset - self.search_window.start()) / self.search_window.size();
 
         *self.progress.write().unwrap() = fraction_completed;
     }

@@ -29,8 +29,8 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     let len = Len::from(pixel_budget * OVERSAMPLE).min(selected_window.size());
     let show_byte_colors = selected_window.size().as_u64() <= pixel_budget * OVERSAMPLE;
 
-    let min_hover_selection_size = state.scroll_state.total_hexdump_bytes().as_u64() as f32
-        / selected_window.size().as_u64() as f32;
+    let min_hover_selection_size =
+        state.scroll_state.total_hexdump_bytes() / selected_window.size();
 
     let gilbert_curve = state
         .scroll_state

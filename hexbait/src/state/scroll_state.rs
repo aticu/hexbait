@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Whether or not fine grained scrollbars are used.
-type FineGrainedSrcollbars = bool;
+type FineGrainedScrollbars = bool;
 
 /// Whether or not the main image had full quality.
 type FullQuality = bool;
@@ -29,12 +29,12 @@ pub struct ScrollState {
     /// The number of rows that have been scrolled down from the start in hex view.
     pub hex_scroll_offset: u64,
     /// The cached image for the sidebar in the hex view.
-    pub hex_sidebar_cached_image: CachedImage<(u64, u64, FineGrainedSrcollbars)>,
+    pub hex_sidebar_cached_image: CachedImage<(u64, u64, FineGrainedScrollbars)>,
     /// The cached image for the gilbert map.
-    pub gilbert_map_cached_image: CachedImage<(Window, FineGrainedSrcollbars)>,
+    pub gilbert_map_cached_image: CachedImage<(Window, FineGrainedScrollbars)>,
     /// The blurred version of the gilbert map.
     pub gilbert_map_blurred_image:
-        Cached<(Rect, Window, FineGrainedSrcollbars, FullQuality), ColorImage>,
+        Cached<(Rect, Window, FineGrainedScrollbars, FullQuality), ColorImage>,
     /// The cached image for the gilbert map hover overlay.
     pub gilbert_map_hover_cached_image: CachedImage<(f32, Option<f32>, FullQuality)>,
     /// The gilbert curve that is rendered.
@@ -323,7 +323,7 @@ impl ScrollState {
 type Selection = (RelativeOffset, Len);
 
 /// The information about what is hovered in the Gilbert map.
-type HoveredGilbertMap = (f64, f64);
+type HoveredGilbertMap = (f32, f32);
 
 /// The state of a single scrollbar.
 pub struct Scrollbar {
@@ -335,14 +335,14 @@ pub struct Scrollbar {
     ///
     /// This does not depend on the selection.
     /// This is handled by the selection_overlay.
-    pub cached_image: CachedImage<(Window, FineGrainedSrcollbars)>,
+    pub cached_image: CachedImage<(Window, FineGrainedScrollbars)>,
     /// The blurred image of the scrollbar.
-    pub blurred_image: Cached<(Rect, Window, FineGrainedSrcollbars, FullQuality), ColorImage>,
+    pub blurred_image: Cached<(Rect, Window, FineGrainedScrollbars, FullQuality), ColorImage>,
     /// The overlay for the current selection.
     pub selection_overlay: CachedImage<(
         Selection,
         Window,
-        FineGrainedSrcollbars,
+        FineGrainedScrollbars,
         HoveredGilbertMap,
         FullQuality,
     )>,
@@ -400,13 +400,13 @@ impl Scrollbar {
     }
 
     /// Returns the relative start of the selection within the window (range: `0.0..=1.0`).
-    pub fn relative_selection_start(&self, window: Window) -> f64 {
-        self.selection_start.as_u64() as f64 / window.size().as_u64() as f64
+    pub fn relative_selection_start(&self, window: Window) -> f32 {
+        self.selection_start.as_len() / window.size()
     }
 
     /// Returns the relative end of the selection within the window (range: `0.0..=1.0`).
-    pub fn relative_selection_end(&self, window: Window) -> f64 {
-        (self.selection_start + self.selection_len).as_u64() as f64 / window.size().as_u64() as f64
+    pub fn relative_selection_end(&self, window: Window) -> f32 {
+        (self.selection_start + self.selection_len).as_len() / window.size()
     }
 
     /// Scrolls the bar up by the given amount of bytes.

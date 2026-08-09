@@ -45,8 +45,8 @@ impl BigramStatistics {
     }
 
     /// Returns the number of bytes that the statistics cover.
-    pub fn num_covered_bytes(&self) -> u64 {
-        self.contained_regions.len() as u64
+    pub fn num_covered_bytes(&self) -> Len {
+        Len::from(self.contained_regions.len() as u64)
     }
 
     /// Returns `true` if the given window is fully covered by the statistics.
@@ -149,7 +149,10 @@ impl fmt::Debug for BigramStatistics {
         f.debug_struct("Statistics")
             .field(
                 "size",
-                &format!("{}B", SizeFormatterBinary::new(self.num_covered_bytes())),
+                &format!(
+                    "{}B",
+                    SizeFormatterBinary::new(self.num_covered_bytes().as_u64())
+                ),
             )
             .field("contained_regions", &self.contained_regions)
             .finish()

@@ -351,7 +351,7 @@ fn render_row(
 
         // offset
         render_offset(ui, &state.settings, Sense::hover(), offset).on_hover_ui(|ui| {
-            let percentage = offset.as_u64() as f64 / file_size.as_u64() as f64 * 100.0;
+            let percentage = offset.as_len() / file_size * 100.0;
             ui.label(format!(
                 "{} ({}B) {percentage:.02}% of file",
                 offset.as_u64(),

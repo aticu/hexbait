@@ -121,8 +121,8 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
             let hover_pos = hover_pos.clamp(size, 1.0 - size);
 
             (
-                (hover_pos - size).clamp(0.0, 1.0) as f64,
-                (hover_pos + size).clamp(0.0, 1.0) as f64,
+                (hover_pos - size).clamp(0.0, 1.0),
+                (hover_pos + size).clamp(0.0, 1.0),
             )
         } else {
             (
@@ -172,14 +172,12 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
         let selection_start = pos2(
             rect.max.x,
             rect.min.y
-                + state.scroll_state.scrollbars[i].relative_selection_start(window) as f32
-                    * rect.height(),
+                + state.scroll_state.scrollbars[i].relative_selection_start(window) * rect.height(),
         );
         let selection_end = pos2(
             rect.max.x,
             rect.min.y
-                + state.scroll_state.scrollbars[i].relative_selection_end(window) as f32
-                    * rect.height(),
+                + state.scroll_state.scrollbars[i].relative_selection_end(window) * rect.height(),
         );
         old_selection = Some([selection_start, selection_end]);
 
@@ -352,11 +350,11 @@ fn handle_interactions(
             && rect.contains(pos)
             && input.smooth_scroll_delta.y != 0.0
         {
-            let scroll_delta = (-input.smooth_scroll_delta.y as f64 / 2.0).trunc();
+            let scroll_delta = (-input.smooth_scroll_delta.y / 2.0).trunc();
             let scroll_up = scroll_delta < 0.0;
             let scroll_delta = scroll_delta.abs();
-            let row_bytes = window.size().as_u64() as f64 / rect.height() as f64;
-            let scroll_amount = (scroll_delta * row_bytes) as u64;
+            let row_bytes = window.size() / rect.height();
+            let scroll_amount = (scroll_delta * row_bytes).as_u64();
 
             if scroll_up {
                 scroll_state.scroll_up(bar_idx, scroll_amount);
@@ -374,11 +372,11 @@ fn render_bar(
     settings: &Settings,
     rect: Rect,
     window: Window,
-    selected_window: (f64, f64),
+    selected_window: (f32, f32),
     mut metrics: impl FnMut(usize) -> (Option<StatisticsMetrics>, MetricsQuality),
 ) -> Response {
-    let selection_start = (selected_window.0 * rect.height() as f64).round() as usize;
-    let selection_end = (selected_window.1 * rect.height() as f64).round() as usize;
+    let selection_start = (selected_window.0 * rect.height()).round() as usize;
+    let selection_end = (selected_window.1 * rect.height()).round() as usize;
 
     let side_start = (rect.width() - SIDE_BAR_WIDTH as f32) as usize;
     let row_width = side_start / 16;
@@ -386,7 +384,7 @@ fn render_bar(
     let mut full_quality_scrollbar = true;
     let mut full_quality_row = true;
 
-    let elems_per_row = (window.size().as_u64() as f32 / rect.height().trunc()).trunc() as u64;
+    let elems_per_row = (window.size() / rect.height().trunc()).as_u64();
     let large_alignment = highest_aligned_value(0, elems_per_row * LARGE_ALIGNMENT_MARKER_DIFF);
 
     scrollbar.cached_image.paint_at(
@@ -506,9 +504,8 @@ pub fn offset_on_bar(bar_rect: Rect, bar_window: Window, offset: AbsoluteOffset)
         return None;
     }
 
-    let relative_offset =
-        (offset - bar_window.start()).as_u64() as f64 / bar_window.size().as_u64() as f64;
-    let height = bar_rect.height().ceil() as f64;
+    let relative_offset = (offset - bar_window.start()) / bar_window.size();
+    let height = bar_rect.height().ceil();
 
     if (0.0..=1.0).contains(&relative_offset) {
         let offset = ((16.0 * height) * relative_offset) as u32;

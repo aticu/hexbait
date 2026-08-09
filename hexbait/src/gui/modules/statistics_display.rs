@@ -149,8 +149,8 @@ fn render(
     });
 
     if let Some((first, second)) = hover_positions {
-        let intensity =
-            statistics.follow(first, second) as f32 / statistics.num_covered_bytes() as f32;
+        let intensity = statistics.follow(first, second) as f32
+            / statistics.num_covered_bytes().as_u64() as f32;
 
         Tooltip::always_open(
             ui.ctx().clone(),

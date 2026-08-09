@@ -174,7 +174,7 @@ impl StatisticsHandler {
             return (BigramStatistics::empty(), 1.0);
         }
 
-        let coverage = result.statistics.num_covered_bytes() as f32 / window.size().as_u64() as f32;
+        let coverage = result.statistics.num_covered_bytes() / window.size();
 
         (result.statistics.clone(), coverage.clamp(0.0, 1.0))
     }
