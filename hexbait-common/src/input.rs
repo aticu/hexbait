@@ -23,7 +23,7 @@ enum InputType {
         /// The open file handle.
         file: File,
         /// The length of the file in bytes.
-        len: u64,
+        len: Len,
     },
     /// The input is the given memory map.
     Memmap(Mmap),
@@ -64,7 +64,7 @@ impl Input {
             Ok(Input(Arc::new(InputType::Memmap(mmap))))
         } else {
             let mut file = File::open(path).unwrap();
-            let len = file.seek(io::SeekFrom::End(0))?;
+            let len = Len::from(file.seek(io::SeekFrom::End(0))?);
 
             Ok(Input(Arc::new(InputType::File { file, len })))
         }
@@ -88,7 +88,7 @@ impl Input {
     /// The length of the data.
     pub fn len(&self) -> Len {
         match &*self.0 {
-            InputType::File { len, .. } => Len::from(*len),
+            InputType::File { len, .. } => *len,
             InputType::Memmap(mmap) => Len::from(
                 u64::try_from(mmap.len())
                     .expect("non `u64`-fitting length would not fit into memory"),
@@ -146,12 +146,14 @@ impl Input {
                 len: file_len,
                 ..
             } => {
-                if offset.as_u64() > *file_len {
+                let file_end = file_len.as_offset_from_start();
+                if offset > file_end {
                     return Err(io::Error::other("offset is beyond input"));
                 }
 
-                let len_left = *file_len - offset.as_u64();
-                let output_size = std::cmp::min(len_left, len.as_u64())
+                let len_left = file_end - offset;
+                let output_size = std::cmp::min(len_left, len)
+                    .as_u64()
                     .try_into()
                     .expect("we used min above, so this must fit into `buf`");
 

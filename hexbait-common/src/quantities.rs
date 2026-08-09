@@ -295,6 +295,11 @@ impl Len {
         self.0
     }
 
+    /// Returns this length as an absolute offset from the input start.
+    pub const fn as_offset_from_start(self) -> AbsoluteOffset {
+        AbsoluteOffset(self.0)
+    }
+
     /// Rounds this length up towards the given alignment.
     ///
     /// The alignment must be a power of two.
