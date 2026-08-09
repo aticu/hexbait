@@ -1,5 +1,7 @@
 //! Defines common types and functions used by all hexbait `crate`s.
 
+#![forbid(unsafe_code)]
+
 pub use endianness::Endianness;
 pub use input::{Input, ReadBytes};
 pub use quantities::{AbsoluteOffset, Len, RelativeOffset};

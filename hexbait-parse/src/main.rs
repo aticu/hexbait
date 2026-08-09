@@ -2,6 +2,8 @@
 //!
 //! This also serves as a testing ground for an eventual integration into hexbait itself.
 
+#![forbid(unsafe_code)]
+
 use std::path::PathBuf;
 
 use clap::Parser;

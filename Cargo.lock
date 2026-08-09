@@ -1724,7 +1724,6 @@ dependencies = [
 name = "hexbait-common"
 version = "0.1.0"
 dependencies = [
- "memmap2",
  "nix 0.31.3",
 ]
 
