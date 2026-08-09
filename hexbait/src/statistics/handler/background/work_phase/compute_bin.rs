@@ -78,7 +78,7 @@ impl<Statistics: crate::statistics::Statistics> ComputeBin<Statistics> {
 
             let section_align = 1
                 << ((0..63)
-                    .find(|shift| !uncovered_section.start().is_aligned(1 << shift))
+                    .find(|shift| !uncovered_section.start().is_aligned(Len::from(1 << shift)))
                     .unwrap_or(64)
                     - 1);
             let tier_size = uncovered_section.size().min(Len::from(section_align));

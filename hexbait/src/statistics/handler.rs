@@ -187,7 +187,7 @@ impl StatisticsHandler {
     ) -> Option<StatisticsBufAccess> {
         let buf = Arc::clone(&self.result.load().map_buffer);
 
-        if buf[0].window != window.expand_to_align(buf[0].bin_size.as_u64())
+        if buf[0].window != window.expand_to_align(buf[0].bin_size)
             || buf[0].buf.len() != pixel_budget
         {
             return None;
@@ -207,7 +207,7 @@ impl StatisticsHandler {
 
         if result.bar_buffers.len() <= bar_idx
             || result.bar_buffers[bar_idx].window
-                != window.expand_to_align(result.bar_buffers[bar_idx].bin_size.as_u64())
+                != window.expand_to_align(result.bar_buffers[bar_idx].bin_size)
             || result.bar_buffers[bar_idx].buf.len() != bin_count
         {
             return None;
@@ -245,7 +245,7 @@ impl StatisticsHandler {
 /// Computes the bin size for the window and returns the aligned window.
 fn compute_bin_size_and_align_window(window: Window, bins_per_window: u64) -> (Len, Window) {
     let bin_size = determine_bin_size(window, bins_per_window);
-    let aligned_window = window.expand_to_align(bin_size.as_u64());
+    let aligned_window = window.expand_to_align(bin_size);
 
     (bin_size, aligned_window)
 }

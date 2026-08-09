@@ -483,7 +483,7 @@ impl ParseContext {
             Declaration::Align(expr) => {
                 let value = self.eval_expr(expr, cursor, struct_ctx, Default::default())?;
                 let align = value.kind.expect_int();
-                let align = u64::try_from(align).static_analysis_expect();
+                let align = Len::from(u64::try_from(align).static_analysis_expect());
 
                 self.set_offset(
                     cursor,

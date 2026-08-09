@@ -141,17 +141,19 @@ impl ScrollState {
                 .map(|bar| bar.selection_len)
                 .unwrap_or(self.file_size());
 
+        const HEX_BAR_WIDTH: Len = Len::from(16);
+
         if start.is_start_of_file() {
             // ensure that the correction below does not make the start invisible
 
             AbsoluteOffset::ZERO
-        } else if end > AbsoluteOffset::ZERO + self.file_size() - Len::from(16) {
+        } else if end > AbsoluteOffset::ZERO + self.file_size() - HEX_BAR_WIDTH {
             // over-correct towards the end to ensure it's guaranteed to be visible
 
-            AbsoluteOffset::from(self.file_size().round_up(16).as_u64())
+            AbsoluteOffset::from(self.file_size().round_up(HEX_BAR_WIDTH).as_u64())
                 - self.total_hexdump_bytes()
         } else {
-            start.align_down(16)
+            start.align_down(HEX_BAR_WIDTH)
         }
     }
 

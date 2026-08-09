@@ -120,7 +120,7 @@ impl Window {
     /// Expands this window such that both the start and end are aligned to `align`.
     ///
     /// `align` must be a power of two.
-    pub fn expand_to_align(self, align: u64) -> Window {
+    pub fn expand_to_align(self, align: Len) -> Window {
         let start = self.start().align_down(align);
         let end = self.end().align_up(align);
 
@@ -143,9 +143,9 @@ impl Window {
     ///
     /// ```rust
     /// # use hexbait::window::Window;
-    /// # use hexbait_common::AbsoluteOffset;
+    /// # use hexbait_common::{AbsoluteOffset, Len};
     /// assert_eq!(
-    ///     Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(25)).align(8),
+    ///     Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(25)).align(Len::from(8)),
     ///     Some((
     ///         Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(8)),
     ///         Window::new(AbsoluteOffset::from(8), AbsoluteOffset::from(24)),
@@ -153,7 +153,7 @@ impl Window {
     ///     ))
     /// );
     /// assert_eq!(
-    ///     Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(8)).align(8),
+    ///     Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(8)).align(Len::from(8)),
     ///     Some((
     ///         Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(8)),
     ///         Window::new(AbsoluteOffset::from(8), AbsoluteOffset::from(8)),
@@ -161,16 +161,16 @@ impl Window {
     ///     ))
     /// );
     /// assert_eq!(
-    ///     Window::new(AbsoluteOffset::from(7), AbsoluteOffset::from(11)).align(8),
+    ///     Window::new(AbsoluteOffset::from(7), AbsoluteOffset::from(11)).align(Len::from(8)),
     ///     Some((
     ///         Window::new(AbsoluteOffset::from(7), AbsoluteOffset::from(8)),
     ///         Window::new(AbsoluteOffset::from(8), AbsoluteOffset::from(8)),
     ///         Window::new(AbsoluteOffset::from(8), AbsoluteOffset::from(11)),
     ///     ))
     /// );
-    /// assert_eq!(Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(25)).align(32), None);
+    /// assert_eq!(Window::new(AbsoluteOffset::from(3), AbsoluteOffset::from(25)).align(Len::from(32)), None);
     /// ```
-    pub fn align(self, align: u64) -> Option<(Window, Window, Window)> {
+    pub fn align(self, align: Len) -> Option<(Window, Window, Window)> {
         let start = self.start().align_up(align);
         let end = self.end().align_down(align);
 

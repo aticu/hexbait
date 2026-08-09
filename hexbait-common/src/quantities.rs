@@ -29,8 +29,8 @@ impl AbsoluteOffset {
     ///
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
-    pub const fn align_up(self, align: u64) -> Self {
-        Self(align_up(self.0, align))
+    pub const fn align_up(self, align: Len) -> Self {
+        Self(align_up(self.0, align.as_u64()))
     }
 
     /// Aligns this offset down towards the given alignment.
@@ -39,8 +39,8 @@ impl AbsoluteOffset {
     ///
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
-    pub const fn align_down(self, align: u64) -> Self {
-        Self(align_down(self.0, align))
+    pub const fn align_down(self, align: Len) -> Self {
+        Self(align_down(self.0, align.as_u64()))
     }
 
     /// Determines if this offset is aligned to a given alignment.
@@ -49,8 +49,8 @@ impl AbsoluteOffset {
     ///
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
-    pub const fn is_aligned(self, align: u64) -> bool {
-        is_aligned(self.0, align)
+    pub const fn is_aligned(self, align: Len) -> bool {
+        is_aligned(self.0, align.as_u64())
     }
 
     /// Returns this offset as a `u64`.
@@ -173,8 +173,8 @@ impl RelativeOffset {
     ///
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
-    pub const fn align_up(self, align: u64) -> Self {
-        Self(align_up(self.0, align))
+    pub const fn align_up(self, align: Len) -> Self {
+        Self(align_up(self.0, align.as_u64()))
     }
 
     /// Aligns this offset down towards the given alignment.
@@ -183,8 +183,8 @@ impl RelativeOffset {
     ///
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
-    pub const fn align_down(self, align: u64) -> Self {
-        Self(align_down(self.0, align))
+    pub const fn align_down(self, align: Len) -> Self {
+        Self(align_down(self.0, align.as_u64()))
     }
 
     /// Returns this offset as a `u64`.
@@ -301,8 +301,8 @@ impl Len {
     ///
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
-    pub const fn round_up(self, align: u64) -> Self {
-        Self(align_up(self.0, align))
+    pub const fn round_up(self, align: Len) -> Self {
+        Self(align_up(self.0, align.as_u64()))
     }
 
     /// Aligns this length down towards the given alignment.
@@ -311,8 +311,8 @@ impl Len {
     ///
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
-    pub const fn align_down(self, align: u64) -> Self {
-        Self(align_down(self.0, align))
+    pub const fn align_down(self, align: Len) -> Self {
+        Self(align_down(self.0, align.as_u64()))
     }
 }
 

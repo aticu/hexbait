@@ -102,7 +102,7 @@ impl<Statistics: crate::statistics::Statistics> StatisticsTree<Statistics> {
     #[track_caller]
     pub fn insert(&mut self, offset: AbsoluteOffset, tier: Tier, statistics: Statistics) {
         let size = tier.size();
-        assert!(offset.is_aligned(size.as_u64()), "unaligned node insertion");
+        assert!(offset.is_aligned(size), "unaligned node insertion");
         let window = Window::from_start_len(offset, size);
 
         // Remove all nodes within our range (descendants or same-position).
@@ -140,8 +140,7 @@ impl<Statistics: crate::statistics::Statistics> StatisticsTree<Statistics> {
 
         let size = tier.size();
         let parent_size = parent_tier.size();
-        let parent_window =
-            Window::from_start_len(offset.align_down(parent_size.as_u64()), parent_size);
+        let parent_window = Window::from_start_len(offset.align_down(parent_size), parent_size);
 
         // first check if we can promote to avoid computing statistics partially that we need to drop because promotion is not possible
         let can_promote = parent_window.subwindows_of_size(size).all(|window| {
