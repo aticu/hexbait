@@ -1,7 +1,7 @@
 //! Defines new types for various quantities.
 
 use std::{
-    fmt,
+    fmt::{self},
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
 };
 
@@ -21,6 +21,16 @@ impl AbsoluteOffset {
     /// Whether the offset refers to the start of the file.
     pub const fn is_start_of_file(self) -> bool {
         self.0 == 0
+    }
+
+    /// Displays the length from the file start as a human-readable number.
+    pub const fn human(self) -> impl fmt::Display {
+        self.as_len().human()
+    }
+
+    /// Displays the length from the file start as a detailed and a human-readable number.
+    pub const fn detailed(self) -> impl fmt::Display {
+        self.as_len().detailed()
     }
 
     /// Aligns this offset up towards the given alignment.
@@ -313,6 +323,32 @@ impl Len {
     /// Returns the relative offset `length` bytes from the reference offset.
     pub const fn as_relative_offset(self) -> RelativeOffset {
         RelativeOffset(self.0)
+    }
+
+    /// Shows a human readable interpretation of the length.
+    pub const fn human(self) -> impl fmt::Display {
+        struct Display(u64);
+
+        impl fmt::Display for Display {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}B", size_format::SizeFormatterBinary::new(self.0))
+            }
+        }
+
+        Display(self.0)
+    }
+
+    /// Shows the detailed length and a human readable version of it.
+    pub const fn detailed(self) -> impl fmt::Display {
+        struct Display(Len);
+
+        impl fmt::Display for Display {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}, {}", self.0, self.0.human())
+            }
+        }
+
+        Display(self)
     }
 
     /// Rounds this length up towards the given alignment.

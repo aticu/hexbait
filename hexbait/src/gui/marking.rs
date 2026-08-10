@@ -32,17 +32,9 @@ pub fn hover_marking(ui: &mut Ui, mark: MarkRef) {
         }
     }
 
-    ui.label(format!(
-        "Offset: {} ({}B)",
-        mark.window.start().as_u64(),
-        size_format::SizeFormatterBinary::new(mark.window.start().as_u64())
-    ));
+    ui.label(format!("Offset: {}", mark.window.start().detailed()));
     if mark.window.size() > Len::from(1) {
-        ui.label(format!(
-            "Length: {} ({}B)",
-            mark.window.size().as_u64(),
-            size_format::SizeFormatterBinary::new(mark.window.size().as_u64())
-        ));
+        ui.label(format!("Length: {}", mark.window.size().detailed()));
     }
 }
 

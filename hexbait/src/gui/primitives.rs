@@ -24,7 +24,7 @@ pub fn render_offset(
     painter.text(
         ui.cursor().min,
         Align2::LEFT_TOP,
-        format!("{:016x}", offset.as_u64()),
+        format!("{:016x}", offset),
         settings.hex_font(),
         color,
     );

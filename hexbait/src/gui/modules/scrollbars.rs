@@ -261,15 +261,15 @@ fn handle_interactions(
                     if start <= end {
                         let len = std::cmp::max(end - start, total_bytes);
 
-                        if start + len > RelativeOffset::from(window.size().as_u64()) {
-                            (RelativeOffset::from((window.size() - len).as_u64()), len)
+                        if start + len > window.size().as_relative_offset() {
+                            ((window.size() - len).as_relative_offset(), len)
                         } else {
                             (start, len)
                         }
                     } else {
                         let len = std::cmp::max(start - end, total_bytes);
 
-                        if RelativeOffset::from(len.as_u64()) > start {
+                        if len.as_relative_offset() > start {
                             (RelativeOffset::ZERO, len)
                         } else {
                             (start - len, len)

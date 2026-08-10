@@ -79,7 +79,7 @@ impl State {
         if self.parse_state.sync_parse_offset_to_selection_start
             && let Some(selection) = self.selection_state.selection()
         {
-            self.parse_state.parse_offset = selection.start().as_u64().to_string();
+            self.parse_state.parse_offset = selection.start().to_string();
         }
     }
 }

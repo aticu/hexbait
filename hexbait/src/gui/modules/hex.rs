@@ -197,7 +197,7 @@ fn byte_context_menu(ui: &mut Ui, state: &mut State, input: &Input, offset: Abso
     }
 
     if ui.button("Copy offset").clicked() {
-        ui.ctx().copy_text(format!("{}", offset.as_u64()));
+        ui.ctx().copy_text(format!("{}", offset));
     }
 
     if let Some(selected_window) = state.selection_state.selected_window()
@@ -333,9 +333,8 @@ fn render_row(
         let render_offset_info =
             |ui: &mut Ui, byte_offset: AbsoluteOffset, selection: Option<Window>| {
                 ui.label(format!(
-                    "offset from file start: 0x{:x} ({byte_offset:?}, {}B)",
-                    byte_offset.as_u64(),
-                    size_format::SizeFormatterBinary::new(byte_offset.as_u64())
+                    "offset from file start: 0x{byte_offset:x} ({})",
+                    byte_offset.detailed()
                 ));
                 if let Some(selection) = selection {
                     let selection_offset =
@@ -352,11 +351,7 @@ fn render_row(
         // offset
         render_offset(ui, &state.settings, Sense::hover(), offset).on_hover_ui(|ui| {
             let percentage = offset.as_len() / file_size * 100.0;
-            ui.label(format!(
-                "{} ({}B) {percentage:.02}% of file",
-                offset.as_u64(),
-                size_format::SizeFormatterBinary::new(offset.as_u64())
-            ));
+            ui.label(format!("{}, {percentage:.02}% of file", offset.detailed()));
         });
         ui.add_space(state.settings.large_space());
 

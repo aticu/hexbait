@@ -72,7 +72,7 @@ impl<Statistics: crate::statistics::Statistics> ComputeBin<Statistics> {
             computation_state.maybe_yield()?;
 
             // if we're at the end of the input, we should stop here, since there is nothing we can meaningfully do still
-            if uncovered_section.start().as_u64() == computation_state.input.len().as_u64() {
+            if uncovered_section.start() == computation_state.input.len().as_offset_from_start() {
                 break;
             }
 
