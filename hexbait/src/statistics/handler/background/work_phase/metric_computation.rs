@@ -88,7 +88,7 @@ impl MetricComputation {
             window_offset: aligned_window.start(),
             end_offset: aligned_window.end(),
             compute_bin: None,
-            total_bins: (aligned_window.size().as_u64() / bin_size.as_u64()) as usize,
+            total_bins: aligned_window.size().div_floor(bin_size) as usize,
             bin_count: 0,
             out_index: 0,
             quality: match mode {
@@ -118,7 +118,7 @@ impl MetricComputation {
         self.bin_size = bin_size;
         self.window_offset = aligned_window.start();
         self.end_offset = aligned_window.end();
-        self.total_bins = (aligned_window.size().as_u64() / bin_size.as_u64()) as usize;
+        self.total_bins = aligned_window.size().div_floor(bin_size) as usize;
         self.bin_count = 0;
         self.out_index = 0;
         self.quality = match self.mode {

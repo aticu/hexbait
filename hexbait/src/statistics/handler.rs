@@ -258,11 +258,5 @@ fn determine_bin_size(window: Window, bins_per_window: u64) -> Len {
 
 /// Determines the bin size for the given raw bin size.
 fn raw_bin_size_to_bin_size(raw_bin_size: Len) -> Len {
-    let rounded_bin_size = if raw_bin_size.as_u64().is_power_of_two() {
-        raw_bin_size.as_u64()
-    } else {
-        raw_bin_size.as_u64().next_power_of_two() >> 1
-    };
-
-    Len::from(rounded_bin_size).max(MIN_SAMPLE_SIZE)
+    raw_bin_size.prev_power_of_two().max(MIN_SAMPLE_SIZE)
 }

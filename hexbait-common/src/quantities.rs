@@ -207,6 +207,16 @@ impl RelativeOffset {
         self.0
     }
 
+    /// Adds a length to the offset if this would still result in a valid offset.
+    #[must_use = "does not modify the value in place"]
+    pub const fn checked_add(self, len: Len) -> Option<RelativeOffset> {
+        // manual map to stay `const`
+        match self.0.checked_add(len.0) {
+            Some(result) => Some(RelativeOffset::from(result)),
+            None => None,
+        }
+    }
+
     /// Subtracts the given length from this relative offset.
     ///
     /// Returns the length left after the subtraction if this would underflow the offset.
@@ -351,6 +361,21 @@ impl Len {
     /// Returns this length as a `u64`.
     pub const fn as_u64(self) -> u64 {
         self.0
+    }
+
+    /// Subtracts the given length saturating to `Len::ZERO` on overflow.
+    #[must_use = "does not modify the value in place"]
+    pub const fn saturating_sub(self, other: Len) -> Len {
+        Len(self.0.saturating_sub(other.0))
+    }
+
+    /// Returns the length that is the next smaller power of two from `self`.
+    pub const fn prev_power_of_two(self) -> Len {
+        if self.0.is_power_of_two() {
+            self
+        } else {
+            Len(self.0.next_power_of_two() >> 1)
+        }
     }
 
     /// Returns the absolute offset `length` bytes from the input start.

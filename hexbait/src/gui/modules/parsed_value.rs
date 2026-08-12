@@ -127,7 +127,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     };
 
     let view = View::from_input(input.clone());
-    let view = view.subview(parse_offset.to_relative()..RelativeOffset::from(view.len().as_u64()));
+    let view = view.subview(parse_offset.to_relative()..view.len().as_relative_offset());
     let result = hexbait_lang::eval_ir(parse_type, view, RelativeOffset::ZERO);
 
     let hovered = ScrollArea::vertical()

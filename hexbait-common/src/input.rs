@@ -118,17 +118,18 @@ impl Input {
                     .as_u64()
                     .try_into()
                     .expect("we used min above, so this must fit into `buf`");
+                let offset = offset.as_u64();
 
                 Ok(if let Some(preallocated_buf) = preallocated_buf {
                     preallocated_buf.resize(output_size, 0);
-                    read_exact(file, offset.as_u64(), &mut preallocated_buf[..output_size])?;
+                    read_exact(file, offset, &mut preallocated_buf[..output_size])?;
 
                     ReadBytes(ReadBytesInner::ByRef {
                         buf: &preallocated_buf[..output_size],
                     })
                 } else if output_size <= READ_BYTES_INLINE_LEN {
                     let mut buf = [0u8; READ_BYTES_INLINE_LEN];
-                    read_exact(file, offset.as_u64(), &mut buf[..output_size])?;
+                    read_exact(file, offset, &mut buf[..output_size])?;
 
                     ReadBytes(ReadBytesInner::Inline {
                         buf,
@@ -136,7 +137,7 @@ impl Input {
                     })
                 } else {
                     let mut buf = vec![0u8; output_size].into_boxed_slice();
-                    read_exact(file, offset.as_u64(), &mut buf)?;
+                    read_exact(file, offset, &mut buf)?;
 
                     ReadBytes(ReadBytesInner::Owned { buf })
                 })

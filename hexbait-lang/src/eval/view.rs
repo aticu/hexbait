@@ -47,7 +47,7 @@ impl View {
     pub fn subview(&self, range: Range<RelativeOffset>) -> View {
         if let ViewType::Subview { view, valid_range } = &*self.0 {
             // avoid long chains of sub-views to improve read performance
-            let offset = Len::from(valid_range.start.as_u64());
+            let offset = valid_range.start.as_len();
 
             let start = range.start + offset;
             let end = std::cmp::min(range.end + offset, valid_range.end);
@@ -73,17 +73,19 @@ impl View {
                 assert!(valid_range.end >= valid_range.start);
 
                 let len = view.len();
-                if valid_range.start.as_u64() > len.as_u64() {
+                if valid_range.start.as_len() > len {
                     Len::ZERO
                 } else {
-                    Len::from(
-                        std::cmp::min(len.as_u64(), valid_range.end.as_u64())
-                            - valid_range.start.as_u64(),
-                    )
+                    std::cmp::min(len, valid_range.end.as_len()) - valid_range.start.as_len()
                 }
             }
             ViewType::Bytes(bytes) => Len::from(bytes.len() as u64),
         }
+    }
+
+    /// The last valid offset in the view past the last byte.
+    pub fn end_offset(&self) -> RelativeOffset {
+        self.len().as_relative_offset()
     }
 
     /// Returns `true` if the view is empty.
@@ -93,14 +95,14 @@ impl View {
 
     /// Reads data into the buffer at the given offset.
     pub(crate) fn read_at(&self, offset: RelativeOffset, len: Len) -> io::Result<ReadBytes<'_>> {
-        if offset.as_u64() > self.len().as_u64() {
+        if offset > self.end_offset() {
             return Err(io::Error::other("offset is beyond input"));
         }
 
         let out_buf = match &*self.0 {
             ViewType::Input(input) => input.read_at(offset.to_absolute(), len, None)?,
             ViewType::Subview { view, valid_range } => {
-                view.read_at(valid_range.start + Len::from(offset.as_u64()), len)?
+                view.read_at(valid_range.start + offset.as_len(), len)?
             }
             ViewType::Bytes(bytes) => {
                 let mut out = vec![0; len.as_u64() as usize];
@@ -121,8 +123,7 @@ impl View {
                 Provenance::from_range(range.start.to_absolute()..range.end.to_absolute())
             }
             ViewType::Subview { view, valid_range } => view.provenance_from_range(
-                range.start + Len::from(valid_range.start.as_u64())
-                    ..range.end + Len::from(valid_range.start.as_u64()),
+                range.start + valid_range.start.as_len()..range.end + valid_range.start.as_len(),
             ),
             ViewType::Bytes(bytes) => bytes.provenance_range(range),
         }

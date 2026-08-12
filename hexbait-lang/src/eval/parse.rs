@@ -552,7 +552,7 @@ impl ParseContext {
                                 "for end of new scope",
                             )?
                         } else {
-                            RelativeOffset::from(cursor.view().len().as_u64())
+                            cursor.view().end_offset()
                         };
 
                         (cursor.view().subview(start..end), span)

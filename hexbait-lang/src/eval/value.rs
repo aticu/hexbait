@@ -537,7 +537,7 @@ impl BytesValue {
             BytesValue::FromView {
                 view, start, len, ..
             } => {
-                let clamp = |off: RelativeOffset| std::cmp::min(Len::from(off.as_u64()), *len);
+                let clamp = |off: RelativeOffset| std::cmp::min(off.as_len(), *len);
 
                 view.provenance_from_range(*start + clamp(range.start)..*start + clamp(range.end))
             }

@@ -150,7 +150,9 @@ impl ScrollState {
         } else if end > AbsoluteOffset::ZERO + self.file_size() - HEX_BAR_WIDTH {
             // over-correct towards the end to ensure it's guaranteed to be visible
 
-            AbsoluteOffset::from(self.file_size().round_up(HEX_BAR_WIDTH).as_u64())
+            self.file_size()
+                .round_up(HEX_BAR_WIDTH)
+                .as_offset_from_start()
                 - self.total_hexdump_bytes()
         } else {
             start.align_down(HEX_BAR_WIDTH)
@@ -207,10 +209,9 @@ impl ScrollState {
             if point_on_bar < half_len {
                 bar.selection_start = RelativeOffset::ZERO;
             } else if point_on_bar + half_len > window.size() {
-                bar.selection_start =
-                    RelativeOffset::from((window.size() - bar.selection_len).as_u64());
+                bar.selection_start = (window.size() - bar.selection_len).as_relative_offset();
             } else {
-                bar.selection_start = RelativeOffset::from((point_on_bar - half_len).as_u64());
+                bar.selection_start = (point_on_bar - half_len).as_relative_offset();
             }
         };
 
@@ -252,11 +253,7 @@ impl ScrollState {
         self.scrollbars.push(Scrollbar::new(window.size()));
 
         let hex_window_size = self.hex_visible_window_size();
-        let tentative_hex_offset = Len::from(
-            (point - window.start())
-                .as_u64()
-                .saturating_sub(hex_window_size.as_u64() / 2),
-        );
+        let tentative_hex_offset = (point - window.start()).saturating_sub(hex_window_size / 2);
 
         let unrounded_hex_offset =
             if tentative_hex_offset + hex_window_size > total_bytes_in_hexview {
@@ -378,11 +375,10 @@ impl Scrollbar {
     pub fn center_around(&mut self, center: RelativeOffset, window: Window) {
         let half_len = self.selection_len / 2;
 
-        if center < RelativeOffset::from(half_len.as_u64()) {
+        if center < half_len.as_relative_offset() {
             self.selection_start = RelativeOffset::ZERO;
-        } else if center + half_len > RelativeOffset::from(window.size().as_u64()) {
-            self.selection_start =
-                RelativeOffset::from(window.size().as_u64()) - self.selection_len;
+        } else if center + half_len > window.size().as_relative_offset() {
+            self.selection_start = window.size().as_relative_offset() - self.selection_len;
         } else {
             self.selection_start = center - half_len;
         }

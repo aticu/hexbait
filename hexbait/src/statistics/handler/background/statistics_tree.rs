@@ -246,11 +246,11 @@ impl<Statistics: crate::statistics::Statistics> StatisticsTree<Statistics> {
         );
         for (tier, stats) in tier_stats {
             eprint!(
-                ", tier {} ({}B): {} nodes ({}B)",
+                ", tier {} ({}): {} nodes ({})",
                 tier.0,
-                size_format::SizeFormatterBinary::new(tier.size().as_u64()),
+                tier.size().human(),
                 stats.0,
-                size_format::SizeFormatterBinary::new(stats.1)
+                Len::from(stats.1).human()
             );
         }
         eprintln!()
@@ -337,6 +337,7 @@ struct GcPriority {
     /// Sorted descending so lower distances are preferred.
     distance_descending: cmp::Reverse<u64>,
 }
+
 /// Returns the distance from the offset to the nearest edge of the next
 /// higher-priority zone's boundary.
 ///
@@ -353,6 +354,7 @@ fn distance_from_higher_zone(offset: AbsoluteOffset, zone: usize, windows: &[Win
         (offset - window.end()).as_u64()
     }
 }
+
 /// Returns the priority zone of a node at the given offset.
 ///
 /// Zone 0 is outside all windows (least important), zone `windows.len()`

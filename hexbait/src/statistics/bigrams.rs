@@ -4,7 +4,6 @@ use std::{fmt, io, ops::AddAssign};
 
 use hexbait_common::{Input, Len};
 use range_set_blaze::RangeSetBlaze;
-use size_format::SizeFormatterBinary;
 
 use crate::{
     statistics::{Statistics, downsampled_bigrams::DownsampledBigramStatistics},
@@ -147,13 +146,7 @@ impl Statistics for BigramStatistics {
 impl fmt::Debug for BigramStatistics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Statistics")
-            .field(
-                "size",
-                &format!(
-                    "{}B",
-                    SizeFormatterBinary::new(self.num_covered_bytes().as_u64())
-                ),
-            )
+            .field("size", &format!("{}", self.num_covered_bytes().human()))
             .field("contained_regions", &self.contained_regions)
             .finish()
     }

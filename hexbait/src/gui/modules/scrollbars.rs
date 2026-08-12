@@ -5,7 +5,6 @@ use egui::{
     Stroke, Tooltip, Ui, pos2, vec2,
 };
 use hexbait_common::{AbsoluteOffset, Input, Len, RelativeOffset};
-use size_format::SizeFormatterBinary;
 
 use crate::{
     IDLE_TIME,
@@ -65,7 +64,7 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
         ui.painter().text(
             rect.min,
             egui::Align2::LEFT_BOTTOM,
-            format!("{}B", SizeFormatterBinary::new(window.size().as_u64())),
+            window.size().human(),
             FontId::proportional(size_text_height),
             ui.style().noninteractive().text_color(),
         );
