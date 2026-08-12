@@ -4,7 +4,6 @@ use std::{fmt, io, ops::AddAssign};
 
 use hexbait_common::{Input, Len};
 use range_set_blaze::RangeSetBlaze;
-use size_format::SizeFormatterBinary;
 
 use crate::{
     statistics::{Statistics, StatisticsMetrics},
@@ -30,15 +29,15 @@ impl DownsampledBigramStatistics {
     }
 
     /// Returns the number of bytes that the statistics cover.
-    pub fn num_covered_bytes(&self) -> u64 {
-        self.contained_regions.len() as u64
+    pub fn num_covered_bytes(&self) -> Len {
+        Len::from(self.contained_regions.len() as u64)
     }
 
     /// The entropy metric.
     ///
     /// This measures how unpredictable the byte distribution is.
     fn entropy(&self) -> u8 {
-        let total = self.num_covered_bytes() as f32;
+        let total = self.num_covered_bytes().as_u64() as f32;
 
         let raw_entropy = -self
             .follow
@@ -57,7 +56,7 @@ impl DownsampledBigramStatistics {
     ///
     /// This measures how many byte pairs consist of printable ASCII bytes.
     fn printable_ascii(&self) -> u8 {
-        let total = self.num_covered_bytes() as f32;
+        let total = self.num_covered_bytes().as_u64() as f32;
 
         let mut text_mass = 0.0f32;
         for i in 2..8 {
@@ -93,7 +92,7 @@ impl DownsampledBigramStatistics {
             weighted
         };
 
-        let total = self.num_covered_bytes() as f32;
+        let total = self.num_covered_bytes().as_u64() as f32;
 
         let mut weighted = 0.0f32;
         for i in 0..16 {
@@ -190,10 +189,7 @@ impl Statistics for DownsampledBigramStatistics {
 impl fmt::Debug for DownsampledBigramStatistics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Statistics")
-            .field(
-                "size",
-                &format!("{}B", SizeFormatterBinary::new(self.num_covered_bytes())),
-            )
+            .field("size", &format!("{}", self.num_covered_bytes().human()))
             .field("contained_regions", &self.contained_regions)
             .finish()
     }

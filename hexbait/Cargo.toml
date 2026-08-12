@@ -12,7 +12,6 @@ egui_dock = { version = "0.20.1", default-features = false }
 egui_extras = { version = "0.35.0", default-features = false }
 chrono = { version = "0.4.45", default-features = false }
 unicode_names2 = { version = "3.1.0", default-features = false }
-size_format = { version = "1.0.2", default-features = false }
 arc-swap = { version = "1.9.2", default-features = false }
 range-set-blaze = { version = "0.6.1", default-features = false }
 multiversion = { version = "0.8.0", default-features = false, features = ["std"] }

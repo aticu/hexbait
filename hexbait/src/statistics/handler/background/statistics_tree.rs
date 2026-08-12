@@ -240,10 +240,7 @@ impl<Statistics: crate::statistics::Statistics> StatisticsTree<Statistics> {
             stats.0 += 1;
             stats.1 += node.statistics.approximate_memory_usage();
         }
-        eprint!(
-            "mem: {}B",
-            size_format::SizeFormatterBinary::new(self.memory_usage)
-        );
+        eprint!("mem: {}", Len::from(self.memory_usage).human());
         for (tier, stats) in tier_stats {
             eprint!(
                 ", tier {} ({}): {} nodes ({})",

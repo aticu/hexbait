@@ -340,9 +340,9 @@ fn render_row(
                     let selection_offset =
                         byte_offset.as_u64() as i64 - selection.start().as_u64() as i64;
                     ui.label(format!(
-                        "offset from selection start: {sign}0x{:x} ({selection_offset}, {sign}{}B)",
+                        "offset from selection start: {sign}0x{:x} ({selection_offset}, {sign}{})",
                         selection_offset.unsigned_abs(),
-                        size_format::SizeFormatterBinary::new(selection_offset.unsigned_abs()),
+                        Len::from(selection_offset.unsigned_abs()).human(),
                         sign = if selection_offset < 0 { "-" } else { "" },
                     ));
                 }

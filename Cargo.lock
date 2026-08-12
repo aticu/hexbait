@@ -1709,7 +1709,6 @@ dependencies = [
  "infer",
  "multiversion",
  "range-set-blaze",
- "size_format",
  "unicode_names2",
 ]
 
