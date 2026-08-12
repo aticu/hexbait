@@ -286,10 +286,10 @@ impl ScrollState {
     }
 
     /// Scrolls up by the given amount.
-    pub fn scroll_up(&mut self, bar: usize, amount: u64) {
+    pub fn scroll_up(&mut self, bar: usize, amount: Len) {
         let mut amount_left = amount;
         for i in (0..=bar).rev() {
-            if amount_left == 0 {
+            if amount_left == Len::ZERO {
                 break;
             }
 
@@ -298,7 +298,7 @@ impl ScrollState {
     }
 
     /// Scrolls up by the given amount.
-    pub fn scroll_down(&mut self, bar: usize, amount: u64, min_size: Len) {
+    pub fn scroll_down(&mut self, bar: usize, amount: Len, min_size: Len) {
         let mut parent_size = Vec::with_capacity(bar + 1);
         let mut window = Window::from_start_len(AbsoluteOffset::ZERO, self.file_size());
 
@@ -310,7 +310,7 @@ impl ScrollState {
 
         let mut amount_left = amount;
         for i in (0..=bar).rev() {
-            if amount_left == 0 {
+            if amount_left == Len::ZERO {
                 break;
             }
 
@@ -412,36 +412,18 @@ impl Scrollbar {
     /// Scrolls the bar up by the given amount of bytes.
     ///
     /// The returned value specifies how much the bar was "overscrolled".
-    pub fn scroll_up(&mut self, scroll_amount: u64) -> u64 {
-        let start = self.selection_start.as_u64();
-
-        if scroll_amount > start {
-            self.selection_start = RelativeOffset::ZERO;
-
-            scroll_amount - start
-        } else {
-            self.selection_start = RelativeOffset::from(start - scroll_amount);
-
-            0
-        }
+    pub fn scroll_up(&mut self, scroll_amount: Len) -> Len {
+        self.selection_start.remove_len(scroll_amount)
     }
 
     /// Scrolls the bar down by the given amount of bytes.
     ///
     /// The returned value specifies how much the bar was "overscrolled".
-    pub fn scroll_down(&mut self, scroll_amount: u64, bar_len: Len) -> u64 {
-        let start = self.selection_start.as_u64();
-        let last_possible_position = (bar_len - self.selection_len).as_u64();
+    pub fn scroll_down(&mut self, scroll_amount: Len, bar_len: Len) -> Len {
+        let last_possible_position = bar_len - self.selection_len;
 
-        if start.saturating_add(scroll_amount) > last_possible_position {
-            self.selection_start = RelativeOffset::from(last_possible_position);
-
-            start.saturating_add(scroll_amount) - last_possible_position
-        } else {
-            self.selection_start = RelativeOffset::from(start + scroll_amount);
-
-            0
-        }
+        self.selection_start
+            .add_len(scroll_amount, last_possible_position.as_relative_offset())
     }
 
     /// Returns state used by the cached image.

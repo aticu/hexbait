@@ -140,7 +140,7 @@ fn handle_scrolling(
             let scroll_delta = (-scroll_delta) as u64;
 
             if scroll_delta > scroll_state.hex_scroll_offset {
-                let diff = scroll_delta - scroll_state.hex_scroll_offset;
+                let diff = Len::from(scroll_delta - scroll_state.hex_scroll_offset);
                 scroll_state.scroll_up(scroll_state.scrollbars.len() - 1, diff * 16);
 
                 scroll_state.hex_scroll_offset = 0;
@@ -151,7 +151,7 @@ fn handle_scrolling(
             let scroll_delta = scroll_delta as u64;
 
             if scroll_state.hex_scroll_offset + scroll_delta > max_scroll {
-                let diff = (scroll_state.hex_scroll_offset + scroll_delta) - max_scroll;
+                let diff = Len::from((scroll_state.hex_scroll_offset + scroll_delta) - max_scroll);
                 scroll_state.scroll_down(
                     scroll_state.scrollbars.len() - 1,
                     diff * 16,

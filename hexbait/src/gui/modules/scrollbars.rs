@@ -354,7 +354,7 @@ fn handle_interactions(
             let scroll_up = scroll_delta < 0.0;
             let scroll_delta = scroll_delta.abs();
             let row_bytes = window.size() / rect.height();
-            let scroll_amount = (scroll_delta * row_bytes).as_u64();
+            let scroll_amount = scroll_delta * row_bytes;
 
             if scroll_up {
                 scroll_state.scroll_up(bar_idx, scroll_amount);

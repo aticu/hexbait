@@ -40,7 +40,7 @@ impl AbsoluteOffset {
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
     pub const fn align_up(self, align: Len) -> Self {
-        Self(align_up(self.0, align.as_u64()))
+        Self(align_up(self.0, align.0))
     }
 
     /// Aligns this offset down towards the given alignment.
@@ -50,7 +50,7 @@ impl AbsoluteOffset {
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
     pub const fn align_down(self, align: Len) -> Self {
-        Self(align_down(self.0, align.as_u64()))
+        Self(align_down(self.0, align.0))
     }
 
     /// Determines if this offset is aligned to a given alignment.
@@ -60,7 +60,7 @@ impl AbsoluteOffset {
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
     pub const fn is_aligned(self, align: Len) -> bool {
-        is_aligned(self.0, align.as_u64())
+        is_aligned(self.0, align.0)
     }
 
     /// Returns this offset as a `u64`.
@@ -189,7 +189,7 @@ impl RelativeOffset {
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
     pub const fn align_up(self, align: Len) -> Self {
-        Self(align_up(self.0, align.as_u64()))
+        Self(align_up(self.0, align.0))
     }
 
     /// Aligns this offset down towards the given alignment.
@@ -199,12 +199,50 @@ impl RelativeOffset {
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
     pub const fn align_down(self, align: Len) -> Self {
-        Self(align_down(self.0, align.as_u64()))
+        Self(align_down(self.0, align.0))
     }
 
     /// Returns this offset as a `u64`.
     pub const fn as_u64(self) -> u64 {
         self.0
+    }
+
+    /// Subtracts the given length from this relative offset.
+    ///
+    /// Returns the length left after the subtraction if this would underflow the offset.
+    pub const fn remove_len(&mut self, len: Len) -> Len {
+        if self.0 >= len.0 {
+            self.0 -= len.0;
+            Len::ZERO
+        } else {
+            self.0 = 0;
+            Len(len.0 - self.0)
+        }
+    }
+
+    /// Adds the given length to this relative offset.
+    ///
+    /// Returns the length left if the offset after the addition would be larger than `max` and sets
+    /// `self` to `max`.
+    pub const fn add_len(&mut self, len: Len, max: RelativeOffset) -> Len {
+        let end = self.0 as u128 + len.0 as u128;
+        let max = max.0 as u128;
+
+        // the `as u64` calls here cannot overflow because `max` came from a `u64`
+        if end <= max {
+            self.0 = end as u64;
+            Len::ZERO
+        } else {
+            self.0 = max as u64;
+
+            let len_left = end - max;
+            if len_left > u64::MAX as u128 {
+                // this should not happen, but clip here in case it does
+                Len(u64::MAX)
+            } else {
+                Len(len_left as u64)
+            }
+        }
     }
 
     /// Returns this offset as an absolute offset.
@@ -351,6 +389,16 @@ impl Len {
         Display(self)
     }
 
+    /// Determines if this length if a multiple of another length.
+    pub const fn is_multiple_of(self, other: Len) -> bool {
+        self.0.is_multiple_of(other.0)
+    }
+
+    /// Divides self by the other length rounding towards zero.
+    pub const fn div_floor(self, other: Len) -> u64 {
+        self.0 / other.0
+    }
+
     /// Rounds this length up towards the given alignment.
     ///
     /// The alignment must be a power of two.
@@ -358,7 +406,7 @@ impl Len {
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
     pub const fn round_up(self, align: Len) -> Self {
-        Self(align_up(self.0, align.as_u64()))
+        Self(align_up(self.0, align.0))
     }
 
     /// Aligns this length down towards the given alignment.
@@ -368,7 +416,7 @@ impl Len {
     /// # Panics
     /// This function MAY panic if the alignment is not a power of two.
     pub const fn align_down(self, align: Len) -> Self {
-        Self(align_down(self.0, align.as_u64()))
+        Self(align_down(self.0, align.0))
     }
 }
 

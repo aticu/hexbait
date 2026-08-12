@@ -3,7 +3,6 @@
 use std::{fmt, ops::RangeInclusive};
 
 use hexbait_common::{AbsoluteOffset, Len};
-use size_format::SizeFormatterBinary;
 
 /// Represents a region of the input.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -111,9 +110,9 @@ impl Window {
     /// # Panics
     /// This function MAY panic if `self.size()` is not a multiple of `size`.
     pub fn subwindows_of_size(self, size: Len) -> impl Iterator<Item = Window> {
-        debug_assert!(self.size().as_u64().is_multiple_of(size.as_u64()));
+        debug_assert!(self.size().is_multiple_of(size));
 
-        (0..self.size().as_u64() / size.as_u64())
+        (0..self.size().div_floor(size))
             .map(move |i| Window::from_start_len(self.start() + i * size, size))
     }
 
@@ -202,11 +201,9 @@ impl fmt::Debug for Window {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Window(at: {}B ({:?}), size: {}B ({:?}))",
-            SizeFormatterBinary::new(self.start().as_u64()),
-            self.start(),
-            SizeFormatterBinary::new(self.size().as_u64()),
-            self.size(),
+            "Window(at: {}, size: {})",
+            self.start().detailed(),
+            self.size().detailed(),
         )
     }
 }
