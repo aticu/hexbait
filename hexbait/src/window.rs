@@ -3,6 +3,7 @@
 use std::{fmt, ops::RangeInclusive};
 
 use hexbait_common::{AbsoluteOffset, Len};
+use range_set_blaze::RangeSetBlaze;
 
 /// Represents a region of the input.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -101,6 +102,17 @@ impl Window {
         } else {
             None
         }
+    }
+
+    /// The covered region of this window.
+    pub fn covered_region(self) -> RangeSetBlaze<u64> {
+        let mut out = RangeSetBlaze::new();
+
+        if let Some(range) = self.range_inclusive() {
+            out.ranges_insert(range.start().as_u64()..=range.end().as_u64());
+        }
+
+        out
     }
 
     /// Returns an iterator over smaller windows of the given size.

@@ -103,6 +103,8 @@ enum SeekError {
         /// The offset where the seek was attempted.
         seek_offset: RelativeOffset,
     },
+    /// The value overflowed the offset type.
+    Overflow,
 }
 
 /// The parsing context for a `struct`.
@@ -195,6 +197,7 @@ impl ParseContext {
                             "scope end is {end}, but new cursor position would be {seek_offset}"
                         )
                     }
+                    SeekError::Overflow => String::from("integer overflow"),
                 }
             ),
             kind: ParseErrKind::InputTooShort,
@@ -691,27 +694,33 @@ impl ParseContext {
     ) -> Result<Value, ParseErrWithMaybePartialResult> {
         let start = cursor.offset();
         let len = Len::from(count);
+        let Some(end) = start.checked_add(len) else {
+            return Err(self
+                .seek_err(
+                    SeekError::Overflow,
+                    &cursor.provenance_from_range(start..cursor.view().end_offset()),
+                    span,
+                    "when reading",
+                )
+                .into());
+        };
         let mut buf = [0; BytesValue::INLINE_LEN];
-        let provenance = cursor.provenance_from_range(start..start + len);
+        let provenance = cursor.provenance_from_range(start..end);
 
         if count > BytesValue::INLINE_LEN as u64 {
             let prefix_suffix_len = Len::from(BytesValue::PREFIX_SUFFIX_LEN as u64);
 
             let (prefix, _) = cursor.peek_bytes(cursor.offset(), prefix_suffix_len, span, self)?;
             buf[..BytesValue::PREFIX_SUFFIX_LEN].copy_from_slice(&prefix);
-            let (suffix, _) = cursor.peek_bytes(
-                cursor.offset() + len - prefix_suffix_len,
-                prefix_suffix_len,
-                span,
-                self,
-            )?;
+            let (suffix, _) =
+                cursor.peek_bytes(end - prefix_suffix_len, prefix_suffix_len, span, self)?;
             buf[BytesValue::PREFIX_SUFFIX_LEN..].copy_from_slice(&suffix);
 
             cursor
                 .advance_by(len)
                 .map_err(|err| self.seek_err(err, &provenance, span, "after reading"))?;
         } else {
-            let (bytes, _) = cursor.read_bytes_and_advance(Len::from(count), span, self)?;
+            let (bytes, _) = cursor.read_bytes_and_advance(len, span, self)?;
             buf[..bytes.len()].copy_from_slice(&bytes);
         };
 

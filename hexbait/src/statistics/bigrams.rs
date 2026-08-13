@@ -54,10 +54,7 @@ impl BigramStatistics {
             return true;
         }
 
-        let mut window_region = RangeSetBlaze::new();
-        window_region.ranges_insert(window.start().as_u64()..=window.end().as_u64() - 1);
-
-        self.contained_regions.is_superset(&window_region)
+        self.contained_regions.is_superset(&window.covered_region())
     }
 
     /// Returns the downsampled statistics.
@@ -129,12 +126,10 @@ impl Statistics for BigramStatistics {
         let window_size = start - window.start();
 
         let window = Window::from_start_len(window.start(), window_size);
-        let mut contained_regions = RangeSetBlaze::new();
-        contained_regions.ranges_insert(window.start().as_u64()..=window.end().as_u64() - 1);
 
         Ok(BigramStatistics {
             follow,
-            contained_regions,
+            contained_regions: window.covered_region(),
         })
     }
 

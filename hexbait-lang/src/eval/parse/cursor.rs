@@ -67,10 +67,7 @@ pub fn advance_by(
             })
         }
     } else {
-        Err(SeekError::SeekPastEnd {
-            end,
-            seek_offset: RelativeOffset::from(u64::MAX),
-        })
+        Err(SeekError::Overflow)
     }
 }
 
