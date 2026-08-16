@@ -19,7 +19,7 @@ use crate::{
 /// Shows a hexdump in the GUI.
 pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     let start = state.scroll_state.hex_start();
-    let start_row = start.as_u64() / 16;
+    let start_row = start.as_len().div_floor(Len::from(16));
 
     let rect = ui.max_rect().intersect(ui.cursor());
     let height = ui.available_height();
@@ -475,12 +475,12 @@ fn render_sidebar(
             if x == 16 {
                 Color32::BLACK
             } else if x > 16 {
-                let start_offset = (start + y as u64) * 16;
-                let alignment = highest_aligned_value(start_offset, start_offset + 16);
+                let start_offset = AbsoluteOffset::from((start + y as u64) * 16);
+                let alignment = highest_aligned_value(start_offset, start_offset + Len::from(16));
 
                 state
                     .settings
-                    .alignment_marker_color(AbsoluteOffset::from(alignment))
+                    .alignment_marker_color(alignment)
                     .unwrap_or(Color32::BLACK)
             } else if let Some(&byte) = window.get(y * 16 + x) {
                 if highlight_row_range.contains(&(y as u64)) {

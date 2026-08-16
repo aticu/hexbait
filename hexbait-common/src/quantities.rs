@@ -2,7 +2,7 @@
 
 use std::{
     fmt::{self},
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, Sub, SubAssign},
 };
 
 /// Defines an absolute offset into a file.
@@ -61,6 +61,25 @@ impl AbsoluteOffset {
     /// This function MAY panic if the alignment is not a power of two.
     pub const fn is_aligned(self, align: Len) -> bool {
         is_aligned(self.0, align.0)
+    }
+
+    /// Subtracts the given length from this offset.
+    ///
+    /// On underflow this saturates to zero.
+    pub const fn saturating_sub(self, len: Len) -> Self {
+        Self(self.0.saturating_sub(len.0))
+    }
+
+    /// Adds the given length to this offset.
+    ///
+    /// On overflow this saturates to the maximum possible offset.
+    pub const fn saturating_add(self, len: Len) -> Self {
+        Self(self.0.saturating_add(len.0))
+    }
+
+    /// Divides self by the length rounding towards zero.
+    pub const fn div_floor(self, other: Len) -> u64 {
+        self.0 / other.0
     }
 
     /// Returns this offset as a `u64`.
@@ -528,6 +547,15 @@ impl Div<Len> for Len {
     #[track_caller]
     fn div(self, rhs: Len) -> Self::Output {
         self.0 as f32 / rhs.0 as f32
+    }
+}
+
+impl Rem<Len> for Len {
+    type Output = Len;
+
+    #[track_caller]
+    fn rem(self, rhs: Len) -> Self::Output {
+        Len(self.0 % rhs.0)
     }
 }
 

@@ -1,7 +1,7 @@
 //! Handles the user settings.
 
 use egui::{Color32, FontId, TextStyle, Ui};
-use hexbait_common::AbsoluteOffset;
+use hexbait_common::Len;
 
 use crate::gui::color::{ALIGNMENT_MARKER_COLORS, BYTE_COLORS, ColorMap, LerpStrength};
 
@@ -216,7 +216,7 @@ impl Settings {
     }
 
     /// Returns the color for an alignment marker at the given color.
-    pub fn alignment_marker_color(&self, offset: AbsoluteOffset) -> Option<Color32> {
+    pub fn alignment_marker_color(&self, offset: Len) -> Option<Color32> {
         let offset = offset.as_u64();
         let level = (offset.trailing_zeros() / 10) as usize;
         if level == 0 {

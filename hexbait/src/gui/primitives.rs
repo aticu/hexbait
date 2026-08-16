@@ -18,7 +18,7 @@ pub fn render_offset(
     let painter = ui.painter().with_clip_rect(rect);
 
     let color = settings
-        .alignment_marker_color(offset)
+        .alignment_marker_color(offset.as_len())
         .unwrap_or(Color32::from_rgb(100, 100, 100));
 
     painter.text(

@@ -29,13 +29,17 @@ pub(crate) fn highlight(
         0.85,
     );
 
-    // TODO: fix this properly at some point by using the correct types in this function
-    let mut range = range.start().as_u64()..=range.end().as_u64();
+    const VALUES_PER_ROW: u64 = 16;
 
-    let screen_start_offset = screen_start_offset_in_rows * 16;
+    let row_len = Len::from(VALUES_PER_ROW);
+    let last_row_byte = (row_len - Len::from(1)).as_offset_from_start();
+
+    let mut range = range;
+
+    let screen_start_offset = AbsoluteOffset::from(screen_start_offset_in_rows * VALUES_PER_ROW);
     let screen_end_offset = std::cmp::min(
-        screen_start_offset + (rows_onscreen + 1) * 16,
-        file_size.as_u64(),
+        screen_start_offset + Len::from((rows_onscreen + 1) * VALUES_PER_ROW),
+        file_size.as_offset_from_start(),
     );
 
     if *range.start() > screen_end_offset || *range.end() < screen_start_offset {
@@ -43,10 +47,10 @@ pub(crate) fn highlight(
         return;
     }
 
-    if *range.start() < screen_start_offset.saturating_sub(16) {
-        range = screen_start_offset - 16..=*range.end();
+    if *range.start() < screen_start_offset.saturating_sub(row_len) {
+        range = screen_start_offset - row_len..=*range.end();
     }
-    if *range.end() > screen_end_offset.saturating_add(16) {
+    if *range.end() > screen_end_offset.saturating_add(row_len) {
         range = *range.start()..=screen_end_offset;
     }
 
@@ -56,23 +60,23 @@ pub(crate) fn highlight(
     let large_space = settings.large_space();
     let small_space = settings.small_space();
 
-    let row_start = |offset: u64| {
-        let row = offset / 16;
+    let row_start = |offset: AbsoluteOffset| {
+        let row = offset.div_floor(row_len);
         let start_row = screen_start_offset_in_rows;
         let row_offset = (row as i64 - start_row as i64).clamp(-1, rows_onscreen as i64 + 1);
 
         screen_rect.min.y + row_offset as f32 * char_height
     };
-    let col_start_hex = |offset: u64| {
-        let col = offset % 16;
+    let col_start_hex = |offset: AbsoluteOffset| {
+        let col = (offset.as_len() % row_len).as_u64();
         let start_offset = (16.0 * char_width) + large_space;
         let col_width = (2.0 * char_width) + small_space;
         let middle_offset = (col >= 8) as u8 as f32 * small_space;
 
         screen_rect.min.x + start_offset + middle_offset + col as f32 * col_width
     };
-    let col_start_glyph = |offset: u64| {
-        let col = offset % 16;
+    let col_start_glyph = |offset: AbsoluteOffset| {
+        let col = (offset.as_len() % row_len).as_u64();
         let start_offset = (48.0 * char_width) + (2.0 * large_space) + (16.0 * small_space);
         let col_width = char_width;
         let middle_offset = (col >= 8) as u8 as f32 * small_space;
@@ -99,10 +103,13 @@ pub(crate) fn highlight(
         col_start_glyph(*range.end()) + char_width,
     );
     // x positions of first and last column for both hex display and glyph display
-    let first_x = (col_start_hex(0), col_start_glyph(0));
+    let first_x = (
+        col_start_hex(AbsoluteOffset::ZERO),
+        col_start_glyph(AbsoluteOffset::ZERO),
+    );
     let last_x = (
-        col_start_hex(15) + (2.0 * char_width),
-        col_start_glyph(15) + char_width,
+        col_start_hex(last_row_byte) + (2.0 * char_width),
+        col_start_glyph(last_row_byte) + char_width,
     );
 
     let mut add_point = |x: (f32, f32), y: f32| {
@@ -124,7 +131,7 @@ pub(crate) fn highlight(
         ));
     };
 
-    if *range.start() / 16 == range.end() / 16 {
+    if range.start().div_floor(row_len) == range.end().div_floor(row_len) {
         // single row case
         add_point(start_x, start_y);
         add_point(end_x, start_y);
@@ -132,7 +139,9 @@ pub(crate) fn highlight(
         add_point(start_x, end_y);
 
         add_rect(start_x, end_x, start_y, end_y);
-    } else if (*range.start() / 16) + 1 == *range.end() / 16 && range.clone().count() <= 16 {
+    } else if (range.start().div_floor(row_len)) + 1 == range.end().div_floor(row_len)
+        && *range.end() - *range.start() + Len::from(1) <= row_len
+    {
         // split two-row case
         add_point(start_x, start_y);
         add_point(last_x, start_y);
@@ -150,19 +159,19 @@ pub(crate) fn highlight(
         // joined multi-row case
         add_point(start_x, start_y);
         add_point(last_x, start_y);
-        if *range.end() % 16 != 15 {
+        if *range.end() != last_row_byte {
             add_point(last_x, end_y - char_height);
             add_point(end_x, end_y - char_height);
         }
         add_point(end_x, end_y);
         add_point(first_x, end_y);
-        if !range.start().is_multiple_of(16) {
+        if !range.start().as_len().is_multiple_of(row_len) {
             add_point(first_x, start_y + char_height);
             add_point(start_x, start_y + char_height);
         }
 
         add_rect(start_x, last_x, start_y, start_y + char_height);
-        if *range.start() / 16 + 1 != *range.end() / 16 {
+        if range.start().div_floor(row_len) + 1 != range.end().div_floor(row_len) {
             add_rect(first_x, last_x, start_y + char_height, end_y - char_height);
         }
         add_rect(first_x, end_x, end_y - char_height, end_y);

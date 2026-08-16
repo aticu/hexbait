@@ -262,7 +262,7 @@ impl ScrollState {
                 tentative_hex_offset
             };
 
-        self.hex_scroll_offset = unrounded_hex_offset.as_u64() / 16;
+        self.hex_scroll_offset = unrounded_hex_offset.div_floor(Len::from(16));
     }
 
     /// Enforces the invariant that no fully selected bar can be in the middle.

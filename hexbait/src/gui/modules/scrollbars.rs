@@ -383,8 +383,11 @@ fn render_bar(
     let mut full_quality_scrollbar = true;
     let mut full_quality_row = true;
 
-    let elems_per_row = (window.size() / rect.height().trunc()).as_u64();
-    let large_alignment = highest_aligned_value(0, elems_per_row * LARGE_ALIGNMENT_MARKER_DIFF);
+    let elems_per_row = window.size() / rect.height().trunc();
+    let large_alignment = highest_aligned_value(
+        AbsoluteOffset::ZERO,
+        (elems_per_row * LARGE_ALIGNMENT_MARKER_DIFF).as_offset_from_start(),
+    );
 
     scrollbar.cached_image.paint_at(
         ui,
@@ -444,15 +447,15 @@ fn render_bar(
         |blurred_image, x, y| {
             if x >= side_start {
                 let y = y as u64;
-                let start = window.start().as_u64() + y * elems_per_row;
-                let end = window.start().as_u64() + (y + 1) * elems_per_row;
+                let start = window.start() + y * elems_per_row;
+                let end = window.start() + (y + 1) * elems_per_row;
 
                 let alignment = highest_aligned_value(start, end);
                 let large_marker = alignment > large_alignment;
 
                 if large_marker || x == side_start + 1 {
                     return settings
-                        .alignment_marker_color(AbsoluteOffset::from(alignment))
+                        .alignment_marker_color(alignment)
                         .unwrap_or(Color32::BLACK);
                 } else {
                     return Color32::BLACK;
