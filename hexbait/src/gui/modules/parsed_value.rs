@@ -3,7 +3,7 @@
 use egui::{FontId, Key, Layout, Response, RichText, ScrollArea, TextStyle, Ui, UiBuilder};
 use hexbait_common::{AbsoluteOffset, Input, RelativeOffset};
 use hexbait_lang::{
-    ParseErr, ParseErrId, Value, ValueKind, View,
+    Diagnostic, DiagnosticId, Value, ValueKind, View,
     ir::{
         Symbol,
         path::{Path, PathComponent},
@@ -139,7 +139,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
                 hexbait_lang::ir::path::Path::new(),
                 None,
                 &result.value,
-                &result.errors,
+                &result.diagnostics,
             )
         })
         .inner;
@@ -158,7 +158,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
             }
         }
         HoverInfo::Error { id } => {
-            for range in result.errors[id.raw_idx()].provenance.byte_ranges() {
+            for range in result.diagnostics[id.raw_idx()].provenance.byte_ranges() {
                 state.marked_locations.add(
                     (AbsoluteOffset::from(*range.start())..=AbsoluteOffset::from(*range.end()))
                         .into(),
@@ -182,7 +182,7 @@ pub enum HoverInfo {
     /// An error is hovered.
     Error {
         /// The ID of the hovered error.
-        id: ParseErrId,
+        id: DiagnosticId,
     },
 }
 
@@ -195,7 +195,7 @@ fn show_value(
     path: Path,
     name: Option<&Symbol>,
     value: &Value,
-    errors: &[ParseErr],
+    diagnostics: &[Diagnostic],
 ) -> HoverInfo {
     let name_prefix = if let Some(name) = name {
         format!("{name:?}: ")
@@ -296,13 +296,14 @@ fn show_value(
                             let mut path = path.clone();
                             path.push(PathComponent::FieldAccess(name.clone()));
 
-                            let hovered = show_value(ui, state, path, Some(name), value, errors);
+                            let hovered =
+                                show_value(ui, state, path, Some(name), value, diagnostics);
                             if hovered != HoverInfo::Nothing {
                                 child_hovered = hovered;
                             }
                         }
                         hovered_err =
-                            hovered_err.or(render_error_and_return_hovered(ui, error, errors));
+                            hovered_err.or(render_error_and_return_hovered(ui, error, diagnostics));
                     },
                 );
 
@@ -324,13 +325,13 @@ fn show_value(
                             let mut path = path.clone();
                             path.push(PathComponent::Indexing(i));
 
-                            let hovered = show_value(ui, state, path, None, value, errors);
+                            let hovered = show_value(ui, state, path, None, value, diagnostics);
                             if hovered != HoverInfo::Nothing {
                                 child_hovered = hovered;
                             }
                         }
                         hovered_err =
-                            hovered_err.or(render_error_and_return_hovered(ui, error, errors));
+                            hovered_err.or(render_error_and_return_hovered(ui, error, diagnostics));
                     },
                 );
 
@@ -361,11 +362,11 @@ fn show_value(
 /// Returns the hovered error if it is hovered.
 fn render_error_and_return_hovered(
     ui: &mut Ui,
-    error: &Option<ParseErrId>,
-    errors: &[ParseErr],
-) -> Option<ParseErrId> {
-    if let Some(err_id) = error {
-        let err = &errors[err_id.raw_idx()];
+    diagnostic: &Option<DiagnosticId>,
+    diagnostics: &[Diagnostic],
+) -> Option<DiagnosticId> {
+    if let Some(err_id) = diagnostic {
+        let err = &diagnostics[err_id.raw_idx()];
 
         // TODO: use the error span to highlight it in a possible future editor
 

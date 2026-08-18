@@ -1,58 +1,49 @@
 //! Implements errors and warnings for parsing.
 
-use std::io;
-
 use crate::{Span, Value, eval::provenance::Provenance};
 
-/// An error that occurred during parsing.
-#[derive(Debug)]
-pub enum ParseErrKind {
-    /// The input was shorter than expected.
-    InputTooShort,
-    /// A value that is meant as an offset was too large.
-    OffsetTooLarge,
-    /// An arithmetic error occurred while evaluating an expression.
-    ArithmeticError,
-    /// An assertion failed.
-    AssertionFailure,
-    /// An assertion failed.
-    ExpectationFailure,
-    /// An I/O error occurred during parsing.
-    Io(io::Error),
+/// The result of a parsing operation.
+pub type Result<T, E = ParseErr> = std::result::Result<T, E>;
+
+/// The level of a diagnostic.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum DiagnosticLevel {
+    /// The diagnostic is a parsing failure.
+    ///
+    /// This indicates that parsing can only continue after a `recover` declaration.
+    Fail,
+    /// The diagnostic is a warning.
+    ///
+    /// This should be used for format mismatches that aren't fatal.
+    Warn,
 }
 
-impl From<io::Error> for ParseErrKind {
-    fn from(err: io::Error) -> Self {
-        ParseErrKind::Io(err)
-    }
-}
-
-/// An error that occurred during parsing.
+/// A diagnostic that occurred during parsing.
 #[derive(Debug)]
-pub struct ParseErr {
-    /// The error message.
+pub struct Diagnostic {
+    /// The diagnostic message.
     pub message: String,
-    /// The kind of error that occurred.
-    pub kind: ParseErrKind,
-    /// The provenance where the error occurred.
+    /// The level of the diagnostic.
+    pub level: DiagnosticLevel,
+    /// The provenance where the diagnostic occurred.
     pub provenance: Provenance,
-    /// The span of the node where parsing failed.
+    /// The span of the node that produced the diagnostic.
     pub span: Span,
 }
 
-/// An ID referencing a specific parsing error.
+/// An ID referencing a specific diagnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ParseErrId {
-    /// The index into the error array at which the error occurs.
+pub struct DiagnosticId {
+    /// The index into the diagnostics `Vec` at which the diagnostic is stored.
     idx: usize,
 }
 
-impl ParseErrId {
-    /// Created a new parse error ID, but inserting it into the list of parsing errors.
-    pub(crate) fn new(err: ParseErr, vec: &mut Vec<ParseErr>) -> ParseErrId {
+impl DiagnosticId {
+    /// Created a new diagnostic ID, by inserting it into the list of diagnostics.
+    pub(crate) fn new(err: Diagnostic, vec: &mut Vec<Diagnostic>) -> DiagnosticId {
         let idx = vec.len();
         vec.push(err);
-        ParseErrId { idx }
+        DiagnosticId { idx }
     }
 
     /// Returns the raw index into the errors.
@@ -63,29 +54,37 @@ impl ParseErrId {
 
 /// A parse error that may or may not contain partial results.
 #[derive(Debug)]
-pub(crate) struct ParseErrWithMaybePartialResult {
-    /// The parse error.
-    pub(crate) parse_err: ParseErrId,
+pub struct ParseErr {
+    /// The diagnostic that caused parsing to fail.
+    error: DiagnosticId,
     /// A partial result that was parsed despite the error.
-    pub(crate) partial_result: Option<Value>,
+    partial_result: Option<Value>,
 }
 
-impl From<ParseErrId> for ParseErrWithMaybePartialResult {
-    fn from(parse_err: ParseErrId) -> Self {
-        ParseErrWithMaybePartialResult {
-            parse_err,
+impl ParseErr {
+    /// Creates a new parse error.
+    pub fn new(error: DiagnosticId) -> ParseErr {
+        ParseErr {
+            error,
             partial_result: None,
         }
     }
-}
 
-/// A warning that occurred during parsing.
-#[derive(Debug)]
-pub struct ParseWarning {
-    /// The warning message.
-    pub message: String,
-    /// The provenance where the warning occurred.
-    pub provenance: Provenance,
-    /// The span of the node that triggered the warning.
-    pub span: Span,
+    /// The diagnostics ID that caused this error.
+    pub fn id(&self) -> DiagnosticId {
+        self.error
+    }
+
+    /// Adds a partial result to the parse error.
+    pub fn with_partial_result(self, value: Value) -> ParseErr {
+        ParseErr {
+            error: self.error,
+            partial_result: Some(value),
+        }
+    }
+
+    /// Takes the stored partial result if there is any.
+    pub fn take_partial_result(&mut self) -> Option<Value> {
+        self.partial_result.take()
+    }
 }

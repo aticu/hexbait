@@ -4,12 +4,14 @@ use std::{fmt, sync::Arc};
 
 use crate::{
     BytesValue, Int, Span,
-    eval::parse::diagnostics::ParseErrWithMaybePartialResult,
     ir::{
         BinOp, ConcatArg, Declaration, ElsePart, Expr, ExprKind, File, IfChain, LetStatement, Lit,
         ParseType, ParseTypeKind, RepeatKind, ScopeKind, StructContent, StructField, Symbol, UnOp,
     },
-    parse::cursor::Cursor,
+    parse::{
+        cursor::Cursor,
+        diagnostics::{ParseErr, Result},
+    },
 };
 
 use super::{
@@ -18,9 +20,10 @@ use super::{
     view::View,
 };
 
-pub use diagnostics::{ParseErr, ParseErrId, ParseErrKind, ParseWarning};
 use hexbait_common::{Endianness, Len, RelativeOffset};
 use num_traits::Zero as _;
+
+pub use diagnostics::{Diagnostic, DiagnosticId, DiagnosticLevel};
 
 mod cursor;
 mod diagnostics;
@@ -29,10 +32,8 @@ mod diagnostics;
 pub struct ParseResult {
     /// The parsed value.
     pub value: Value,
-    /// The errors that occurred during parsing.
-    pub errors: Vec<ParseErr>,
-    /// The warnings that occurred during parsing.
-    pub warnings: Vec<ParseWarning>,
+    /// The diagnostics that occurred during parsing.
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 /// Evaluates the given IR on the given input.
@@ -42,8 +43,7 @@ pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseRe
     let mut cursor = Cursor::new(view, start_offset).static_analysis_expect();
 
     let diagnostics = Diagnostics {
-        errors: Vec::new(),
-        warnings: Vec::new(),
+        diagnostics: Vec::new(),
     };
 
     let mut parse_ctx = ParseContext { diagnostics };
@@ -54,8 +54,7 @@ pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseRe
 
     ParseResult {
         value: struct_ctx.into_value(),
-        errors: parse_ctx.diagnostics.errors,
-        warnings: parse_ctx.diagnostics.warnings,
+        diagnostics: parse_ctx.diagnostics.diagnostics,
     }
 }
 
@@ -75,16 +74,24 @@ struct ParseContext {
 /// Stores the diagnostics that occur during parsing.
 #[derive(Debug)]
 struct Diagnostics {
-    /// The errors that occurred during parsing.
-    errors: Vec<ParseErr>,
-    /// The warnings that occurred during parsing.
-    warnings: Vec<ParseWarning>,
+    /// The diagnostics that occurred during parsing.
+    diagnostics: Vec<Diagnostic>,
 }
 
 impl Diagnostics {
-    /// Creates a new error in the parsing context.
-    fn new_err(&mut self, err: ParseErr) -> ParseErrId {
-        ParseErrId::new(err, &mut self.errors)
+    /// Creates a new diagnostic.
+    fn new_diagnostic(&mut self, diagnostic: Diagnostic) -> DiagnosticId {
+        DiagnosticId::new(diagnostic, &mut self.diagnostics)
+    }
+
+    /// Creates a new parsing error.
+    fn new_err(&mut self, message: String, provenance: Provenance, span: Span) -> ParseErr {
+        ParseErr::new(self.new_diagnostic(Diagnostic {
+            message,
+            level: DiagnosticLevel::Fail,
+            provenance,
+            span,
+        }))
     }
 
     /// Creates a parsing error for the given seek error.
@@ -94,9 +101,9 @@ impl Diagnostics {
         provenance: &Provenance,
         span: Span,
         context: &str,
-    ) -> ParseErrId {
-        self.new_err(ParseErr {
-            message: format!(
+    ) -> ParseErr {
+        self.new_err(
+            format!(
                 "could not set cursor {context}: {}",
                 match err {
                     SeekError::NegativeOffset => String::from("negative offset"),
@@ -108,10 +115,9 @@ impl Diagnostics {
                     SeekError::Overflow => String::from("integer overflow"),
                 }
             ),
-            kind: ParseErrKind::InputTooShort,
-            provenance: provenance.clone(),
+            provenance.clone(),
             span,
-        })
+        )
     }
 }
 
@@ -153,7 +159,7 @@ struct StructContext<'parent> {
     /// The recovery strategy to use if parsing fails.
     recovery_strategy: RecoveryStrategy,
     /// An error that may have occurred during parsing of this struct.
-    error: Option<ParseErrId>,
+    error: Option<DiagnosticId>,
 }
 
 impl<'parent> StructContext<'parent> {
@@ -223,7 +229,7 @@ impl ParseContext {
         span: Span,
         cursor: &Cursor,
         context: &str,
-    ) -> Result<RelativeOffset, ParseErrId> {
+    ) -> Result<RelativeOffset> {
         u64::try_from(new_offset)
             .map(RelativeOffset::from)
             .map_err(|_| SeekError::NegativeOffset)
@@ -239,7 +245,7 @@ impl ParseContext {
         provenance: &Provenance,
         span: Span,
         context: &str,
-    ) -> Result<(), ParseErrId> {
+    ) -> Result<()> {
         let old_offset = cursor.offset();
 
         match compute_offset(old_offset).and_then(|new_offset| cursor.set_offset(new_offset)) {
@@ -255,7 +261,7 @@ impl ParseContext {
         cursor: &Cursor,
         struct_ctx: &StructContext,
         additional_ctx: AdditionalExprContext,
-    ) -> Result<Value, ParseErrId> {
+    ) -> Result<Value> {
         match &expr.kind {
             ExprKind::Lit(lit) => Ok(Value {
                 kind: match lit {
@@ -386,12 +392,8 @@ impl ParseContext {
                     OpKind::FallibleIntOp(func) => {
                         let value =
                             func(lhs.expect_int(), rhs.expect_int()).map_err(|message| {
-                                self.diagnostics.new_err(ParseErr {
-                                    message,
-                                    kind: ParseErrKind::ArithmeticError,
-                                    provenance: provenance.clone(),
-                                    span: expr.span,
-                                })
+                                self.diagnostics
+                                    .new_err(message, provenance.clone(), expr.span)
                             })?;
 
                         Value {
@@ -452,7 +454,6 @@ impl ParseContext {
                 };
 
                 self.eval_parse_type(ty, &mut cursor, struct_ctx)
-                    .map_err(|err| err.parse_err)
             }
             ExprKind::Concat { args } => {
                 let mut parts = Vec::new();
@@ -494,7 +495,7 @@ impl ParseContext {
         declaration: &Declaration,
         cursor: &mut Cursor,
         struct_ctx: &mut StructContext,
-    ) -> Result<(), ParseErrWithMaybePartialResult> {
+    ) -> Result<()> {
         match declaration {
             Declaration::Endianness(endianness) => cursor.set_endianness(*endianness),
             Declaration::Align(expr) => {
@@ -619,15 +620,11 @@ impl ParseContext {
                         String::from("assertion failed")
                     };
 
-                    return Err(self
-                        .diagnostics
-                        .new_err(ParseErr {
-                            message,
-                            kind: ParseErrKind::AssertionFailure,
-                            provenance: condition_value.provenance.clone(),
-                            span: condition.span,
-                        })
-                        .into());
+                    return Err(self.diagnostics.new_err(
+                        message,
+                        condition_value.provenance.clone(),
+                        condition.span,
+                    ));
                 }
             }
             Declaration::WarnIf { condition, message } => {
@@ -649,8 +646,9 @@ impl ParseContext {
                         String::from("warning triggered")
                     };
 
-                    self.diagnostics.warnings.push(ParseWarning {
+                    self.diagnostics.new_diagnostic(Diagnostic {
                         message,
+                        level: DiagnosticLevel::Warn,
                         provenance: condition_value.provenance.clone(),
                         span: condition.span,
                     });
@@ -679,7 +677,7 @@ impl ParseContext {
         if_chain: &IfChain,
         cursor: &mut Cursor,
         struct_ctx: &mut StructContext,
-    ) -> Result<(), ParseErrWithMaybePartialResult> {
+    ) -> Result<()> {
         let condition =
             self.eval_expr(&if_chain.condition, cursor, struct_ctx, Default::default())?;
 
@@ -704,24 +702,16 @@ impl ParseContext {
     }
 
     /// Reads a bytes value.
-    fn read_bytes_value(
-        &mut self,
-        count: u64,
-        span: Span,
-        cursor: &mut Cursor,
-    ) -> Result<Value, ParseErrWithMaybePartialResult> {
+    fn read_bytes_value(&mut self, count: u64, span: Span, cursor: &mut Cursor) -> Result<Value> {
         let start = cursor.offset();
         let len = Len::from(count);
         let Some(end) = start.checked_add(len) else {
-            return Err(self
-                .diagnostics
-                .seek_err(
-                    SeekError::Overflow,
-                    &cursor.provenance_from_range(start..cursor.view().end_offset()),
-                    span,
-                    "when reading",
-                )
-                .into());
+            return Err(self.diagnostics.seek_err(
+                SeekError::Overflow,
+                &cursor.provenance_from_range(start..cursor.view().end_offset()),
+                span,
+                "when reading",
+            ));
         };
         let mut buf = [0; BytesValue::INLINE_LEN];
         let provenance = cursor.provenance_from_range(start..end);
@@ -766,7 +756,7 @@ impl ParseContext {
         parse_type: &ParseType,
         cursor: &mut Cursor,
         struct_ctx: &StructContext,
-    ) -> Result<Value, ParseErrWithMaybePartialResult> {
+    ) -> Result<Value> {
         let value = match &parse_type.kind {
             ParseTypeKind::Named { name } => {
                 todo!("trying to parse named `{name:?}` unimplemented")
@@ -779,15 +769,11 @@ impl ParseContext {
                     if let Ok(count) = u64::try_from(count_val.kind.expect_int()) {
                         self.read_bytes_value(count, parse_type.span, cursor)?
                     } else {
-                        return Err(ParseErrWithMaybePartialResult {
-                            parse_err: self.diagnostics.new_err(ParseErr {
-                                message: "count too large".into(),
-                                kind: ParseErrKind::InputTooShort,
-                                provenance: count_val.provenance.clone(),
-                                span: count_expr.span,
-                            }),
-                            partial_result: None,
-                        });
+                        return Err(self.diagnostics.new_err(
+                            "count too large".into(),
+                            count_val.provenance.clone(),
+                            count_expr.span,
+                        ));
                     }
                 }
                 RepeatKind::While { condition } => {
@@ -836,12 +822,11 @@ impl ParseContext {
                             self.eval_expr(bit_width, cursor, struct_ctx, Default::default())?;
 
                         u32::try_from(val.kind.expect_int()).map_err(|_| {
-                            self.diagnostics.new_err(ParseErr {
-                                message: "bit width is too large".to_string(),
-                                kind: ParseErrKind::ArithmeticError,
-                                provenance: val.provenance,
-                                span: bit_width.span,
-                            })
+                            self.diagnostics.new_err(
+                                "bit width is too large".to_string(),
+                                val.provenance,
+                                bit_width.span,
+                            )
                         })?
                     }
                     _ => unreachable!(),
@@ -895,34 +880,28 @@ impl ParseContext {
                                     provenance += &parsed_value.provenance;
                                     values.push(parsed_value);
                                 }
-                                Err(err) => {
-                                    if let Some(partial_result) = err.partial_result {
+                                Err(mut err) => {
+                                    if let Some(partial_result) = err.take_partial_result() {
                                         provenance += &partial_result.provenance;
                                         values.push(partial_result);
                                     }
-                                    return Err(ParseErrWithMaybePartialResult {
-                                        parse_err: err.parse_err,
-                                        partial_result: Some(Value {
-                                            kind: ValueKind::Array {
-                                                items: values,
-                                                error: Some(err.parse_err),
-                                            },
-                                            provenance,
-                                        }),
-                                    });
+                                    let err_id = err.id();
+                                    return Err(err.with_partial_result(Value {
+                                        kind: ValueKind::Array {
+                                            items: values,
+                                            error: Some(err_id),
+                                        },
+                                        provenance,
+                                    }));
                                 }
                             };
                         }
                     } else {
-                        return Err(ParseErrWithMaybePartialResult {
-                            parse_err: self.diagnostics.new_err(ParseErr {
-                                message: "count too large".into(),
-                                kind: ParseErrKind::InputTooShort,
-                                provenance: count_val.provenance.clone(),
-                                span: count.span,
-                            }),
-                            partial_result: None,
-                        });
+                        return Err(self.diagnostics.new_err(
+                            "count too large".into(),
+                            count_val.provenance.clone(),
+                            count.span,
+                        ));
                     }
 
                     Value {
@@ -958,21 +937,19 @@ impl ParseContext {
                                 provenance += &parsed_value.provenance;
                                 values.push(parsed_value);
                             }
-                            Err(err) => {
-                                if let Some(partial_result) = err.partial_result {
+                            Err(mut err) => {
+                                if let Some(partial_result) = err.take_partial_result() {
                                     provenance += &partial_result.provenance;
                                     values.push(partial_result);
                                 }
-                                return Err(ParseErrWithMaybePartialResult {
-                                    parse_err: err.parse_err,
-                                    partial_result: Some(Value {
-                                        kind: ValueKind::Array {
-                                            items: values,
-                                            error: Some(err.parse_err),
-                                        },
-                                        provenance,
-                                    }),
-                                });
+                                let err_id = err.id();
+                                return Err(err.with_partial_result(Value {
+                                    kind: ValueKind::Array {
+                                        items: values,
+                                        error: Some(err_id),
+                                    },
+                                    provenance,
+                                }));
                             }
                         };
                     }
@@ -992,14 +969,7 @@ impl ParseContext {
 
                 match self.eval_struct_content(content, cursor, &mut ctx) {
                     Ok(()) => ctx.into_value(),
-                    Err(mut err) => {
-                        // the partial result should have already been added at this point
-                        assert!(err.partial_result.is_none());
-
-                        err.partial_result = Some(ctx.into_value());
-
-                        Err(err)?
-                    }
+                    Err(err) => Err(err.with_partial_result(ctx.into_value()))?,
                 }
             }
             ParseTypeKind::Switch {
@@ -1032,25 +1002,24 @@ impl ParseContext {
         field: &StructField,
         cursor: &mut Cursor,
         struct_ctx: &mut StructContext,
-    ) -> Result<(), ParseErrWithMaybePartialResult> {
+    ) -> Result<()> {
         let value = self.eval_parse_type(&field.ty, cursor, struct_ctx)?;
 
         if let Some(expected) = &field.expected {
             let span = expected.span;
             let expected = self.eval_expr(expected, cursor, struct_ctx, Default::default())?;
             if expected != value {
-                return Err(ParseErrWithMaybePartialResult {
-                    parse_err: self.diagnostics.new_err(ParseErr {
-                        message: format!(
+                return Err(self
+                    .diagnostics
+                    .new_err(
+                        format!(
                             "field expectation failed: {:?} != {:?}",
                             expected.kind, value.kind
                         ),
-                        kind: ParseErrKind::ExpectationFailure,
-                        provenance: &value.provenance + &expected.provenance,
+                        &value.provenance + &expected.provenance,
                         span,
-                    }),
-                    partial_result: Some(value),
-                });
+                    )
+                    .with_partial_result(value));
             }
         }
 
@@ -1068,7 +1037,7 @@ impl ParseContext {
         let_statement: &LetStatement,
         cursor: &mut Cursor,
         struct_ctx: &mut StructContext,
-    ) -> Result<(), ParseErrId> {
+    ) -> Result<()> {
         let value = self.eval_expr(&let_statement.expr, cursor, struct_ctx, Default::default())?;
 
         // TODO: use resolved names here later
@@ -1085,22 +1054,19 @@ impl ParseContext {
         content: &StructContent,
         cursor: &mut Cursor,
         struct_ctx: &mut StructContext,
-    ) -> Result<(), ParseErrWithMaybePartialResult> {
+    ) -> Result<()> {
         match content {
             StructContent::Field(field) => {
                 match self.eval_struct_field(field, cursor, struct_ctx) {
                     Ok(()) => Ok(()),
-                    Err(err) => {
-                        if let Some(partial_result) = err.partial_result {
+                    Err(mut err) => {
+                        if let Some(partial_result) = err.take_partial_result() {
                             // TODO: use resolved names here later
                             struct_ctx
                                 .parsed_fields
                                 .push((field.name.inner.clone(), partial_result));
                         }
-                        Err(ParseErrWithMaybePartialResult {
-                            parse_err: err.parse_err,
-                            partial_result: None,
-                        })
+                        Err(err)
                     }
                 }
             }
@@ -1120,12 +1086,12 @@ impl ParseContext {
         content: &[StructContent],
         cursor: &mut Cursor,
         struct_ctx: &mut StructContext,
-    ) -> Result<(), ParseErrWithMaybePartialResult> {
+    ) -> Result<()> {
         for content in content {
             match self.eval_single_struct_content(content, cursor, struct_ctx) {
                 Ok(()) => (),
                 Err(err) => {
-                    struct_ctx.error = Some(err.parse_err);
+                    struct_ctx.error = Some(err.id());
                     match &struct_ctx.recovery_strategy {
                         RecoveryStrategy::Fallback => return Err(err),
                         RecoveryStrategy::SkipTo { offset } => {

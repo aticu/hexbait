@@ -2,7 +2,7 @@
 
 use std::str::FromStr as _;
 
-use hexbait_lang::{ParseResult, Provenance, ValueKind};
+use hexbait_lang::{DiagnosticLevel, ParseResult, Provenance, ValueKind};
 use serde_json::{Map, Number, Value};
 
 /// Converts the given parse result to JSON.
@@ -15,37 +15,49 @@ pub fn result_to_json(result: &ParseResult, detailed: bool) -> Value {
         object.insert("value".to_string(), as_json);
         object.insert(
             "errors".to_string(),
-            Value::Array(Vec::from_iter(result.errors.iter().map(|err| {
-                let mut err_object = Map::new();
+            Value::Array(Vec::from_iter(
+                result
+                    .diagnostics
+                    .iter()
+                    .filter(|diagnostic| diagnostic.level == DiagnosticLevel::Fail)
+                    .map(|err| {
+                        let mut err_object = Map::new();
 
-                err_object.insert(
-                    "message".to_string(),
-                    Value::String(err.message.to_string()),
-                );
-                err_object.insert(
-                    "provenance".to_string(),
-                    Value::String(format_provenance(&err.provenance)),
-                );
+                        err_object.insert(
+                            "message".to_string(),
+                            Value::String(err.message.to_string()),
+                        );
+                        err_object.insert(
+                            "provenance".to_string(),
+                            Value::String(format_provenance(&err.provenance)),
+                        );
 
-                Value::Object(err_object)
-            }))),
+                        Value::Object(err_object)
+                    }),
+            )),
         );
         object.insert(
             "warnings".to_string(),
-            Value::Array(Vec::from_iter(result.warnings.iter().map(|warning| {
-                let mut warning_object = Map::new();
+            Value::Array(Vec::from_iter(
+                result
+                    .diagnostics
+                    .iter()
+                    .filter(|diagnostic| diagnostic.level == DiagnosticLevel::Warn)
+                    .map(|warning| {
+                        let mut warning_object = Map::new();
 
-                warning_object.insert(
-                    "message".to_string(),
-                    Value::String(warning.message.to_string()),
-                );
-                warning_object.insert(
-                    "provenance".to_string(),
-                    Value::String(format_provenance(&warning.provenance)),
-                );
+                        warning_object.insert(
+                            "message".to_string(),
+                            Value::String(warning.message.to_string()),
+                        );
+                        warning_object.insert(
+                            "provenance".to_string(),
+                            Value::String(format_provenance(&warning.provenance)),
+                        );
 
-                Value::Object(warning_object)
-            }))),
+                        Value::Object(warning_object)
+                    }),
+            )),
         );
 
         Value::Object(object)
@@ -120,7 +132,7 @@ fn value_to_json(value: &hexbait_lang::Value, result: &ParseResult, detailed: bo
         if let Some(err) = err {
             object.insert(
                 "error".to_string(),
-                Value::String(result.errors[err].message.to_string()),
+                Value::String(result.diagnostics[err].message.to_string()),
             );
         }
 

@@ -5,8 +5,8 @@ use std::ops::Range;
 use hexbait_common::{Endianness, Len, ReadBytes, RelativeOffset};
 
 use crate::{
-    ParseErr, ParseErrId, Provenance, Span, View,
-    parse::{Diagnostics, ParseErrKind, SeekError},
+    Provenance, Span, View,
+    parse::{Diagnostics, Result, SeekError},
 };
 
 /// Reads the specified number of bytes without advancing the cursor.
@@ -16,33 +16,18 @@ fn peek_bytes<'view>(
     count: Len,
     span: Span,
     diagnostics: &mut Diagnostics,
-) -> Result<(ReadBytes<'view>, Provenance), ParseErrId> {
+) -> Result<(ReadBytes<'view>, Provenance)> {
     let err_provenance = || view.provenance_from_range(start..start + Len::from(1));
 
     if view.end_offset() < start + count {
-        return Err(diagnostics.new_err(ParseErr {
-            message: "view is too short".into(),
-            kind: ParseErrKind::InputTooShort,
-            provenance: err_provenance(),
-            span,
-        }));
+        return Err(diagnostics.new_err("view is too short".into(), err_provenance(), span));
     }
 
-    let buf = view.read_at(start, count).map_err(|err| {
-        diagnostics.new_err(ParseErr {
-            message: format!("io error: {err}"),
-            kind: ParseErrKind::Io(err),
-            provenance: err_provenance(),
-            span,
-        })
-    })?;
+    let buf = view
+        .read_at(start, count)
+        .map_err(|err| diagnostics.new_err(format!("io error: {err}"), err_provenance(), span))?;
     if buf.len() < count.as_u64() as usize {
-        return Err(diagnostics.new_err(ParseErr {
-            message: "view is too short".into(),
-            kind: ParseErrKind::InputTooShort,
-            provenance: err_provenance(),
-            span,
-        }));
+        return Err(diagnostics.new_err("view is too short".into(), err_provenance(), span));
     }
 
     let provenance = view.provenance_from_range(start..start + count);
@@ -182,7 +167,7 @@ impl Cursor {
         count: Len,
         span: Span,
         diagnostics: &mut Diagnostics,
-    ) -> Result<(ReadBytes<'_>, Provenance), ParseErrId> {
+    ) -> Result<(ReadBytes<'_>, Provenance)> {
         peek_bytes(&self.view, start, count, span, diagnostics)
     }
 
@@ -192,7 +177,7 @@ impl Cursor {
         count: Len,
         span: Span,
         diagnostics: &mut Diagnostics,
-    ) -> Result<(ReadBytes<'_>, Provenance), ParseErrId> {
+    ) -> Result<(ReadBytes<'_>, Provenance)> {
         let end = self.view.end_offset();
 
         let result = peek_bytes(&self.view, self.offset(), count, span, diagnostics)?;

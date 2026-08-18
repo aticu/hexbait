@@ -6,11 +6,11 @@ use hexbait_common::{Len, ReadBytes, RelativeOffset};
 
 use crate::{
     Int, View,
-    eval::parse::ParseErrId,
     ir::{
         Lit, Symbol,
         path::{Path, PathComponent},
     },
+    parse::DiagnosticId,
 };
 
 use super::provenance::Provenance;
@@ -60,14 +60,14 @@ pub enum ValueKind {
         /// The fields of the `struct`.
         fields: Vec<(Symbol, Value)>,
         /// An error that occurred while parsing the `struct`.
-        error: Option<ParseErrId>,
+        error: Option<DiagnosticId>,
     },
     /// Represents an array of values.
     Array {
         /// The items in the array.
         items: Vec<Value>,
         /// An error that occurred while parsing the array.
-        error: Option<ParseErrId>,
+        error: Option<DiagnosticId>,
     },
 }
 
