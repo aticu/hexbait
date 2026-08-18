@@ -41,10 +41,12 @@ pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseRe
     // the start offset should always be valid
     let mut cursor = Cursor::new(view, start_offset).static_analysis_expect();
 
-    let mut parse_ctx = ParseContext {
+    let diagnostics = Diagnostics {
         errors: Vec::new(),
         warnings: Vec::new(),
     };
+
+    let mut parse_ctx = ParseContext { diagnostics };
 
     parse_ctx
         .eval_struct_content(&file.content, &mut cursor, &mut struct_ctx)
@@ -52,8 +54,8 @@ pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseRe
 
     ParseResult {
         value: struct_ctx.into_value(),
-        errors: parse_ctx.errors,
-        warnings: parse_ctx.warnings,
+        errors: parse_ctx.diagnostics.errors,
+        warnings: parse_ctx.diagnostics.warnings,
     }
 }
 
@@ -66,16 +68,50 @@ macro_rules! impossible {
 /// The context used during parsing.
 #[derive(Debug)]
 struct ParseContext {
+    /// Stores the diagnostics during parsing.
+    diagnostics: Diagnostics,
+}
+
+/// Stores the diagnostics that occur during parsing.
+#[derive(Debug)]
+struct Diagnostics {
     /// The errors that occurred during parsing.
     errors: Vec<ParseErr>,
     /// The warnings that occurred during parsing.
     warnings: Vec<ParseWarning>,
 }
 
-impl ParseContext {
+impl Diagnostics {
     /// Creates a new error in the parsing context.
     fn new_err(&mut self, err: ParseErr) -> ParseErrId {
         ParseErrId::new(err, &mut self.errors)
+    }
+
+    /// Creates a parsing error for the given seek error.
+    fn seek_err(
+        &mut self,
+        err: SeekError,
+        provenance: &Provenance,
+        span: Span,
+        context: &str,
+    ) -> ParseErrId {
+        self.new_err(ParseErr {
+            message: format!(
+                "could not set cursor {context}: {}",
+                match err {
+                    SeekError::NegativeOffset => String::from("negative offset"),
+                    SeekError::SeekPastEnd { end, seek_offset } => {
+                        format!(
+                            "scope end is {end}, but new cursor position would be {seek_offset}"
+                        )
+                    }
+                    SeekError::Overflow => String::from("integer overflow"),
+                }
+            ),
+            kind: ParseErrKind::InputTooShort,
+            provenance: provenance.clone(),
+            span,
+        })
     }
 }
 
@@ -179,33 +215,6 @@ impl<'parent> StructContext<'parent> {
 }
 
 impl ParseContext {
-    /// Creates a parsing error for the given seek error.
-    fn seek_err(
-        &mut self,
-        err: SeekError,
-        provenance: &Provenance,
-        span: Span,
-        context: &str,
-    ) -> ParseErrId {
-        self.new_err(ParseErr {
-            message: format!(
-                "could not set cursor {context}: {}",
-                match err {
-                    SeekError::NegativeOffset => String::from("negative offset"),
-                    SeekError::SeekPastEnd { end, seek_offset } => {
-                        format!(
-                            "scope end is {end}, but new cursor position would be {seek_offset}"
-                        )
-                    }
-                    SeekError::Overflow => String::from("integer overflow"),
-                }
-            ),
-            kind: ParseErrKind::InputTooShort,
-            provenance: provenance.clone(),
-            span,
-        })
-    }
-
     /// Determines if a seek to the given offset is possible.
     fn probe_seek(
         &mut self,
@@ -219,7 +228,7 @@ impl ParseContext {
             .map(RelativeOffset::from)
             .map_err(|_| SeekError::NegativeOffset)
             .and_then(|offset| cursor.probe_seek(offset))
-            .map_err(|err| self.seek_err(err, provenance, span, context))
+            .map_err(|err| self.diagnostics.seek_err(err, provenance, span, context))
     }
 
     /// Attempts to set the cursor to the given offset.
@@ -235,7 +244,7 @@ impl ParseContext {
 
         match compute_offset(old_offset).and_then(|new_offset| cursor.set_offset(new_offset)) {
             Ok(()) => Ok(()),
-            Err(err) => Err(self.seek_err(err, provenance, span, context)),
+            Err(err) => Err(self.diagnostics.seek_err(err, provenance, span, context)),
         }
     }
 
@@ -377,7 +386,7 @@ impl ParseContext {
                     OpKind::FallibleIntOp(func) => {
                         let value =
                             func(lhs.expect_int(), rhs.expect_int()).map_err(|message| {
-                                self.new_err(ParseErr {
+                                self.diagnostics.new_err(ParseErr {
                                     message,
                                     kind: ParseErrKind::ArithmeticError,
                                     provenance: provenance.clone(),
@@ -428,7 +437,12 @@ impl ParseContext {
                             cursor.child_with_same_view(RelativeOffset::from(offset))
                         })
                         .map_err(|err| {
-                            self.seek_err(err, &offset.provenance, offset_expr.span, "during peek")
+                            self.diagnostics.seek_err(
+                                err,
+                                &offset.provenance,
+                                offset_expr.span,
+                                "during peek",
+                            )
                         })?
                 } else {
                     // the current cursor is valid
@@ -573,7 +587,10 @@ impl ParseContext {
 
                 let mut subcursor = cursor
                     .child_with_view_and_offset(view, RelativeOffset::ZERO)
-                    .map_err(|err| self.seek_err(err, &Provenance::empty(), span, "for scope"))?;
+                    .map_err(|err| {
+                        self.diagnostics
+                            .seek_err(err, &Provenance::empty(), span, "for scope")
+                    })?;
 
                 for single_content in content {
                     self.eval_single_struct_content(single_content, &mut subcursor, struct_ctx)?;
@@ -603,6 +620,7 @@ impl ParseContext {
                     };
 
                     return Err(self
+                        .diagnostics
                         .new_err(ParseErr {
                             message,
                             kind: ParseErrKind::AssertionFailure,
@@ -631,7 +649,7 @@ impl ParseContext {
                         String::from("warning triggered")
                     };
 
-                    self.warnings.push(ParseWarning {
+                    self.diagnostics.warnings.push(ParseWarning {
                         message,
                         provenance: condition_value.provenance.clone(),
                         span: condition.span,
@@ -696,6 +714,7 @@ impl ParseContext {
         let len = Len::from(count);
         let Some(end) = start.checked_add(len) else {
             return Err(self
+                .diagnostics
                 .seek_err(
                     SeekError::Overflow,
                     &cursor.provenance_from_range(start..cursor.view().end_offset()),
@@ -710,17 +729,23 @@ impl ParseContext {
         if count > BytesValue::INLINE_LEN as u64 {
             let prefix_suffix_len = Len::from(BytesValue::PREFIX_SUFFIX_LEN as u64);
 
-            let (prefix, _) = cursor.peek_bytes(cursor.offset(), prefix_suffix_len, span, self)?;
+            let (prefix, _) =
+                cursor.peek_bytes(start, prefix_suffix_len, span, &mut self.diagnostics)?;
             buf[..BytesValue::PREFIX_SUFFIX_LEN].copy_from_slice(&prefix);
-            let (suffix, _) =
-                cursor.peek_bytes(end - prefix_suffix_len, prefix_suffix_len, span, self)?;
+            let (suffix, _) = cursor.peek_bytes(
+                end - prefix_suffix_len,
+                prefix_suffix_len,
+                span,
+                &mut self.diagnostics,
+            )?;
             buf[BytesValue::PREFIX_SUFFIX_LEN..].copy_from_slice(&suffix);
 
-            cursor
-                .advance_by(len)
-                .map_err(|err| self.seek_err(err, &provenance, span, "after reading"))?;
+            cursor.advance_by(len).map_err(|err| {
+                self.diagnostics
+                    .seek_err(err, &provenance, span, "after reading")
+            })?;
         } else {
-            let (bytes, _) = cursor.read_bytes_and_advance(len, span, self)?;
+            let (bytes, _) = cursor.read_bytes_and_advance(len, span, &mut self.diagnostics)?;
             buf[..bytes.len()].copy_from_slice(&bytes);
         };
 
@@ -755,7 +780,7 @@ impl ParseContext {
                         self.read_bytes_value(count, parse_type.span, cursor)?
                     } else {
                         return Err(ParseErrWithMaybePartialResult {
-                            parse_err: self.new_err(ParseErr {
+                            parse_err: self.diagnostics.new_err(ParseErr {
                                 message: "count too large".into(),
                                 kind: ParseErrKind::InputTooShort,
                                 provenance: count_val.provenance.clone(),
@@ -788,7 +813,7 @@ impl ParseContext {
                         let (bytes, provenance) = peek_cursor.read_bytes_and_advance(
                             Len::from(1),
                             parse_type.span,
-                            self,
+                            &mut self.diagnostics,
                         )?;
 
                         last_byte = Some(Value {
@@ -811,7 +836,7 @@ impl ParseContext {
                             self.eval_expr(bit_width, cursor, struct_ctx, Default::default())?;
 
                         u32::try_from(val.kind.expect_int()).map_err(|_| {
-                            self.new_err(ParseErr {
+                            self.diagnostics.new_err(ParseErr {
                                 message: "bit width is too large".to_string(),
                                 kind: ParseErrKind::ArithmeticError,
                                 provenance: val.provenance,
@@ -833,7 +858,7 @@ impl ParseContext {
                 let (parsed_bytes, provenance) = cursor.read_bytes_and_advance(
                     Len::from(u64::try_from(size_in_bytes).unwrap()),
                     parse_type.span,
-                    self,
+                    &mut self.diagnostics,
                 )?;
 
                 let num = match (endianness, signed) {
@@ -890,7 +915,7 @@ impl ParseContext {
                         }
                     } else {
                         return Err(ParseErrWithMaybePartialResult {
-                            parse_err: self.new_err(ParseErr {
+                            parse_err: self.diagnostics.new_err(ParseErr {
                                 message: "count too large".into(),
                                 kind: ParseErrKind::InputTooShort,
                                 provenance: count_val.provenance.clone(),
@@ -1015,7 +1040,7 @@ impl ParseContext {
             let expected = self.eval_expr(expected, cursor, struct_ctx, Default::default())?;
             if expected != value {
                 return Err(ParseErrWithMaybePartialResult {
-                    parse_err: self.new_err(ParseErr {
+                    parse_err: self.diagnostics.new_err(ParseErr {
                         message: format!(
                             "field expectation failed: {:?} != {:?}",
                             expected.kind, value.kind

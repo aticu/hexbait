@@ -6,7 +6,7 @@ use hexbait_common::{Endianness, Len, ReadBytes, RelativeOffset};
 
 use crate::{
     ParseErr, ParseErrId, Provenance, Span, View,
-    parse::{ParseContext, ParseErrKind, SeekError},
+    parse::{Diagnostics, ParseErrKind, SeekError},
 };
 
 /// Reads the specified number of bytes without advancing the cursor.
@@ -15,12 +15,12 @@ fn peek_bytes<'view>(
     start: RelativeOffset,
     count: Len,
     span: Span,
-    parse_ctx: &mut ParseContext,
+    diagnostics: &mut Diagnostics,
 ) -> Result<(ReadBytes<'view>, Provenance), ParseErrId> {
     let err_provenance = || view.provenance_from_range(start..start + Len::from(1));
 
     if view.end_offset() < start + count {
-        return Err(parse_ctx.new_err(ParseErr {
+        return Err(diagnostics.new_err(ParseErr {
             message: "view is too short".into(),
             kind: ParseErrKind::InputTooShort,
             provenance: err_provenance(),
@@ -29,7 +29,7 @@ fn peek_bytes<'view>(
     }
 
     let buf = view.read_at(start, count).map_err(|err| {
-        parse_ctx.new_err(ParseErr {
+        diagnostics.new_err(ParseErr {
             message: format!("io error: {err}"),
             kind: ParseErrKind::Io(err),
             provenance: err_provenance(),
@@ -37,7 +37,7 @@ fn peek_bytes<'view>(
         })
     })?;
     if buf.len() < count.as_u64() as usize {
-        return Err(parse_ctx.new_err(ParseErr {
+        return Err(diagnostics.new_err(ParseErr {
             message: "view is too short".into(),
             kind: ParseErrKind::InputTooShort,
             provenance: err_provenance(),
@@ -181,9 +181,9 @@ impl Cursor {
         start: RelativeOffset,
         count: Len,
         span: Span,
-        parse_ctx: &mut ParseContext,
+        diagnostics: &mut Diagnostics,
     ) -> Result<(ReadBytes<'_>, Provenance), ParseErrId> {
-        peek_bytes(&self.view, start, count, span, parse_ctx)
+        peek_bytes(&self.view, start, count, span, diagnostics)
     }
 
     /// Reads the specified number of bytes, advancing the cursor.
@@ -191,14 +191,15 @@ impl Cursor {
         &mut self,
         count: Len,
         span: Span,
-        parse_ctx: &mut ParseContext,
+        diagnostics: &mut Diagnostics,
     ) -> Result<(ReadBytes<'_>, Provenance), ParseErrId> {
         let end = self.view.end_offset();
 
-        let result = peek_bytes(&self.view, self.offset(), count, span, parse_ctx)?;
+        let result = peek_bytes(&self.view, self.offset(), count, span, diagnostics)?;
 
-        advance_by(&mut self.offset, count, end)
-            .map_err(|err| parse_ctx.seek_err(err, &Provenance::empty(), span, "after reading"))?;
+        advance_by(&mut self.offset, count, end).map_err(|err| {
+            diagnostics.seek_err(err, &Provenance::empty(), span, "after reading")
+        })?;
 
         Ok(result)
     }
