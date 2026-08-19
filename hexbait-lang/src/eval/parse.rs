@@ -1,16 +1,17 @@
 //! Implements the parsing evaluation logic.
 
-use std::{fmt, sync::Arc};
+use std::fmt;
 
 use crate::{
     BytesValue, Int, Span,
     ir::{
-        BinOp, ConcatArg, Declaration, ElsePart, Expr, ExprKind, File, IfChain, LetStatement, Lit,
-        ParseType, ParseTypeKind, RepeatKind, ScopeKind, StructContent, StructField, UnOp,
+        Declaration, ElsePart, File, IfChain, LetStatement, ParseType, ParseTypeKind, RepeatKind,
+        ScopeKind, StructContent, StructField,
     },
     parse::{
         cursor::Cursor,
         diagnostics::{ParseErr, Result},
+        expr::AdditionalExprContext,
         struct_context::StructContext,
     },
 };
@@ -22,12 +23,12 @@ use super::{
 };
 
 use hexbait_common::{Endianness, Len, RelativeOffset};
-use num_traits::Zero as _;
 
 pub use diagnostics::{Diagnostic, DiagnosticId, DiagnosticLevel};
 
 mod cursor;
 mod diagnostics;
+mod expr;
 mod struct_context;
 
 /// The result of parsing.
@@ -58,12 +59,6 @@ pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseRe
         value: struct_ctx.into_value(),
         diagnostics: parse_ctx.diagnostics.diagnostics,
     }
-}
-
-macro_rules! impossible {
-    () => {
-        unreachable!("impossible because of static analysis")
-    };
 }
 
 /// The context used during parsing.
@@ -252,237 +247,6 @@ impl ParseContext {
         }
     }
 
-    /// Evaluates the given expression.
-    fn eval_expr(
-        &mut self,
-        expr: &Expr,
-        cursor: &Cursor,
-        struct_ctx: &StructContext,
-        additional_ctx: AdditionalExprContext,
-    ) -> Result<Value> {
-        match &expr.kind {
-            ExprKind::Lit(lit) => Ok(Value {
-                kind: match lit {
-                    Lit::Int(int) => ValueKind::Integer(int.clone()),
-                    Lit::Bytes(bytes) => ValueKind::Bytes(BytesValue::Lit(Arc::clone(bytes))),
-                    Lit::Bool(val) => ValueKind::Boolean(*val),
-                },
-                provenance: Provenance::empty(),
-            }),
-            ExprKind::VarUse(var) => Ok(struct_ctx
-                .field(&var.inner)
-                .static_analysis_expect()
-                .clone()),
-            ExprKind::Offset => Ok(Value {
-                kind: ValueKind::Integer(Int::from(cursor.offset().as_u64())),
-                provenance: Provenance::empty(),
-            }),
-            ExprKind::Parent => Ok(struct_ctx.parent().static_analysis_expect().as_value()),
-            ExprKind::Last => Ok(additional_ctx.last.static_analysis_expect().clone()),
-            ExprKind::Len => Ok(additional_ctx.len.static_analysis_expect().clone()),
-            ExprKind::UnOp { op, operand } => {
-                let Value {
-                    kind: operand,
-                    provenance,
-                } = self.eval_expr(operand, cursor, struct_ctx, additional_ctx)?;
-
-                Ok(match op {
-                    UnOp::Neg => Value {
-                        kind: ValueKind::Integer(-operand.expect_int()),
-                        provenance,
-                    },
-                    UnOp::Plus => Value {
-                        kind: operand,
-                        provenance,
-                    },
-                    UnOp::Not => Value {
-                        kind: ValueKind::Boolean(!operand.expect_bool()),
-                        provenance,
-                    },
-                })
-            }
-            ExprKind::BinOp { op, lhs, rhs } => {
-                let Value {
-                    kind: lhs,
-                    mut provenance,
-                } = self.eval_expr(lhs, cursor, struct_ctx, additional_ctx)?;
-
-                match op {
-                    BinOp::LogicalAnd if !lhs.expect_bool() => {
-                        return Ok(Value {
-                            kind: ValueKind::Boolean(false),
-                            provenance,
-                        });
-                    }
-                    BinOp::LogicalOr if lhs.expect_bool() => {
-                        return Ok(Value {
-                            kind: ValueKind::Boolean(true),
-                            provenance,
-                        });
-                    }
-                    _ => (),
-                }
-
-                let Value {
-                    kind: rhs,
-                    provenance: rhs_provenance,
-                } = self.eval_expr(rhs, cursor, struct_ctx, additional_ctx)?;
-                provenance += &rhs_provenance;
-
-                enum OpKind {
-                    IntOp(fn(&Int, &Int) -> Int),
-                    FallibleIntOp(fn(&Int, &Int) -> Result<Int, String>),
-                    CmpOp(fn(&Int, &Int) -> bool),
-                    Eq,
-                    Neq,
-                    BoolRhsIdentity,
-                }
-
-                let op_kind = match op {
-                    BinOp::Add => OpKind::IntOp(|x, y| x + y),
-                    BinOp::Sub => OpKind::IntOp(|x, y| x - y),
-                    BinOp::Mul => OpKind::IntOp(|x, y| x * y),
-                    BinOp::Div => OpKind::FallibleIntOp(|x, y| {
-                        if y.is_zero() {
-                            Err("division by zero".to_string())
-                        } else {
-                            Ok(x / y)
-                        }
-                    }),
-                    BinOp::Mod => OpKind::FallibleIntOp(|x, y| {
-                        if y.is_zero() {
-                            Err("modulo by zero".to_string())
-                        } else {
-                            Ok(x % y)
-                        }
-                    }),
-                    BinOp::Eq => OpKind::Eq,
-                    BinOp::Neq => OpKind::Neq,
-                    BinOp::Gt => OpKind::CmpOp(|x, y| x > y),
-                    BinOp::Geq => OpKind::CmpOp(|x, y| x >= y),
-                    BinOp::Lt => OpKind::CmpOp(|x, y| x < y),
-                    BinOp::Leq => OpKind::CmpOp(|x, y| x <= y),
-                    BinOp::BitAnd => OpKind::IntOp(|x, y| x & y),
-                    BinOp::BitOr => OpKind::IntOp(|x, y| x | y),
-                    BinOp::BitXor => OpKind::IntOp(|x, y| x ^ y),
-                    BinOp::ShiftLeft => OpKind::FallibleIntOp(|x, y| {
-                        u32::try_from(y)
-                            .map_err(|_| "shift offset too large".to_string())
-                            .map(|y| x << y)
-                    }),
-                    BinOp::ShiftRight => OpKind::FallibleIntOp(|x, y| {
-                        u32::try_from(y)
-                            .map_err(|_| "shift offset too large".to_string())
-                            .map(|y| x >> y)
-                    }),
-                    BinOp::LogicalAnd | BinOp::LogicalOr => OpKind::BoolRhsIdentity,
-                };
-
-                Ok(match op_kind {
-                    OpKind::IntOp(func) => Value {
-                        kind: ValueKind::Integer(func(lhs.expect_int(), rhs.expect_int())),
-                        provenance,
-                    },
-                    OpKind::FallibleIntOp(func) => {
-                        let value =
-                            func(lhs.expect_int(), rhs.expect_int()).map_err(|message| {
-                                self.diagnostics
-                                    .new_err(message, provenance.clone(), expr.span)
-                            })?;
-
-                        Value {
-                            kind: ValueKind::Integer(value),
-                            provenance,
-                        }
-                    }
-                    OpKind::CmpOp(func) => Value {
-                        kind: ValueKind::Boolean(func(lhs.expect_int(), rhs.expect_int())),
-                        provenance,
-                    },
-                    OpKind::Eq => Value {
-                        kind: ValueKind::Boolean(lhs == rhs),
-                        provenance,
-                    },
-                    OpKind::Neq => Value {
-                        kind: ValueKind::Boolean(lhs != rhs),
-                        provenance,
-                    },
-                    OpKind::BoolRhsIdentity => Value {
-                        kind: ValueKind::Boolean(rhs.expect_bool()),
-                        provenance,
-                    },
-                })
-            }
-            ExprKind::FieldAccess { expr, field } => {
-                let expr = self.eval_expr(expr, cursor, struct_ctx, additional_ctx)?;
-
-                Ok(expr
-                    .kind
-                    .expect_struct()
-                    .iter()
-                    .find_map(|(name, value)| (name == &field.inner).then(|| value.clone()))
-                    .static_analysis_expect())
-            }
-            ExprKind::Peek { ty, offset } => {
-                let mut cursor = if let Some(offset_expr) = offset {
-                    let offset = self.eval_expr(offset_expr, cursor, struct_ctx, additional_ctx)?;
-
-                    u64::try_from(offset.kind.expect_int())
-                        .map_err(|_| SeekError::NegativeOffset)
-                        .and_then(|offset| {
-                            cursor.child_with_same_view(RelativeOffset::from(offset))
-                        })
-                        .map_err(|err| {
-                            self.diagnostics.seek_err(
-                                err,
-                                &offset.provenance,
-                                offset_expr.span,
-                                "during peek",
-                            )
-                        })?
-                } else {
-                    // the current cursor is valid
-                    cursor
-                        .child_with_same_view(cursor.offset())
-                        .static_analysis_expect()
-                };
-
-                self.eval_parse_type(ty, &mut cursor, struct_ctx)
-            }
-            ExprKind::Concat { args } => {
-                let mut parts = Vec::new();
-                let mut provenance = Provenance::empty();
-
-                for arg in args {
-                    let (expr, expand) = match arg {
-                        ConcatArg::Direct(expr) => (expr, false),
-                        ConcatArg::Expanding(expr) => (expr, true),
-                    };
-
-                    let expr = self.eval_expr(expr, cursor, struct_ctx, additional_ctx)?;
-
-                    provenance += &expr.provenance;
-                    if expand {
-                        parts.extend(
-                            expr.kind
-                                .expect_array_take()
-                                .into_iter()
-                                .map(|val| val.kind.expect_bytes_take()),
-                        );
-                    } else {
-                        parts.push(expr.kind.expect_bytes_take());
-                    }
-                }
-
-                Ok(Value {
-                    kind: ValueKind::Bytes(BytesValue::Concat { parts }),
-                    provenance,
-                })
-            }
-            ExprKind::Error => impossible!(),
-        }
-    }
-
     /// Evaluates the given declaration.
     fn eval_declaration(
         &mut self,
@@ -607,7 +371,7 @@ impl ParseContext {
                             match message_val.kind.expect_bytes() {
                                 BytesValue::Lit(lit) =>
                                     std::str::from_utf8(lit).static_analysis_expect(),
-                                _ => impossible!(),
+                                _ => static_analysis_impossible(),
                             }
                         )
                     } else {
@@ -633,7 +397,7 @@ impl ParseContext {
                             match message_val.kind.expect_bytes() {
                                 BytesValue::Lit(lit) =>
                                     std::str::from_utf8(lit).static_analysis_expect(),
-                                _ => impossible!(),
+                                _ => static_analysis_impossible(),
                             }
                         )
                     } else {
@@ -805,7 +569,7 @@ impl ParseContext {
 
                     self.read_bytes_value(len, parse_type.span, cursor)?
                 }
-                RepeatKind::Error => impossible!(),
+                RepeatKind::Error => static_analysis_impossible(),
             },
             ParseTypeKind::Integer { signed, .. }
             | ParseTypeKind::DynamicInteger { signed, .. } => {
@@ -903,7 +667,7 @@ impl ParseContext {
 
                     accumulator.into_value()
                 }
-                crate::ir::RepeatKind::Error => impossible!(),
+                crate::ir::RepeatKind::Error => static_analysis_impossible(),
             },
             ParseTypeKind::Struct { content } => {
                 let mut ctx = struct_ctx.child();
@@ -931,7 +695,7 @@ impl ParseContext {
                     self.eval_parse_type(default, cursor, struct_ctx)?
                 }
             }
-            ParseTypeKind::Error => impossible!(),
+            ParseTypeKind::Error => static_analysis_impossible(),
         };
 
         Ok(value)
@@ -1008,7 +772,7 @@ impl ParseContext {
             StructContent::LetStatement(let_statement) => {
                 Ok(self.eval_let_statement(let_statement, cursor, struct_ctx)?)
             }
-            StructContent::Error => impossible!(),
+            StructContent::Error => static_analysis_impossible(),
         }
     }
 
@@ -1029,13 +793,10 @@ impl ParseContext {
     }
 }
 
-/// Additional context that can be used during expression evaluation.
-#[derive(Debug, Default, Clone, Copy)]
-struct AdditionalExprContext<'parent> {
-    /// The last parsed value in the current repeat expression.
-    last: Option<&'parent Value>,
-    /// The length of the current repeat expression.
-    len: Option<&'parent Value>,
+/// Indicates that something is impossible because of static analysis.
+#[track_caller]
+fn static_analysis_impossible() -> ! {
+    unreachable!("impossible because of static analysis")
 }
 
 /// An extension trait to unwrap with a message that a situation should be impossible because of
