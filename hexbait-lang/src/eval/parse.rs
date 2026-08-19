@@ -149,6 +149,73 @@ enum SeekError {
     Overflow,
 }
 
+/// An accumulator for repeating parse types.
+struct RepetitionAccumulator {
+    /// The provenance of the resulting array.
+    provenance: Provenance,
+    /// The already parsed values.
+    values: Vec<Value>,
+}
+
+impl RepetitionAccumulator {
+    /// Creates a new accumulator.
+    fn new() -> RepetitionAccumulator {
+        RepetitionAccumulator {
+            provenance: Provenance::empty(),
+            values: Vec::new(),
+        }
+    }
+
+    /// Pushes a new value into the accumulator.
+    fn push(
+        &mut self,
+        parse_ctx: &mut ParseContext,
+        cursor: &mut Cursor,
+        struct_ctx: &StructContext,
+        parse_type: &ParseType,
+    ) -> Result<()> {
+        match parse_ctx.eval_parse_type(parse_type, cursor, struct_ctx) {
+            Ok(parsed_value) => {
+                self.provenance += &parsed_value.provenance;
+                self.values.push(parsed_value);
+
+                Ok(())
+            }
+            Err(mut err) => {
+                if let Some(partial_result) = err.take_partial_result() {
+                    self.provenance += &partial_result.provenance;
+                    self.values.push(partial_result);
+                }
+                let err_id = err.id();
+
+                Err(err.with_partial_result(Value {
+                    kind: ValueKind::Array {
+                        items: std::mem::take(&mut self.values),
+                        error: Some(err_id),
+                    },
+                    provenance: std::mem::take(&mut self.provenance),
+                }))
+            }
+        }
+    }
+
+    /// Returns access to the already accumulated values.
+    fn values(&self) -> &[Value] {
+        &self.values
+    }
+
+    /// Turns the accumulator into a finished value.
+    fn into_value(self) -> Value {
+        Value {
+            kind: ValueKind::Array {
+                items: self.values,
+                error: None,
+            },
+            provenance: self.provenance,
+        }
+    }
+}
+
 /// The parsing context for a `struct`.
 #[derive(Debug)]
 struct StructContext<'parent> {
@@ -869,32 +936,11 @@ impl ParseContext {
                 crate::ir::RepeatKind::Len { count } => {
                     let count_val =
                         self.eval_expr(count, cursor, struct_ctx, Default::default())?;
-
-                    let mut values = Vec::new();
-                    let mut provenance = Provenance::empty();
+                    let mut accumulator = RepetitionAccumulator::new();
 
                     if let Ok(count) = u64::try_from(count_val.kind.expect_int()) {
                         for _ in 0..count {
-                            match self.eval_parse_type(parse_type, cursor, struct_ctx) {
-                                Ok(parsed_value) => {
-                                    provenance += &parsed_value.provenance;
-                                    values.push(parsed_value);
-                                }
-                                Err(mut err) => {
-                                    if let Some(partial_result) = err.take_partial_result() {
-                                        provenance += &partial_result.provenance;
-                                        values.push(partial_result);
-                                    }
-                                    let err_id = err.id();
-                                    return Err(err.with_partial_result(Value {
-                                        kind: ValueKind::Array {
-                                            items: values,
-                                            error: Some(err_id),
-                                        },
-                                        provenance,
-                                    }));
-                                }
-                            };
+                            accumulator.push(self, cursor, struct_ctx, parse_type)?;
                         }
                     } else {
                         return Err(self.diagnostics.new_err(
@@ -904,17 +950,10 @@ impl ParseContext {
                         ));
                     }
 
-                    Value {
-                        kind: ValueKind::Array {
-                            items: values,
-                            error: None,
-                        },
-                        provenance,
-                    }
+                    accumulator.into_value()
                 }
                 crate::ir::RepeatKind::While { condition } => {
-                    let mut values = Vec::new();
-                    let mut provenance = Provenance::empty();
+                    let mut accumulator = RepetitionAccumulator::new();
 
                     while self
                         .eval_expr(
@@ -922,9 +961,9 @@ impl ParseContext {
                             cursor,
                             struct_ctx,
                             AdditionalExprContext {
-                                last: values.last(),
+                                last: accumulator.values().last(),
                                 len: Some(&Value {
-                                    kind: ValueKind::Integer(Int::from(values.len())),
+                                    kind: ValueKind::Integer(Int::from(accumulator.values().len())),
                                     provenance: Provenance::empty(),
                                 }),
                             },
@@ -932,35 +971,10 @@ impl ParseContext {
                         .kind
                         .expect_bool()
                     {
-                        match self.eval_parse_type(parse_type, cursor, struct_ctx) {
-                            Ok(parsed_value) => {
-                                provenance += &parsed_value.provenance;
-                                values.push(parsed_value);
-                            }
-                            Err(mut err) => {
-                                if let Some(partial_result) = err.take_partial_result() {
-                                    provenance += &partial_result.provenance;
-                                    values.push(partial_result);
-                                }
-                                let err_id = err.id();
-                                return Err(err.with_partial_result(Value {
-                                    kind: ValueKind::Array {
-                                        items: values,
-                                        error: Some(err_id),
-                                    },
-                                    provenance,
-                                }));
-                            }
-                        };
+                        accumulator.push(self, cursor, struct_ctx, parse_type)?;
                     }
 
-                    Value {
-                        kind: ValueKind::Array {
-                            items: values,
-                            error: None,
-                        },
-                        provenance,
-                    }
+                    accumulator.into_value()
                 }
                 crate::ir::RepeatKind::Error => impossible!(),
             },
