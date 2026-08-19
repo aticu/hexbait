@@ -6,11 +6,12 @@ use crate::{
     BytesValue, Int, Span,
     ir::{
         BinOp, ConcatArg, Declaration, ElsePart, Expr, ExprKind, File, IfChain, LetStatement, Lit,
-        ParseType, ParseTypeKind, RepeatKind, ScopeKind, StructContent, StructField, Symbol, UnOp,
+        ParseType, ParseTypeKind, RepeatKind, ScopeKind, StructContent, StructField, UnOp,
     },
     parse::{
         cursor::Cursor,
         diagnostics::{ParseErr, Result},
+        struct_context::StructContext,
     },
 };
 
@@ -27,6 +28,7 @@ pub use diagnostics::{Diagnostic, DiagnosticId, DiagnosticLevel};
 
 mod cursor;
 mod diagnostics;
+mod struct_context;
 
 /// The result of parsing.
 pub struct ParseResult {
@@ -216,77 +218,6 @@ impl RepetitionAccumulator {
     }
 }
 
-/// The parsing context for a `struct`.
-#[derive(Debug)]
-struct StructContext<'parent> {
-    /// The already parsed fields.
-    parsed_fields: Vec<(Symbol, Value)>,
-    /// The parent `struct`.
-    parent: Option<&'parent StructContext<'parent>>,
-    /// The recovery strategy to use if parsing fails.
-    recovery_strategy: RecoveryStrategy,
-    /// An error that may have occurred during parsing of this struct.
-    error: Option<DiagnosticId>,
-}
-
-impl<'parent> StructContext<'parent> {
-    /// Creates a new `struct` parsing context.
-    fn new() -> StructContext<'static> {
-        StructContext {
-            parsed_fields: Vec::new(),
-            parent: None,
-            recovery_strategy: RecoveryStrategy::Fallback,
-            error: None,
-        }
-    }
-
-    /// Creates the context for a child `struct`.
-    fn child<'this>(&'this self) -> StructContext<'this> {
-        StructContext {
-            parsed_fields: Vec::new(),
-            parent: Some(self),
-            recovery_strategy: RecoveryStrategy::Fallback,
-            error: None,
-        }
-    }
-
-    /// Returns the `struct` context as a partially parsed `struct` value.
-    fn as_value(&self) -> Value {
-        let mut provenance = Provenance::empty();
-        for (_, value) in &self.parsed_fields {
-            provenance += &value.provenance;
-        }
-
-        Value {
-            kind: ValueKind::Struct {
-                fields: self.parsed_fields.clone(),
-                error: self.error,
-            },
-            provenance,
-        }
-    }
-
-    /// Turns the `struct` context into a fully parsed `struct`.
-    fn into_value(self) -> Value {
-        let mut provenance = Provenance::empty();
-        for (_, value) in &self.parsed_fields {
-            provenance += &value.provenance;
-        }
-
-        Value {
-            kind: ValueKind::Struct {
-                fields: self
-                    .parsed_fields
-                    .into_iter()
-                    .filter(|(name, _)| !name.as_str().starts_with('_'))
-                    .collect(),
-                error: self.error,
-            },
-            provenance,
-        }
-    }
-}
-
 impl ParseContext {
     /// Determines if a seek to the given offset is possible.
     fn probe_seek(
@@ -338,19 +269,15 @@ impl ParseContext {
                 },
                 provenance: Provenance::empty(),
             }),
-            ExprKind::VarUse(var) => {
-                for (name, val) in &struct_ctx.parsed_fields {
-                    if *name == var.inner {
-                        return Ok(val.clone());
-                    }
-                }
-                impossible!()
-            }
+            ExprKind::VarUse(var) => Ok(struct_ctx
+                .field(&var.inner)
+                .static_analysis_expect()
+                .clone()),
             ExprKind::Offset => Ok(Value {
                 kind: ValueKind::Integer(Int::from(cursor.offset().as_u64())),
                 provenance: Provenance::empty(),
             }),
-            ExprKind::Parent => Ok(struct_ctx.parent.static_analysis_expect().as_value()),
+            ExprKind::Parent => Ok(struct_ctx.parent().static_analysis_expect().as_value()),
             ExprKind::Last => Ok(additional_ctx.last.static_analysis_expect().clone()),
             ExprKind::Len => Ok(additional_ctx.len.static_analysis_expect().clone()),
             ExprKind::UnOp { op, operand } => {
@@ -731,7 +658,7 @@ impl ParseContext {
                     "recovery offset",
                 )?;
 
-                struct_ctx.recovery_strategy = RecoveryStrategy::SkipTo { offset };
+                struct_ctx.set_recovery_strategy(RecoveryStrategy::SkipTo { offset });
             }
         }
 
@@ -1037,10 +964,7 @@ impl ParseContext {
             }
         }
 
-        // TODO: use resolved names here later
-        struct_ctx
-            .parsed_fields
-            .push((field.name.inner.clone(), value));
+        struct_ctx.insert(field.name.inner.clone(), value);
 
         Ok(())
     }
@@ -1054,10 +978,7 @@ impl ParseContext {
     ) -> Result<()> {
         let value = self.eval_expr(&let_statement.expr, cursor, struct_ctx, Default::default())?;
 
-        // TODO: use resolved names here later
-        struct_ctx
-            .parsed_fields
-            .push((let_statement.name.inner.clone(), value));
+        struct_ctx.insert(let_statement.name.inner.clone(), value);
 
         Ok(())
     }
@@ -1075,10 +996,7 @@ impl ParseContext {
                     Ok(()) => Ok(()),
                     Err(mut err) => {
                         if let Some(partial_result) = err.take_partial_result() {
-                            // TODO: use resolved names here later
-                            struct_ctx
-                                .parsed_fields
-                                .push((field.name.inner.clone(), partial_result));
+                            struct_ctx.insert(field.name.inner.clone(), partial_result);
                         }
                         Err(err)
                     }
@@ -1102,20 +1020,8 @@ impl ParseContext {
         struct_ctx: &mut StructContext,
     ) -> Result<()> {
         for content in content {
-            match self.eval_single_struct_content(content, cursor, struct_ctx) {
-                Ok(()) => (),
-                Err(err) => {
-                    struct_ctx.error = Some(err.id());
-                    match &struct_ctx.recovery_strategy {
-                        RecoveryStrategy::Fallback => return Err(err),
-                        RecoveryStrategy::SkipTo { offset } => {
-                            // the offset should be checked at the time of use
-                            cursor.set_offset(*offset).static_analysis_expect();
-
-                            return Ok(());
-                        }
-                    }
-                }
+            if let Err(err) = self.eval_single_struct_content(content, cursor, struct_ctx) {
+                return struct_ctx.recover(cursor, err);
             }
         }
 
