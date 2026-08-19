@@ -6,12 +6,31 @@ use crate::{
     BytesValue, Diagnostic, DiagnosticLevel, Int, Provenance, Span, View,
     ir::{Declaration, ScopeKind},
     parse::{
-        ParseContext, RecoveryStrategy, SeekError, StaticAnalysisImpossible as _, cursor::Cursor,
-        diagnostics::Result, static_analysis_impossible, struct_context::StructContext,
+        ParseContext, StaticAnalysisImpossible as _,
+        cursor::Cursor,
+        diagnostics::{Result, SeekError},
+        static_analysis_impossible,
+        struct_context::{RecoveryStrategy, StructContext},
     },
 };
 
 impl ParseContext {
+    /// Determines if a seek to the given offset is possible.
+    fn probe_seek(
+        &mut self,
+        new_offset: &Int,
+        provenance: &Provenance,
+        span: Span,
+        cursor: &Cursor,
+        context: &str,
+    ) -> Result<RelativeOffset> {
+        u64::try_from(new_offset)
+            .map(RelativeOffset::from)
+            .map_err(|_| SeekError::NegativeOffset)
+            .and_then(|offset| cursor.probe_seek(offset))
+            .map_err(|err| self.diagnostics.seek_err(err, provenance, span, context))
+    }
+
     /// Attempts to set the cursor to the given offset.
     fn set_offset(
         &mut self,

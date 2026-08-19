@@ -3,22 +3,17 @@
 use std::fmt;
 
 use crate::{
-    BytesValue, Int, Span,
     ir::{ElsePart, File, IfChain, LetStatement, StructContent, StructField},
     parse::{
         cursor::Cursor,
-        diagnostics::{ParseErr, Result},
+        diagnostics::{Diagnostics, Result},
         struct_context::StructContext,
     },
 };
 
-use super::{
-    provenance::Provenance,
-    value::{Value, ValueKind},
-    view::View,
-};
+use super::{value::Value, view::View};
 
-use hexbait_common::{Len, RelativeOffset};
+use hexbait_common::RelativeOffset;
 
 pub use diagnostics::{Diagnostic, DiagnosticId, DiagnosticLevel};
 
@@ -43,11 +38,9 @@ pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseRe
     // the start offset should always be valid
     let mut cursor = Cursor::new(view, start_offset).static_analysis_expect();
 
-    let diagnostics = Diagnostics {
-        diagnostics: Vec::new(),
+    let mut parse_ctx = ParseContext {
+        diagnostics: Diagnostics::new(),
     };
-
-    let mut parse_ctx = ParseContext { diagnostics };
 
     parse_ctx
         .eval_struct_content(&file.content, &mut cursor, &mut struct_ctx)
@@ -55,7 +48,7 @@ pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseRe
 
     ParseResult {
         value: struct_ctx.into_value(),
-        diagnostics: parse_ctx.diagnostics.diagnostics,
+        diagnostics: parse_ctx.diagnostics.into_diagnostics(),
     }
 }
 
@@ -66,101 +59,7 @@ struct ParseContext {
     diagnostics: Diagnostics,
 }
 
-/// Stores the diagnostics that occur during parsing.
-#[derive(Debug)]
-struct Diagnostics {
-    /// The diagnostics that occurred during parsing.
-    diagnostics: Vec<Diagnostic>,
-}
-
-impl Diagnostics {
-    /// Creates a new diagnostic.
-    fn new_diagnostic(&mut self, diagnostic: Diagnostic) -> DiagnosticId {
-        DiagnosticId::new(diagnostic, &mut self.diagnostics)
-    }
-
-    /// Creates a new parsing error.
-    fn new_err(&mut self, message: String, provenance: Provenance, span: Span) -> ParseErr {
-        ParseErr::new(self.new_diagnostic(Diagnostic {
-            message,
-            level: DiagnosticLevel::Fail,
-            provenance,
-            span,
-        }))
-    }
-
-    /// Creates a parsing error for the given seek error.
-    fn seek_err(
-        &mut self,
-        err: SeekError,
-        provenance: &Provenance,
-        span: Span,
-        context: &str,
-    ) -> ParseErr {
-        self.new_err(
-            format!(
-                "could not set cursor {context}: {}",
-                match err {
-                    SeekError::NegativeOffset => String::from("negative offset"),
-                    SeekError::SeekPastEnd { end, seek_offset } => {
-                        format!(
-                            "scope end is {end}, but new cursor position would be {seek_offset}"
-                        )
-                    }
-                    SeekError::Overflow => String::from("integer overflow"),
-                }
-            ),
-            provenance.clone(),
-            span,
-        )
-    }
-}
-
-/// The different recovery strategies.
-#[derive(Debug)]
-enum RecoveryStrategy {
-    /// Divert to the recovery strategy of the parent `struct`.
-    Fallback,
-    /// Skips to the given offset.
-    SkipTo {
-        /// The offset to skip to.
-        offset: RelativeOffset,
-    },
-}
-
-/// An error that can occur when seeking the input.
-#[derive(Debug)]
-enum SeekError {
-    /// A seek was attempted to a negative offset.
-    NegativeOffset,
-    /// A seek past the end of the current scope.
-    SeekPastEnd {
-        /// The end of the scope.
-        end: RelativeOffset,
-        /// The offset where the seek was attempted.
-        seek_offset: RelativeOffset,
-    },
-    /// The value overflowed the offset type.
-    Overflow,
-}
-
 impl ParseContext {
-    /// Determines if a seek to the given offset is possible.
-    fn probe_seek(
-        &mut self,
-        new_offset: &Int,
-        provenance: &Provenance,
-        span: Span,
-        cursor: &Cursor,
-        context: &str,
-    ) -> Result<RelativeOffset> {
-        u64::try_from(new_offset)
-            .map(RelativeOffset::from)
-            .map_err(|_| SeekError::NegativeOffset)
-            .and_then(|offset| cursor.probe_seek(offset))
-            .map_err(|err| self.diagnostics.seek_err(err, provenance, span, context))
-    }
-
     /// Evaluates the given `if` chain.
     fn eval_if_chain(
         &mut self,
@@ -189,55 +88,6 @@ impl ParseContext {
         }
 
         Ok(())
-    }
-
-    /// Reads a bytes value.
-    fn read_bytes_value(&mut self, count: u64, span: Span, cursor: &mut Cursor) -> Result<Value> {
-        let start = cursor.offset();
-        let len = Len::from(count);
-        let Some(end) = start.checked_add(len) else {
-            return Err(self.diagnostics.seek_err(
-                SeekError::Overflow,
-                &cursor.provenance_from_range(start..cursor.view().end_offset()),
-                span,
-                "when reading",
-            ));
-        };
-        let mut buf = [0; BytesValue::INLINE_LEN];
-        let provenance = cursor.provenance_from_range(start..end);
-
-        if count > BytesValue::INLINE_LEN as u64 {
-            let prefix_suffix_len = Len::from(BytesValue::PREFIX_SUFFIX_LEN as u64);
-
-            let (prefix, _) =
-                cursor.peek_bytes(start, prefix_suffix_len, span, &mut self.diagnostics)?;
-            buf[..BytesValue::PREFIX_SUFFIX_LEN].copy_from_slice(&prefix);
-            let (suffix, _) = cursor.peek_bytes(
-                end - prefix_suffix_len,
-                prefix_suffix_len,
-                span,
-                &mut self.diagnostics,
-            )?;
-            buf[BytesValue::PREFIX_SUFFIX_LEN..].copy_from_slice(&suffix);
-
-            cursor.advance_by(len).map_err(|err| {
-                self.diagnostics
-                    .seek_err(err, &provenance, span, "after reading")
-            })?;
-        } else {
-            let (bytes, _) = cursor.read_bytes_and_advance(len, span, &mut self.diagnostics)?;
-            buf[..bytes.len()].copy_from_slice(&bytes);
-        };
-
-        Ok(Value {
-            kind: ValueKind::Bytes(BytesValue::FromView {
-                view: cursor.view().clone(),
-                start,
-                len,
-                buf,
-            }),
-            provenance,
-        })
     }
 
     /// Evaluates the given `struct` field.

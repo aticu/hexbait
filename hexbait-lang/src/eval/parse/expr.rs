@@ -9,8 +9,11 @@ use crate::{
     BytesValue, Int, Provenance, Value, ValueKind,
     ir::{BinOp, ConcatArg, Expr, ExprKind, Lit, UnOp},
     parse::{
-        ParseContext, SeekError, StaticAnalysisImpossible as _, cursor::Cursor,
-        diagnostics::Result, static_analysis_impossible, struct_context::StructContext,
+        ParseContext, StaticAnalysisImpossible as _,
+        cursor::Cursor,
+        diagnostics::{Result, SeekError},
+        static_analysis_impossible,
+        struct_context::StructContext,
     },
 };
 

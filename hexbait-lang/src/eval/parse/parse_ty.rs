@@ -3,15 +3,68 @@
 use hexbait_common::{Endianness, Len};
 
 use crate::{
-    Int, Provenance, Value, ValueKind,
+    BytesValue, Int, Provenance, Span, Value, ValueKind,
     ir::{ParseType, ParseTypeKind, RepeatKind},
     parse::{
-        ParseContext, cursor::Cursor, diagnostics::Result, expr::AdditionalExprContext,
-        static_analysis_impossible, struct_context::StructContext,
+        ParseContext,
+        cursor::Cursor,
+        diagnostics::{Result, SeekError},
+        expr::AdditionalExprContext,
+        static_analysis_impossible,
+        struct_context::StructContext,
     },
 };
 
 impl ParseContext {
+    /// Reads a bytes value.
+    fn read_bytes_value(&mut self, count: u64, span: Span, cursor: &mut Cursor) -> Result<Value> {
+        let start = cursor.offset();
+        let len = Len::from(count);
+        let Some(end) = start.checked_add(len) else {
+            return Err(self.diagnostics.seek_err(
+                SeekError::Overflow,
+                &cursor.provenance_from_range(start..cursor.view().end_offset()),
+                span,
+                "when reading",
+            ));
+        };
+        let mut buf = [0; BytesValue::INLINE_LEN];
+        let provenance = cursor.provenance_from_range(start..end);
+
+        if count > BytesValue::INLINE_LEN as u64 {
+            let prefix_suffix_len = Len::from(BytesValue::PREFIX_SUFFIX_LEN as u64);
+
+            let (prefix, _) =
+                cursor.peek_bytes(start, prefix_suffix_len, span, &mut self.diagnostics)?;
+            buf[..BytesValue::PREFIX_SUFFIX_LEN].copy_from_slice(&prefix);
+            let (suffix, _) = cursor.peek_bytes(
+                end - prefix_suffix_len,
+                prefix_suffix_len,
+                span,
+                &mut self.diagnostics,
+            )?;
+            buf[BytesValue::PREFIX_SUFFIX_LEN..].copy_from_slice(&suffix);
+
+            cursor.advance_by(len).map_err(|err| {
+                self.diagnostics
+                    .seek_err(err, &provenance, span, "after reading")
+            })?;
+        } else {
+            let (bytes, _) = cursor.read_bytes_and_advance(len, span, &mut self.diagnostics)?;
+            buf[..bytes.len()].copy_from_slice(&bytes);
+        };
+
+        Ok(Value {
+            kind: ValueKind::Bytes(BytesValue::FromView {
+                view: cursor.view().clone(),
+                start,
+                len,
+                buf,
+            }),
+            provenance,
+        })
+    }
+
     /// Evaluates the given parsing type.
     pub fn eval_parse_type(
         &mut self,

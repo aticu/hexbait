@@ -1,5 +1,7 @@
 //! Implements errors and warnings for parsing.
 
+use hexbait_common::RelativeOffset;
+
 use crate::{Span, Value, eval::provenance::Provenance};
 
 /// The result of a parsing operation.
@@ -87,4 +89,82 @@ impl ParseErr {
     pub fn take_partial_result(&mut self) -> Option<Value> {
         self.partial_result.take()
     }
+}
+
+/// Stores the diagnostics that occur during parsing.
+#[derive(Debug)]
+pub struct Diagnostics {
+    /// The diagnostics that occurred during parsing.
+    diagnostics: Vec<Diagnostic>,
+}
+
+impl Diagnostics {
+    /// Creates a new diagnostics store.
+    pub fn new() -> Diagnostics {
+        Diagnostics {
+            diagnostics: Vec::new(),
+        }
+    }
+
+    /// Creates a new diagnostic.
+    pub fn new_diagnostic(&mut self, diagnostic: Diagnostic) -> DiagnosticId {
+        DiagnosticId::new(diagnostic, &mut self.diagnostics)
+    }
+
+    /// Creates a new parsing error.
+    pub fn new_err(&mut self, message: String, provenance: Provenance, span: Span) -> ParseErr {
+        ParseErr::new(self.new_diagnostic(Diagnostic {
+            message,
+            level: DiagnosticLevel::Fail,
+            provenance,
+            span,
+        }))
+    }
+
+    /// Creates a parsing error for the given seek error.
+    pub fn seek_err(
+        &mut self,
+        err: SeekError,
+        provenance: &Provenance,
+        span: Span,
+        context: &str,
+    ) -> ParseErr {
+        self.new_err(
+            format!(
+                "could not set cursor {context}: {}",
+                match err {
+                    SeekError::NegativeOffset => String::from("negative offset"),
+                    SeekError::SeekPastEnd { end, seek_offset } => {
+                        format!(
+                            "scope end is {end}, but new cursor position would be {seek_offset}"
+                        )
+                    }
+                    SeekError::Overflow => String::from("integer overflow"),
+                }
+            ),
+            provenance.clone(),
+            span,
+        )
+    }
+
+    /// Returns the inner diagnostics.
+    pub fn into_diagnostics(self) -> Vec<Diagnostic> {
+        self.diagnostics
+    }
+}
+
+/// An error that can occur when seeking the input.
+#[derive(Debug)]
+pub enum SeekError {
+    /// A seek was attempted to a negative offset.
+    NegativeOffset,
+    /// A seek past the end of the current scope.
+    SeekPastEnd {
+        /// The end of the scope.
+        end: RelativeOffset,
+        /// The offset where the seek was attempted.
+        seek_offset: RelativeOffset,
+    },
+    /// The value overflowed the offset type.
+    Overflow,
 }

@@ -1,10 +1,12 @@
 //! Implements the `struct` context needed for parsing.
 
+use hexbait_common::RelativeOffset;
+
 use crate::{
     DiagnosticId, Provenance, Value, ValueKind,
     ir::Symbol,
     parse::{
-        RecoveryStrategy, StaticAnalysisImpossible as _,
+        StaticAnalysisImpossible as _,
         cursor::Cursor,
         diagnostics::{ParseErr, Result},
     },
@@ -121,4 +123,16 @@ impl<'parent> StructContext<'parent> {
             provenance,
         }
     }
+}
+
+/// The different recovery strategies.
+#[derive(Debug)]
+pub enum RecoveryStrategy {
+    /// Divert to the recovery strategy of the parent `struct`.
+    Fallback,
+    /// Skips to the given offset.
+    SkipTo {
+        /// The offset to skip to.
+        offset: RelativeOffset,
+    },
 }

@@ -6,7 +6,7 @@ use hexbait_common::{Endianness, Len, ReadBytes, RelativeOffset};
 
 use crate::{
     Provenance, Span, View,
-    parse::{Diagnostics, Result, SeekError},
+    parse::{Diagnostics, Result, diagnostics::SeekError},
 };
 
 /// Reads the specified number of bytes without advancing the cursor.
