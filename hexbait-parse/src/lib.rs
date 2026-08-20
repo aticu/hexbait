@@ -2,7 +2,7 @@
 
 use std::str::FromStr as _;
 
-use hexbait_lang::{DiagnosticLevel, ParseResult, Provenance, ValueKind};
+use hexbait_lang::{DiagnosticLevel, ParseResult, Provenance, StructContent, ValueKind};
 use serde_json::{Map, Number, Value};
 
 /// Converts the given parse result to JSON.
@@ -96,15 +96,28 @@ fn value_to_json(value: &hexbait_lang::Value, result: &ParseResult, detailed: bo
             }
             Value::String(as_str)
         }
-        ValueKind::Struct { fields, error } => {
-            err = error.map(|err| err.raw_idx());
-
+        ValueKind::Struct { content } => {
             let mut object = Map::new();
-            for (name, val) in fields {
-                object.insert(
-                    name.as_str().to_string(),
-                    value_to_json(val, result, detailed),
-                );
+            for content in content {
+                match content {
+                    StructContent::Field { name, value } => {
+                        object.insert(
+                            name.as_str().to_string(),
+                            value_to_json(value, result, detailed),
+                        );
+                    }
+                    StructContent::Diagnostic(diagnostic_id) => {
+                        let diagnostic = &result.diagnostics[diagnostic_id.raw_idx()];
+                        let level = match diagnostic.level {
+                            DiagnosticLevel::Fail => "failure",
+                            DiagnosticLevel::Warn => "warning",
+                        };
+                        object.insert(
+                            format!("_{level}{}", diagnostic_id.raw_idx()),
+                            Value::String(diagnostic.message.to_string()),
+                        );
+                    }
+                }
             }
 
             Value::Object(object)

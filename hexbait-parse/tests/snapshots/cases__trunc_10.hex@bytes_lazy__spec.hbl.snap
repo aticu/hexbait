@@ -1,13 +1,14 @@
 ---
 source: hexbait-parse/tests/cases.rs
-expression: "render(&spec, &input)"
+expression: "\n=== Spec ===\nsmall bytes len 16;\nbig bytes len 17;\n\n\n=== Hex ===\n# neither fits\n00 01 02 03 04 05 06 07 08 09\n"
 input_file: hexbait-parse/tests/cases/bytes_lazy/spec.hbl
 ---
 {
   "value": {
-    "value": {},
-    "provenance": "",
-    "error": "view is too short"
+    "value": {
+      "_failure0": "view is too short"
+    },
+    "provenance": ""
   },
   "errors": [
     {

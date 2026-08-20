@@ -1,6 +1,6 @@
 ---
 source: hexbait-parse/tests/cases.rs
-expression: "render(&spec, &input)"
+expression: "\n=== Spec ===\n!endian le;\n\nmagic bytes = \"%PDF\";\nver u8 = 1;\ntag bytes = <\"AB\" 00 ff>;\n\n\n=== Hex ===\n25 50 44 46 01 41 42 00 fe\n"
 input_file: hexbait-parse/tests/cases/expected/spec.hbl
 ---
 {
@@ -17,10 +17,10 @@ input_file: hexbait-parse/tests/cases/expected/spec.hbl
       "tag": {
         "value": "414200fe",
         "provenance": "5..=8"
-      }
+      },
+      "_failure0": "field expectation failed: [41 42 00 ff] != [41 42 00 fe]"
     },
-    "provenance": "0..=8",
-    "error": "field expectation failed: [41 42 00 ff] != [41 42 00 fe]"
+    "provenance": "0..=8"
   },
   "errors": [
     {

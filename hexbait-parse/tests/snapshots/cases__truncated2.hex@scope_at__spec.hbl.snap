@@ -5,9 +5,10 @@ input_file: hexbait-parse/tests/cases/scope_at/spec.hbl
 ---
 {
   "value": {
-    "value": {},
-    "provenance": "",
-    "error": "could not set cursor for end of new scope: scope end is 3, but new cursor position would be 6"
+    "value": {
+      "_failure0": "could not set cursor for end of new scope: scope end is 3, but new cursor position would be 6"
+    },
+    "provenance": ""
   },
   "errors": [
     {

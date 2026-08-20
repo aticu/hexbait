@@ -205,12 +205,14 @@ impl ParseContext {
                         String::from("warning triggered")
                     };
 
-                    self.diagnostics.new_diagnostic(Diagnostic {
+                    let id = self.diagnostics.new_diagnostic(Diagnostic {
                         message,
                         level: DiagnosticLevel::Warn,
                         provenance: condition_value.provenance.clone(),
                         span: condition.span,
                     });
+
+                    struct_ctx.push_diagnostic(id);
                 }
             }
             Declaration::Recover { at } => {

@@ -9,10 +9,10 @@ input_file: hexbait-parse/tests/cases/eof/spec.hbl
       "a": {
         "value": 1,
         "provenance": "0..=1"
-      }
+      },
+      "_failure0": "view is too short"
     },
-    "provenance": "0..=1",
-    "error": "view is too short"
+    "provenance": "0..=1"
   },
   "errors": [
     {

@@ -15,14 +15,14 @@ input_file: hexbait-parse/tests/cases/assert_recover/spec.hbl
           "a": {
             "value": 9,
             "provenance": "1..=1"
-          }
+          },
+          "_failure0": "assertion failed"
         },
-        "provenance": "1..=1",
-        "error": "assertion failed"
-      }
+        "provenance": "1..=1"
+      },
+      "_failure1": "view is too short"
     },
-    "provenance": "0..=1",
-    "error": "view is too short"
+    "provenance": "0..=1"
   },
   "errors": [
     {

@@ -5,9 +5,10 @@ input_file: hexbait-parse/tests/cases/read_past_end/spec.hbl
 ---
 {
   "value": {
-    "value": {},
-    "provenance": "",
-    "error": "view is too short"
+    "value": {
+      "_failure0": "view is too short"
+    },
+    "provenance": ""
   },
   "errors": [
     {

@@ -1,6 +1,6 @@
 ---
 source: hexbait-parse/tests/cases.rs
-expression: "render(&spec, &input)"
+expression: "\n=== Spec ===\nsmall bytes len 16;\nbig bytes len 17;\n\n\n=== Hex ===\n# `small` fits, `big` does not\n00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f\n10 11 12 13\n"
 input_file: hexbait-parse/tests/cases/bytes_lazy/spec.hbl
 ---
 {
@@ -9,10 +9,10 @@ input_file: hexbait-parse/tests/cases/bytes_lazy/spec.hbl
       "small": {
         "value": "000102030405060708090a0b0c0d0e0f",
         "provenance": "0..=15"
-      }
+      },
+      "_failure0": "view is too short"
     },
-    "provenance": "0..=15",
-    "error": "view is too short"
+    "provenance": "0..=15"
   },
   "errors": [
     {

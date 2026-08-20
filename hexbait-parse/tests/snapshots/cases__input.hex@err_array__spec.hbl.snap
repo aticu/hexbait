@@ -24,18 +24,18 @@ input_file: hexbait-parse/tests/cases/err_array/spec.hbl
                   "tag": {
                     "value": 187,
                     "provenance": "1..=1"
-                  }
+                  },
+                  "_failure0": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
                 },
-                "provenance": "1..=1",
-                "error": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
+                "provenance": "1..=1"
               }
             ],
             "provenance": "0..=1",
             "error": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
-          }
+          },
+          "_failure0": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
         },
-        "provenance": "0..=1",
-        "error": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
+        "provenance": "0..=1"
       },
       "b": {
         "value": {
@@ -55,22 +55,22 @@ input_file: hexbait-parse/tests/cases/err_array/spec.hbl
                   "tag": {
                     "value": 187,
                     "provenance": "1..=1"
-                  }
+                  },
+                  "_failure1": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
                 },
-                "provenance": "1..=1",
-                "error": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
+                "provenance": "1..=1"
               }
             ],
             "provenance": "0..=1",
             "error": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
-          }
+          },
+          "_failure1": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
         },
-        "provenance": "0..=1",
-        "error": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
-      }
+        "provenance": "0..=1"
+      },
+      "_failure1": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
     },
-    "provenance": "0..=1",
-    "error": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
+    "provenance": "0..=1"
   },
   "errors": [
     {

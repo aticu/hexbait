@@ -5,9 +5,10 @@ input_file: hexbait-parse/tests/cases/negative_offset/spec.hbl
 ---
 {
   "value": {
-    "value": {},
-    "provenance": "",
-    "error": "could not set cursor for start of new scope: negative offset"
+    "value": {
+      "_failure0": "could not set cursor for start of new scope: negative offset"
+    },
+    "provenance": ""
   },
   "errors": [
     {

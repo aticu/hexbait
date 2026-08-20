@@ -1,6 +1,6 @@
 ---
 source: hexbait-parse/tests/cases.rs
-expression: "render(&spec, &input)"
+expression: "\n=== Spec ===\n!endian le;\n\nhead u8;\nbody {\n  !recover at 6;\n  tag u8 = 0xaa;\n  skipped u16;\n};\ntail u8;\n\n\n=== Hex ===\n# tag wrong, `skipped` never parsed, resume at 6\n01 bb 02 03 04 05 06 07\n"
 input_file: hexbait-parse/tests/cases/recover/spec.hbl
 ---
 {
@@ -15,10 +15,10 @@ input_file: hexbait-parse/tests/cases/recover/spec.hbl
           "tag": {
             "value": 187,
             "provenance": "1..=1"
-          }
+          },
+          "_failure0": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
         },
-        "provenance": "1..=1",
-        "error": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
+        "provenance": "1..=1"
       },
       "tail": {
         "value": 6,

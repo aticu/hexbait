@@ -3,7 +3,7 @@
 use egui::{FontId, Key, Layout, Response, RichText, ScrollArea, TextStyle, Ui, UiBuilder};
 use hexbait_common::{AbsoluteOffset, Input, RelativeOffset};
 use hexbait_lang::{
-    Diagnostic, DiagnosticId, Value, ValueKind, View,
+    Diagnostic, DiagnosticId, DiagnosticLevel, StructContent, Value, ValueKind, View,
     ir::{
         Symbol,
         path::{Path, PathComponent},
@@ -215,7 +215,7 @@ fn show_value(
     };
 
     let mut child_hovered = HoverInfo::Nothing;
-    let mut hovered_err = None;
+    let mut hovered_diagnostic = None;
 
     match &value.kind {
         ValueKind::Boolean(_) | ValueKind::Integer(_) | ValueKind::Float(_) => {
@@ -281,7 +281,7 @@ fn show_value(
                 ui.spacing_mut().item_spacing = old_spacing;
             });
         }
-        ValueKind::Struct { fields, error } => {
+        ValueKind::Struct { content } => {
             ui.vertical(|ui| {
                 handle_response(ui.label(format!("{name_prefix}{{")));
 
@@ -292,18 +292,29 @@ fn show_value(
                         .max_rect(child_rect)
                         .layout(egui::Layout::top_down(egui::Align::Min)),
                     |ui| {
-                        for (name, value) in fields {
-                            let mut path = path.clone();
-                            path.push(PathComponent::FieldAccess(name.clone()));
+                        for content in content {
+                            match content {
+                                StructContent::Field { name, value } => {
+                                    let mut path = path.clone();
+                                    path.push(PathComponent::FieldAccess(name.clone()));
 
-                            let hovered =
-                                show_value(ui, state, path, Some(name), value, diagnostics);
-                            if hovered != HoverInfo::Nothing {
-                                child_hovered = hovered;
+                                    let hovered =
+                                        show_value(ui, state, path, Some(name), value, diagnostics);
+                                    if hovered != HoverInfo::Nothing {
+                                        child_hovered = hovered;
+                                    }
+                                }
+                                StructContent::Diagnostic(diagnostic_id) => {
+                                    hovered_diagnostic = hovered_diagnostic.or(
+                                        render_diagnostic_and_return_hovered(
+                                            ui,
+                                            *diagnostic_id,
+                                            diagnostics,
+                                        ),
+                                    );
+                                }
                             }
                         }
-                        hovered_err =
-                            hovered_err.or(render_error_and_return_hovered(ui, error, diagnostics));
                     },
                 );
 
@@ -330,8 +341,11 @@ fn show_value(
                                 child_hovered = hovered;
                             }
                         }
-                        hovered_err =
-                            hovered_err.or(render_error_and_return_hovered(ui, error, diagnostics));
+                        if let Some(diagnostic) = error {
+                            hovered_diagnostic = hovered_diagnostic.or(
+                                render_diagnostic_and_return_hovered(ui, *diagnostic, diagnostics),
+                            );
+                        }
                     },
                 );
 
@@ -350,7 +364,7 @@ fn show_value(
         child_hovered
     } else if this_hovered {
         HoverInfo::Value { path: path.clone() }
-    } else if let Some(err) = hovered_err {
+    } else if let Some(err) = hovered_diagnostic {
         HoverInfo::Error { id: err }
     } else {
         HoverInfo::Nothing
@@ -360,27 +374,24 @@ fn show_value(
 /// Renders the given error to the UI if it is present.
 ///
 /// Returns the hovered error if it is hovered.
-fn render_error_and_return_hovered(
+fn render_diagnostic_and_return_hovered(
     ui: &mut Ui,
-    diagnostic: &Option<DiagnosticId>,
+    diagnostic_id: DiagnosticId,
     diagnostics: &[Diagnostic],
 ) -> Option<DiagnosticId> {
-    if let Some(err_id) = diagnostic {
-        let err = &diagnostics[err_id.raw_idx()];
+    let diagnostic = &diagnostics[diagnostic_id.raw_idx()];
 
-        // TODO: use the error span to highlight it in a possible future editor
+    // TODO: use the error span to highlight it in a possible future editor
 
-        if ui
-            .label(
-                RichText::new(format!("... parsing error: {},", err.message))
-                    .color(ui.visuals().error_fg_color),
-            )
-            .hovered()
-        {
-            Some(*err_id)
-        } else {
-            None
-        }
+    let (ty_name, color) = match diagnostic.level {
+        DiagnosticLevel::Fail => ("failure", ui.visuals().error_fg_color),
+        DiagnosticLevel::Warn => ("warning", ui.visuals().warn_fg_color),
+    };
+    if ui
+        .label(RichText::new(format!("parsing {ty_name}: {},", diagnostic.message)).color(color))
+        .hovered()
+    {
+        Some(diagnostic_id)
     } else {
         None
     }

@@ -7,13 +7,14 @@ input_file: hexbait-parse/tests/cases/recover_inner_scope/spec.hbl
   "value": {
     "value": {
       "inner": {
-        "value": {},
-        "provenance": "",
-        "error": "view is too short"
-      }
+        "value": {
+          "_failure0": "view is too short"
+        },
+        "provenance": ""
+      },
+      "_failure0": "view is too short"
     },
-    "provenance": "",
-    "error": "view is too short"
+    "provenance": ""
   },
   "errors": [
     {

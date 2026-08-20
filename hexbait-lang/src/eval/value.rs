@@ -58,9 +58,7 @@ pub enum ValueKind {
     /// them.
     Struct {
         /// The fields of the `struct`.
-        fields: Vec<(Symbol, Value)>,
-        /// An error that occurred while parsing the `struct`.
-        error: Option<DiagnosticId>,
+        content: Vec<StructContent>,
     },
     /// Represents an array of values.
     Array {
@@ -112,13 +110,17 @@ impl fmt::Debug for ValueKind {
                     }
                 }
             }
-            Self::Struct { fields, error } => {
+            Self::Struct { content } => {
                 let mut debug_struct = f.debug_struct("struct");
-                for (name, value) in fields {
-                    debug_struct.field(name.as_str(), value);
-                }
-                if let Some(err) = error {
-                    debug_struct.field("__error", &err);
+                for content in content {
+                    match content {
+                        StructContent::Field { name, value } => {
+                            debug_struct.field(name.as_str(), value);
+                        }
+                        StructContent::Diagnostic(err) => {
+                            debug_struct.field("__diagnostic", &err);
+                        }
+                    }
                 }
                 debug_struct.finish()
             }
@@ -203,9 +205,9 @@ impl ValueKind {
     /// # Panics
     /// This function will panic if the value is not a struct.
     #[track_caller]
-    pub fn expect_struct(&self) -> &[(Symbol, Value)] {
+    pub fn expect_struct(&self) -> &[StructContent] {
         match self {
-            ValueKind::Struct { fields, .. } => fields,
+            ValueKind::Struct { content, .. } => content,
             _ => unreachable!("expected a struct value"),
         }
     }
@@ -243,19 +245,13 @@ impl Value {
         for component in path.iter() {
             match component {
                 PathComponent::FieldAccess(field) => {
-                    let ValueKind::Struct { fields, .. } = &current_value.kind else {
+                    let ValueKind::Struct { content } = &current_value.kind else {
                         return None;
                     };
 
-                    'find_entry: {
-                        for (name, value) in fields {
-                            if name == field {
-                                current_value = value;
-                                break 'find_entry;
-                            }
-                        }
-                        return None;
-                    }
+                    current_value = content
+                        .iter()
+                        .find_map(|content| content.val_if_name_eq(field))?;
                 }
                 PathComponent::Indexing(index) => {
                     let ValueKind::Array { items, .. } = &current_value.kind else {
@@ -295,6 +291,33 @@ impl PartialEq<Lit> for ValueKind {
                     false
                 }
             }
+        }
+    }
+}
+
+/// A single part of the content of a `struct`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum StructContent {
+    /// The content is a `struct` field.
+    Field {
+        /// The name of the field.
+        name: Symbol,
+        /// The value of the field.
+        value: Value,
+    },
+    /// A diagnostic that occurred while parsing the `struct`.
+    Diagnostic(DiagnosticId),
+}
+
+impl StructContent {
+    /// Returns the value if this `struct` content is a field named `name`.
+    pub fn val_if_name_eq(&self, name: &Symbol) -> Option<&Value> {
+        match self {
+            StructContent::Field {
+                name: this_name,
+                value,
+            } if this_name == name => Some(value),
+            _ => None,
         }
     }
 }

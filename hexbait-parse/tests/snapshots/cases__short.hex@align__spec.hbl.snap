@@ -9,10 +9,10 @@ input_file: hexbait-parse/tests/cases/align/spec.hbl
       "a": {
         "value": 1,
         "provenance": "0..=0"
-      }
+      },
+      "_failure0": "could not set cursor during alignment: scope end is 2, but new cursor position would be 4"
     },
-    "provenance": "0..=0",
-    "error": "could not set cursor during alignment: scope end is 2, but new cursor position would be 4"
+    "provenance": "0..=0"
   },
   "errors": [
     {

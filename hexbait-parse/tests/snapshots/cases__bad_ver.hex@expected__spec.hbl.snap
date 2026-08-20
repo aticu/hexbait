@@ -1,6 +1,6 @@
 ---
 source: hexbait-parse/tests/cases.rs
-expression: "render(&spec, &input)"
+expression: "\n=== Spec ===\n!endian le;\n\nmagic bytes = \"%PDF\";\nver u8 = 1;\ntag bytes = <\"AB\" 00 ff>;\n\n\n=== Hex ===\n25 50 44 46 02 41 42 00 ff\n"
 input_file: hexbait-parse/tests/cases/expected/spec.hbl
 ---
 {
@@ -13,10 +13,10 @@ input_file: hexbait-parse/tests/cases/expected/spec.hbl
       "ver": {
         "value": 2,
         "provenance": "4..=4"
-      }
+      },
+      "_failure0": "field expectation failed: 1 (0x1) != 2 (0x2)"
     },
-    "provenance": "0..=4",
-    "error": "field expectation failed: 1 (0x1) != 2 (0x2)"
+    "provenance": "0..=4"
   },
   "errors": [
     {

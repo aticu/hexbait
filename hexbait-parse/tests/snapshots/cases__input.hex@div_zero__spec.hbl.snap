@@ -7,18 +7,20 @@ input_file: hexbait-parse/tests/cases/div_zero/spec.hbl
   "value": {
     "value": {
       "div": {
-        "value": {},
-        "provenance": "",
-        "error": "division by zero"
+        "value": {
+          "_failure0": "division by zero"
+        },
+        "provenance": ""
       },
       "mod": {
-        "value": {},
-        "provenance": "",
-        "error": "modulo by zero"
-      }
+        "value": {
+          "_failure1": "modulo by zero"
+        },
+        "provenance": ""
+      },
+      "_failure1": "modulo by zero"
     },
-    "provenance": "",
-    "error": "modulo by zero"
+    "provenance": ""
   },
   "errors": [
     {

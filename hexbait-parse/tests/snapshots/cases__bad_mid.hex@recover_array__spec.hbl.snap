@@ -30,10 +30,10 @@ input_file: hexbait-parse/tests/cases/recover_array/spec.hbl
               "tag": {
                 "value": 187,
                 "provenance": "3..=3"
-              }
+              },
+              "_failure0": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
             },
-            "provenance": "3..=3",
-            "error": "field expectation failed: 170 (0xaa) != 187 (0xbb)"
+            "provenance": "3..=3"
           },
           {
             "value": {

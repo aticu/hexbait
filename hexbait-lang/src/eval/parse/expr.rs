@@ -186,7 +186,8 @@ impl ParseContext {
                     .kind
                     .expect_struct()
                     .iter()
-                    .find_map(|(name, value)| (name == &field.inner).then(|| value.clone()))
+                    .find_map(|content| content.val_if_name_eq(&field.inner))
+                    .cloned()
                     .static_analysis_expect())
             }
             ExprKind::Peek { ty, offset } => {

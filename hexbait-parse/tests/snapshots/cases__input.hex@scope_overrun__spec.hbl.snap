@@ -1,6 +1,6 @@
 ---
 source: hexbait-parse/tests/cases.rs
-expression: "render(&spec, &input)"
+expression: "\n=== Spec ===\n!endian le;\n\n!scope at 0 until 4 {\n  x u16;\n  y u16;\n  past u16;\n}\n\n\n=== Hex ===\n01 00 02 00 03 00 04 00\n"
 input_file: hexbait-parse/tests/cases/scope_overrun/spec.hbl
 ---
 {
@@ -13,10 +13,10 @@ input_file: hexbait-parse/tests/cases/scope_overrun/spec.hbl
       "y": {
         "value": 2,
         "provenance": "2..=3"
-      }
+      },
+      "_failure0": "view is too short"
     },
-    "provenance": "0..=3",
-    "error": "view is too short"
+    "provenance": "0..=3"
   },
   "errors": [
     {

@@ -7,18 +7,20 @@ input_file: hexbait-parse/tests/cases/seek_past_end/spec.hbl
   "value": {
     "value": {
       "a": {
-        "value": {},
-        "provenance": "",
-        "error": "could not set cursor during seek: scope end is 0, but new cursor position would be 1"
+        "value": {
+          "_failure0": "could not set cursor during seek: scope end is 0, but new cursor position would be 1"
+        },
+        "provenance": ""
       },
       "b": {
-        "value": {},
-        "provenance": "",
-        "error": "could not set cursor during seek: scope end is 0, but new cursor position would be 1"
-      }
+        "value": {
+          "_failure1": "could not set cursor during seek: scope end is 0, but new cursor position would be 1"
+        },
+        "provenance": ""
+      },
+      "_failure1": "could not set cursor during seek: scope end is 0, but new cursor position would be 1"
     },
-    "provenance": "",
-    "error": "could not set cursor during seek: scope end is 0, but new cursor position would be 1"
+    "provenance": ""
   },
   "errors": [
     {

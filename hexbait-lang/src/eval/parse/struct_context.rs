@@ -4,6 +4,7 @@ use hexbait_common::RelativeOffset;
 
 use crate::{
     DiagnosticId, Provenance, Value, ValueKind,
+    eval::value::StructContent,
     ir::Symbol,
     parse::{
         StaticAnalysisImpossible as _,
@@ -15,52 +16,52 @@ use crate::{
 /// The parsing context for a `struct`.
 #[derive(Debug)]
 pub struct StructContext<'parent> {
-    /// The already parsed fields.
-    parsed_fields: Vec<(Symbol, Value)>,
+    /// The already parsed content.
+    content: Vec<StructContent>,
     /// The parent `struct`.
     parent: Option<&'parent StructContext<'parent>>,
     /// The recovery strategy to use if parsing fails.
     recovery_strategy: RecoveryStrategy,
-    /// An error that may have occurred during parsing of this struct.
-    error: Option<DiagnosticId>,
 }
 
 impl<'parent> StructContext<'parent> {
     /// Creates a new `struct` parsing context.
     pub fn new() -> StructContext<'static> {
         StructContext {
-            parsed_fields: Vec::new(),
+            content: Vec::new(),
             parent: None,
             recovery_strategy: RecoveryStrategy::Fallback,
-            error: None,
         }
     }
 
     /// Creates the context for a child `struct`.
     pub fn child<'this>(&'this self) -> StructContext<'this> {
         StructContext {
-            parsed_fields: Vec::new(),
+            content: Vec::new(),
             parent: Some(self),
             recovery_strategy: RecoveryStrategy::Fallback,
-            error: None,
         }
     }
 
     /// Returns the field named `field_name`.
     pub fn field(&self, field_name: &Symbol) -> Option<&Value> {
-        for (name, val) in &self.parsed_fields {
-            if name == field_name {
-                return Some(val);
-            }
-        }
-
-        None
+        self.content
+            .iter()
+            .find_map(|content| content.val_if_name_eq(field_name))
     }
 
     /// Inserts a field with the given name into the `struct`.
     pub fn insert(&mut self, field_name: Symbol, value: Value) {
         // TODO: use resolved names here later
-        self.parsed_fields.push((field_name, value));
+        self.content.push(StructContent::Field {
+            name: field_name,
+            value,
+        });
+    }
+
+    /// Pushes the given diagnostic into the `struct`.
+    pub fn push_diagnostic(&mut self, diagnostic: DiagnosticId) {
+        self.content.push(StructContent::Diagnostic(diagnostic));
     }
 
     /// Sets the recovery strategy of this `struct`.
@@ -75,7 +76,7 @@ impl<'parent> StructContext<'parent> {
 
     /// Recovers this `struct` from the given error.
     pub fn recover(&mut self, cursor: &mut Cursor, err: ParseErr) -> Result<()> {
-        self.error = Some(err.id());
+        self.push_diagnostic(err.id());
 
         match &self.recovery_strategy {
             RecoveryStrategy::Fallback => Err(err),
@@ -88,37 +89,42 @@ impl<'parent> StructContext<'parent> {
         }
     }
 
-    /// Returns the `struct` context as a partially parsed `struct` value.
-    pub fn as_value(&self) -> Value {
+    /// The provenance of the struct.
+    fn provenance(&self) -> Provenance {
         let mut provenance = Provenance::empty();
-        for (_, value) in &self.parsed_fields {
-            provenance += &value.provenance;
+        for content in &self.content {
+            provenance += match content {
+                StructContent::Field { name: _, value } => &value.provenance,
+                StructContent::Diagnostic(_) => continue,
+            }
         }
 
+        provenance
+    }
+
+    /// Returns the `struct` context as a partially parsed `struct` value.
+    pub fn as_value(&self) -> Value {
         Value {
             kind: ValueKind::Struct {
-                fields: self.parsed_fields.clone(),
-                error: self.error,
+                content: self.content.clone(),
             },
-            provenance,
+            provenance: self.provenance(),
         }
     }
 
     /// Turns the `struct` context into a fully parsed `struct`.
     pub fn into_value(self) -> Value {
-        let mut provenance = Provenance::empty();
-        for (_, value) in &self.parsed_fields {
-            provenance += &value.provenance;
-        }
-
+        let provenance = self.provenance();
         Value {
             kind: ValueKind::Struct {
-                fields: self
-                    .parsed_fields
+                content: self
+                    .content
                     .into_iter()
-                    .filter(|(name, _)| !name.as_str().starts_with('_'))
+                    .filter(|content| match content {
+                        StructContent::Field { name, .. } => !name.as_str().starts_with('_'),
+                        StructContent::Diagnostic(_) => true,
+                    })
                     .collect(),
-                error: self.error,
             },
             provenance,
         }

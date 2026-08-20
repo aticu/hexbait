@@ -9,10 +9,10 @@ input_file: hexbait-parse/tests/cases/assert/spec.hbl
       "a": {
         "value": 2,
         "provenance": "0..=0"
-      }
+      },
+      "_failure0": "assertion failed"
     },
-    "provenance": "0..=0",
-    "error": "assertion failed"
+    "provenance": "0..=0"
   },
   "errors": [
     {

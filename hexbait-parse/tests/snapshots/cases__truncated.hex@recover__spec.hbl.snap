@@ -11,13 +11,14 @@ input_file: hexbait-parse/tests/cases/recover/spec.hbl
         "provenance": "0..=0"
       },
       "body": {
-        "value": {},
-        "provenance": "",
-        "error": "could not set cursor recovery offset: scope end is 3, but new cursor position would be 6"
-      }
+        "value": {
+          "_failure0": "could not set cursor recovery offset: scope end is 3, but new cursor position would be 6"
+        },
+        "provenance": ""
+      },
+      "_failure0": "could not set cursor recovery offset: scope end is 3, but new cursor position would be 6"
     },
-    "provenance": "0..=0",
-    "error": "could not set cursor recovery offset: scope end is 3, but new cursor position would be 6"
+    "provenance": "0..=0"
   },
   "errors": [
     {

@@ -13,10 +13,10 @@ input_file: hexbait-parse/tests/cases/assert/spec.hbl
       "b": {
         "value": 254,
         "provenance": "1..=1"
-      }
+      },
+      "_failure0": "assertion failed: b must be 0xff"
     },
-    "provenance": "0..=1",
-    "error": "assertion failed: b must be 0xff"
+    "provenance": "0..=1"
   },
   "errors": [
     {
