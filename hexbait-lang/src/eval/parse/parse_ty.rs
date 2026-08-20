@@ -4,11 +4,11 @@ use hexbait_common::{Endianness, Len};
 
 use crate::{
     BytesValue, Int, Provenance, Span, Value, ValueKind,
-    ir::{ParseType, ParseTypeKind, RepeatKind},
+    ir::{Expr, ParseType, ParseTypeKind, RepeatKind},
     parse::{
-        ParseContext,
+        ParseContext, StaticAnalysisImpossible,
         cursor::Cursor,
-        diagnostics::{Result, SeekError},
+        diagnostics::{Diagnostics, Result, SeekError},
         expr::AdditionalExprContext,
         static_analysis_impossible,
         struct_context::StructContext,
@@ -65,6 +65,48 @@ impl ParseContext {
         })
     }
 
+    /// Evaluates the length of a `len` repetition.
+    fn eval_count(
+        &mut self,
+        expr: &Expr,
+        cursor: &mut Cursor,
+        struct_ctx: &StructContext,
+    ) -> Result<u64> {
+        let count_val = self.eval_expr(expr, cursor, struct_ctx, Default::default())?;
+
+        u64::try_from(count_val.kind.expect_int()).map_err(|_| {
+            self.diagnostics.new_err(
+                "count too large".into(),
+                count_val.provenance.clone(),
+                expr.span,
+            )
+        })
+    }
+
+    /// Evaluates the condition of a `while` repetition.
+    fn eval_while_condition(
+        &mut self,
+        condition: &Expr,
+        cursor: &Cursor,
+        struct_ctx: &StructContext,
+        last_val: Option<&Value>,
+        len: usize,
+    ) -> Result<bool> {
+        self.eval_expr(
+            condition,
+            cursor,
+            struct_ctx,
+            AdditionalExprContext {
+                last: last_val,
+                len: Some(&Value {
+                    kind: ValueKind::Integer(Int::from(len)),
+                    provenance: Provenance::empty(),
+                }),
+            },
+        )
+        .map(|val| val.kind.expect_bool())
+    }
+
     /// Evaluates the given parsing type.
     pub fn eval_parse_type(
         &mut self,
@@ -78,39 +120,20 @@ impl ParseContext {
             }
             ParseTypeKind::Bytes { repetition_kind } => match repetition_kind {
                 RepeatKind::Len { count: count_expr } => {
-                    let count_val =
-                        self.eval_expr(count_expr, cursor, struct_ctx, Default::default())?;
-
-                    if let Ok(count) = u64::try_from(count_val.kind.expect_int()) {
-                        self.read_bytes_value(count, parse_type.span, cursor)?
-                    } else {
-                        return Err(self.diagnostics.new_err(
-                            "count too large".into(),
-                            count_val.provenance.clone(),
-                            count_expr.span,
-                        ));
-                    }
+                    let count = self.eval_count(count_expr, cursor, struct_ctx)?;
+                    self.read_bytes_value(count, parse_type.span, cursor)?
                 }
                 RepeatKind::While { condition } => {
                     let mut last_byte = None;
                     let mut len = 0;
                     let mut peek_cursor = cursor.clone();
-                    while self
-                        .eval_expr(
-                            condition,
-                            &peek_cursor,
-                            struct_ctx,
-                            AdditionalExprContext {
-                                last: last_byte.as_ref(),
-                                len: Some(&Value {
-                                    kind: ValueKind::Integer(Int::from(len)),
-                                    provenance: Provenance::empty(),
-                                }),
-                            },
-                        )?
-                        .kind
-                        .expect_bool()
-                    {
+                    while self.eval_while_condition(
+                        condition,
+                        &peek_cursor,
+                        struct_ctx,
+                        last_byte.as_ref(),
+                        len,
+                    )? {
                         let (bytes, provenance) = peek_cursor.read_bytes_and_advance(
                             Len::from(1),
                             parse_type.span,
@@ -124,107 +147,65 @@ impl ParseContext {
                         len += 1;
                     }
 
-                    self.read_bytes_value(len, parse_type.span, cursor)?
+                    self.read_bytes_value(len as u64, parse_type.span, cursor)?
                 }
                 RepeatKind::Error => static_analysis_impossible(),
             },
-            ParseTypeKind::Integer { signed, .. }
-            | ParseTypeKind::DynamicInteger { signed, .. } => {
-                let bit_width = match &parse_type.kind {
-                    ParseTypeKind::Integer { bit_width, .. } => *bit_width,
-                    ParseTypeKind::DynamicInteger { bit_width, .. } => {
-                        let val =
-                            self.eval_expr(bit_width, cursor, struct_ctx, Default::default())?;
+            ParseTypeKind::Integer { signed, bit_width } => parse_int(
+                *bit_width,
+                *signed,
+                parse_type.span,
+                cursor,
+                &mut self.diagnostics,
+            )?,
+            ParseTypeKind::DynamicInteger { signed, bit_width } => {
+                let bit_width_val =
+                    self.eval_expr(bit_width, cursor, struct_ctx, Default::default())?;
+                let bit_width = u32::try_from(bit_width_val.kind.expect_int()).map_err(|_| {
+                    self.diagnostics.new_err(
+                        "bit width is too large".to_string(),
+                        bit_width_val.provenance,
+                        bit_width.span,
+                    )
+                })?;
 
-                        u32::try_from(val.kind.expect_int()).map_err(|_| {
-                            self.diagnostics.new_err(
-                                "bit width is too large".to_string(),
-                                val.provenance,
-                                bit_width.span,
-                            )
-                        })?
-                    }
-                    _ => unreachable!(),
-                };
-                let signed = *signed;
-
-                assert!(
-                    bit_width % 8 == 0,
-                    "non byte aligned integers currently unimplemented"
-                );
-                let size_in_bytes = (bit_width / 8) as usize;
-
-                let endianness = *cursor.endianness();
-                let (parsed_bytes, provenance) = cursor.read_bytes_and_advance(
-                    Len::from(u64::try_from(size_in_bytes).unwrap()),
+                parse_int(
+                    bit_width,
+                    *signed,
                     parse_type.span,
+                    cursor,
                     &mut self.diagnostics,
-                )?;
-
-                let num = match (endianness, signed) {
-                    (Endianness::Little, true) => Int::from_signed_bytes_le(&parsed_bytes),
-                    (Endianness::Big, true) => Int::from_signed_bytes_be(&parsed_bytes),
-                    (Endianness::Little, false) => {
-                        Int::from_bytes_le(num_bigint::Sign::Plus, &parsed_bytes)
-                    }
-                    (Endianness::Big, false) => {
-                        Int::from_bytes_be(num_bigint::Sign::Plus, &parsed_bytes)
-                    }
-                };
-
-                Value {
-                    kind: ValueKind::Integer(num),
-                    provenance,
-                }
+                )?
             }
             ParseTypeKind::Repeating {
                 parse_type,
                 repetition_kind,
             } => match repetition_kind {
-                crate::ir::RepeatKind::Len { count } => {
-                    let count_val =
-                        self.eval_expr(count, cursor, struct_ctx, Default::default())?;
+                RepeatKind::Len { count } => {
+                    let count = self.eval_count(count, cursor, struct_ctx)?;
+
                     let mut accumulator = RepetitionAccumulator::new();
-
-                    if let Ok(count) = u64::try_from(count_val.kind.expect_int()) {
-                        for _ in 0..count {
-                            accumulator.push(self, cursor, struct_ctx, parse_type)?;
-                        }
-                    } else {
-                        return Err(self.diagnostics.new_err(
-                            "count too large".into(),
-                            count_val.provenance.clone(),
-                            count.span,
-                        ));
+                    for _ in 0..count {
+                        accumulator.push(self, cursor, struct_ctx, parse_type)?;
                     }
-
                     accumulator.into_value()
                 }
-                crate::ir::RepeatKind::While { condition } => {
+                RepeatKind::While { condition } => {
                     let mut accumulator = RepetitionAccumulator::new();
 
-                    while self
-                        .eval_expr(
-                            condition,
-                            cursor,
-                            struct_ctx,
-                            AdditionalExprContext {
-                                last: accumulator.values().last(),
-                                len: Some(&Value {
-                                    kind: ValueKind::Integer(Int::from(accumulator.values().len())),
-                                    provenance: Provenance::empty(),
-                                }),
-                            },
-                        )?
-                        .kind
-                        .expect_bool()
-                    {
+                    while self.eval_while_condition(
+                        condition,
+                        cursor,
+                        struct_ctx,
+                        accumulator.values().last(),
+                        accumulator.values().len(),
+                    )? {
                         accumulator.push(self, cursor, struct_ctx, parse_type)?;
                     }
 
                     accumulator.into_value()
                 }
-                crate::ir::RepeatKind::Error => static_analysis_impossible(),
+                RepeatKind::Error => static_analysis_impossible(),
             },
             ParseTypeKind::Struct { content } => {
                 let mut ctx = struct_ctx.child();
@@ -324,4 +305,38 @@ impl RepetitionAccumulator {
             provenance: self.provenance,
         }
     }
+}
+
+/// Parses an integer.
+fn parse_int(
+    bit_width: u32,
+    signed: bool,
+    span: Span,
+    cursor: &mut Cursor,
+    diagnostics: &mut Diagnostics,
+) -> Result<Value> {
+    assert!(
+        bit_width.is_multiple_of(8),
+        "non byte aligned integers currently unimplemented"
+    );
+    let size_in_bytes = (bit_width / 8) as usize;
+
+    let endianness = *cursor.endianness();
+    let (parsed_bytes, provenance) = cursor.read_bytes_and_advance(
+        Len::from(u64::try_from(size_in_bytes).static_analysis_expect()),
+        span,
+        diagnostics,
+    )?;
+
+    let num = match (endianness, signed) {
+        (Endianness::Little, true) => Int::from_signed_bytes_le(&parsed_bytes),
+        (Endianness::Big, true) => Int::from_signed_bytes_be(&parsed_bytes),
+        (Endianness::Little, false) => Int::from_bytes_le(num_bigint::Sign::Plus, &parsed_bytes),
+        (Endianness::Big, false) => Int::from_bytes_be(num_bigint::Sign::Plus, &parsed_bytes),
+    };
+
+    Ok(Value {
+        kind: ValueKind::Integer(num),
+        provenance,
+    })
 }

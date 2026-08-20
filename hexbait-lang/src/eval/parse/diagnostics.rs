@@ -65,7 +65,7 @@ pub struct ParseErr {
 
 impl ParseErr {
     /// Creates a new parse error.
-    pub fn new(error: DiagnosticId) -> ParseErr {
+    fn new(error: DiagnosticId) -> ParseErr {
         ParseErr {
             error,
             partial_result: None,
@@ -79,6 +79,8 @@ impl ParseErr {
 
     /// Adds a partial result to the parse error.
     pub fn with_partial_result(self, value: Value) -> ParseErr {
+        debug_assert!(self.partial_result.is_none());
+
         ParseErr {
             error: self.error,
             partial_result: Some(value),
