@@ -30,5 +30,6 @@ pub fn check_ir(_file: &File) -> Result<ResolvedNames, AnalysisError> {
     // TODO: ensure u(_) and i(_) parse types contain int expressions
     // TODO: ensure that loops must make progress
     // TODO: ensure that there is no scope between a `recover` and the struct it references
+    // TODO: ensure that `$parent` only appears in field access references and only at the root of them
     Ok(ResolvedNames {})
 }

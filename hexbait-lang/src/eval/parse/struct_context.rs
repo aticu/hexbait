@@ -5,11 +5,12 @@ use hexbait_common::RelativeOffset;
 use crate::{
     DiagnosticId, Provenance, Value, ValueKind,
     eval::value::StructContent,
-    ir::Symbol,
+    ir::{self, Symbol},
     parse::{
         StaticAnalysisImpossible as _,
         cursor::Cursor,
         diagnostics::{ParseErr, Result},
+        static_analysis_impossible,
     },
 };
 
@@ -129,6 +130,46 @@ impl<'parent> StructContext<'parent> {
             provenance,
         }
     }
+
+    /// Evaluates a `struct` reference.
+    pub fn eval_struct_ref<'ctx>(
+        &'ctx self,
+        struct_ref: &ir::StructRef,
+        last: Option<&'ctx Value>,
+    ) -> StructRef<'ctx> {
+        match struct_ref {
+            ir::StructRef::Root(struct_ref_part) => match struct_ref_part {
+                ir::StructRefPart::Parent => {
+                    StructRef::Unfinished(self.parent().static_analysis_expect())
+                }
+                ir::StructRefPart::Last => {
+                    StructRef::Finished(last.static_analysis_expect().kind.expect_struct())
+                }
+                ir::StructRefPart::Named(name) => StructRef::Finished(
+                    self.field(&name.inner)
+                        .static_analysis_expect()
+                        .kind
+                        .expect_struct(),
+                ),
+            },
+            ir::StructRef::Chained { parent, field } => {
+                let parent = self.eval_struct_ref(parent, last);
+
+                match field {
+                    ir::StructRefPart::Parent => match parent {
+                        StructRef::Unfinished(struct_context) => {
+                            StructRef::Unfinished(struct_context.parent().static_analysis_expect())
+                        }
+                        StructRef::Finished(_) => static_analysis_impossible(),
+                    },
+                    ir::StructRefPart::Last => static_analysis_impossible(),
+                    ir::StructRefPart::Named(name) => {
+                        StructRef::Finished(parent.field(&name.inner).kind.expect_struct())
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// The different recovery strategies.
@@ -141,4 +182,27 @@ pub enum RecoveryStrategy {
         /// The offset to skip to.
         offset: RelativeOffset,
     },
+}
+
+/// A reference to a `struct` at runtime.
+pub enum StructRef<'ctx> {
+    /// A reference to a `struct` that finished parsing.
+    Finished(&'ctx [StructContent]),
+    /// A reference to a `struct` that is still being parsed.
+    Unfinished(&'ctx StructContext<'ctx>),
+}
+
+impl<'ctx> StructRef<'ctx> {
+    /// Returns the value of the given field.
+    pub fn field(&self, field: &Symbol) -> &'ctx Value {
+        let fields = match self {
+            StructRef::Finished(struct_contents) => struct_contents,
+            StructRef::Unfinished(struct_context) => &*struct_context.content,
+        };
+
+        fields
+            .iter()
+            .find_map(|content| content.val_if_name_eq(field))
+            .static_analysis_expect()
+    }
 }

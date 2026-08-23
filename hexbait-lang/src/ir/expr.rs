@@ -97,8 +97,8 @@ pub enum ExprKind {
     Len,
     /// A field access expression.
     FieldAccess {
-        /// The expression of which the field will be accessed.
-        expr: Box<Expr>,
+        /// The `struct` of which the field is accessed.
+        struct_ref: StructRef,
         /// The field to access.
         field: Spanned<Symbol>,
     },
@@ -141,4 +141,29 @@ pub enum ConcatArg {
     Direct(Expr),
     /// The concatenation works on an array of `bytes` expressions.
     Expanding(Expr),
+}
+
+/// A single part of a `struct` reference path.
+#[derive(Debug)]
+pub enum StructRefPart {
+    /// Refers to the semi-parsed parent `struct`.
+    Parent,
+    /// Refers to the parsed last element of an array.
+    Last,
+    /// A reference to a named sibling `struct`.
+    Named(Spanned<Symbol>),
+}
+
+/// A reference to a parsed or semi-parsed `struct`.
+#[derive(Debug)]
+pub enum StructRef {
+    /// The `struct` reference is just a single reference.
+    Root(StructRefPart),
+    /// The `struct` reference is part of a chain.
+    Chained {
+        /// The parent of this `struct` ref.
+        parent: Box<StructRef>,
+        /// The referenced field of this `struct` ref.
+        field: StructRefPart,
+    },
 }

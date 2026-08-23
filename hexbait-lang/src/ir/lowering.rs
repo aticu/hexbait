@@ -4,7 +4,7 @@ use crate::{
     Int,
     ast::{self, AstNode as _},
     int_from_str,
-    ir::{ConcatArg, ElsePart, IfChain, ParseTypeKind, ScopeKind},
+    ir::{ConcatArg, ElsePart, IfChain, ParseTypeKind, ScopeKind, StructRef, StructRefPart},
     lexer::TokenKind,
     span::Span,
 };
@@ -431,10 +431,53 @@ impl LoweringCtx {
             required_field!(field_access => field ? self: "expected field name" => ExprKind::Error),
         );
 
-        ExprKind::FieldAccess {
-            expr: Box::new(self.lower_expr(expr)),
-            field,
+        fn lower_struct_ref(lowering_ctx: &mut LoweringCtx, expr: ast::Expr) -> Option<StructRef> {
+            let span = expr.span();
+            let mut err = || {
+                lowering_ctx.error(
+                    "expected `$parent`, `$last`, identifier or another field access",
+                    span,
+                );
+            };
+
+            match expr {
+                ast::Expr::Atom(atom) if atom.child_kind() == Some(TokenKind::Identifier) => {
+                    let name = Spanned::<Symbol>::from(atom.child().parser_expect());
+
+                    Some(StructRef::Root(StructRefPart::Named(name)))
+                }
+                ast::Expr::Metavar(metavar) => {
+                    if metavar.text() == "$parent" {
+                        Some(StructRef::Root(StructRefPart::Parent))
+                    } else if metavar.text() == "$last" {
+                        Some(StructRef::Root(StructRefPart::Last))
+                    } else {
+                        err();
+                        None
+                    }
+                }
+                ast::Expr::FieldAccess(field_access) => Some(StructRef::Chained {
+                    parent: Box::new(lower_struct_ref(
+                        lowering_ctx,
+                        field_access.expr().parser_expect(),
+                    )?),
+                    field: StructRefPart::Named(Spanned::<Symbol>::from(
+                        required_field!(field_access => field ? lowering_ctx: "expected field name" => None),
+                    )),
+                }),
+                _ => {
+                    err();
+                    None
+                }
+            }
         }
+
+        let struct_ref = match lower_struct_ref(self, expr) {
+            Some(struct_ref) => struct_ref,
+            None => return ExprKind::Error,
+        };
+
+        ExprKind::FieldAccess { struct_ref, field }
     }
 
     /// Lowers the given AST `peek` expression to IR.

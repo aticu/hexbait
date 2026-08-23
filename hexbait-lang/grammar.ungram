@@ -268,6 +268,8 @@ InfixExpr =
   lhs:Expr Op rhs:Expr
 
 // An expression that accesses a field of a `struct` value.
+//
+// The expression here must be an ident, `$parent`, '$last' or another `FieldAccess`, otherwise this will be rejected later.
 FieldAccess =
   Expr '.' field:'ident'
 
