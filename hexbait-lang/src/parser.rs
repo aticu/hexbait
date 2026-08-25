@@ -9,8 +9,11 @@ use crate::{
 use infrastructure::{Event, Parser};
 use rowan::GreenNodeBuilder;
 
+mod diagnostics;
 mod implementation;
 mod infrastructure;
+
+pub use diagnostics::Diagnostic;
 
 /// The result of parsing.
 #[derive(Debug)]

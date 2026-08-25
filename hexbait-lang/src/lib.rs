@@ -6,7 +6,7 @@ pub mod ast;
 mod eval;
 pub mod ir;
 mod lexer;
-mod parser;
+pub mod parser;
 mod span;
 mod syntax;
 
