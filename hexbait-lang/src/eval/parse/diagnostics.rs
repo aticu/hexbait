@@ -21,7 +21,7 @@ pub enum DiagnosticLevel {
 }
 
 /// A diagnostic that occurred during parsing.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Diagnostic {
     /// The diagnostic message.
     pub message: String,

@@ -1,6 +1,6 @@
 //! Contains the actual syntax descriptions.
 
-use expressions::expr;
+pub(crate) use expressions::expr;
 
 use crate::{NodeKind, lexer::TokenKind};
 

@@ -34,6 +34,13 @@ pub fn lower_file(file: ast::File) -> File {
     File { content: out }
 }
 
+/// Lowers the given expression AST to IR.
+pub fn lower_expr(expr: ast::Expr) -> Expr {
+    let mut ctx = LoweringCtx::new();
+
+    ctx.lower_expr(expr)
+}
+
 /// The context in which lowering is performed.
 struct LoweringCtx {}
 

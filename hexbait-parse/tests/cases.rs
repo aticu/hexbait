@@ -40,7 +40,7 @@ fn cases() {
 
 /// Renders the parsed JSON for later diffing.
 fn render(spec: &str, input: &[u8]) -> String {
-    let parse = hexbait_lang::parse(spec);
+    let parse = hexbait_lang::parse_file(spec);
     assert!(
         parse.errors.is_empty(),
         "spec failed to parse: {:?}",

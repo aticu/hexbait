@@ -1,7 +1,7 @@
 //! Implements the parser for the hexbait language.
 
 use crate::{
-    ast::{AstNode as _, File},
+    ast::{AstNode, Expr, File},
     lexer::lex,
     span::Span,
     syntax::SyntaxKind,
@@ -14,9 +14,9 @@ mod infrastructure;
 
 /// The result of parsing.
 #[derive(Debug)]
-pub struct Parse {
-    /// The parsed [`File`].
-    pub ast: File,
+pub struct Parse<Result> {
+    /// The parsed result.
+    pub ast: Result,
     /// The errors that occurred during parsing.
     pub errors: Vec<ParseError>,
 }
@@ -32,11 +32,23 @@ pub struct ParseError {
     pub expected: Vec<&'static str>,
 }
 
+/// Parses the given file content.
+pub fn parse_file(src: &str) -> Parse<File> {
+    parse(src, implementation::root)
+}
+
+/// Parses the given expression.
+pub fn parse_expr(src: &str) -> Parse<Expr> {
+    parse(src, |p| {
+        implementation::expr(p);
+    })
+}
+
 /// Parses the given text.
-pub fn parse(src: &str) -> Parse {
+fn parse<Result: AstNode>(src: &str, parse_fn: impl FnOnce(&mut Parser)) -> Parse<Result> {
     let tokens = lex(src);
     let mut p = Parser::new(src, &tokens);
-    implementation::root(&mut p);
+    parse_fn(&mut p);
 
     let mut builder = GreenNodeBuilder::new();
     let mut tok_idx = 0;
@@ -104,7 +116,7 @@ pub fn parse(src: &str) -> Parse {
 
     let syntax_node = rowan::SyntaxNode::<crate::syntax::Language>::new_root(green);
     Parse {
-        ast: File::cast(syntax_node).expect("root node is always `File`"),
+        ast: Result::cast(syntax_node).expect("root node is always `File`"),
         errors,
     }
 }

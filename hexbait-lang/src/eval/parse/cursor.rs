@@ -69,13 +69,16 @@ pub struct Cursor {
 
 impl Cursor {
     /// Creates a new cursor.
-    pub fn new(view: View, offset: RelativeOffset) -> Result<Cursor, SeekError> {
+    pub fn new(
+        view: View,
+        offset: RelativeOffset,
+        endianness: Endianness,
+    ) -> Result<Cursor, SeekError> {
         let end = view.end_offset();
 
         if offset <= end {
             Ok(Cursor {
-                // static analysis makes sure that this is set to the correct value before parsing
-                endianness: Endianness::Little,
+                endianness,
                 offset,
                 view,
             })

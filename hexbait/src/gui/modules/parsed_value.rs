@@ -105,7 +105,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
                 let Ok(content) = std::fs::read_to_string(path) else {
                     break 'parse_type None;
                 };
-                let parse = hexbait_lang::parse(&content);
+                let parse = hexbait_lang::parse_file(&content);
                 if !parse.errors.is_empty() {
                     break 'parse_type None;
                 }
@@ -189,7 +189,7 @@ pub enum HoverInfo {
 /// Displays the given [`Value`] in the GUI.
 ///
 /// The return value is the path of the hovered value.
-fn show_value(
+pub fn show_value(
     ui: &mut Ui,
     state: &mut State,
     path: Path,

@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+pub use console_state::{ConsoleEntry, ConsoleState};
 pub use format_discovery_state::{ColumnInfo, ColumnType, FormatDiscoveryState};
 use hexbait_common::{Endianness, Input};
 pub use parse_state::{ParseState, ParseType};
@@ -16,6 +17,7 @@ use crate::{
     statistics::StatisticsHandler,
 };
 
+mod console_state;
 mod format_discovery_state;
 mod parse_state;
 mod scroll_state;
@@ -44,6 +46,8 @@ pub struct State {
     pub marked_locations: MarkStore,
     /// The format discovery mode state.
     pub format_discovery: FormatDiscoveryState,
+    /// The console state.
+    pub console: ConsoleState,
     /// The currently selected endianness.
     pub endianness: Endianness,
 }
@@ -61,6 +65,7 @@ impl State {
             statistics_handler: StatisticsHandler::new(input.clone()),
             marked_locations: MarkStore::new(),
             format_discovery: FormatDiscoveryState::new(),
+            console: ConsoleState::new(),
             endianness: Endianness::native(),
         }
     }

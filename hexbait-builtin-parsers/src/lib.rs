@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use hexbait_lang::{
     check_ir,
     ir::{File, lower_file},
-    parse,
+    parse_file,
 };
 
 include!(concat!(env!("OUT_DIR"), "/built_in.gen.rs"));
@@ -17,7 +17,7 @@ pub fn built_in_format_descriptions() -> BTreeMap<&'static str, File> {
         .map(|&(name, content)| {
             let name = name.strip_suffix(".hbl").unwrap_or(name);
 
-            let parse = parse(content);
+            let parse = parse_file(content);
             // TODO: handle errors better here
             assert!(parse.errors.is_empty());
             let ir = lower_file(parse.ast);

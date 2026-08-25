@@ -6,6 +6,7 @@ use hexbait_common::Input;
 use crate::state::State;
 
 mod bars;
+pub mod console;
 pub mod content;
 pub mod data_inspector;
 pub mod format_discovery;
@@ -37,6 +38,8 @@ pub enum TabType {
     Search,
     /// Shows the marking menu.
     Marking,
+    /// Shows the hexbait console.
+    Console,
 }
 
 /// The context for the hexbait application.
@@ -64,6 +67,7 @@ impl egui_dock::TabViewer for Context {
             TabType::Settings => settings::show,
             TabType::Search => search::show,
             TabType::Marking => marking::show,
+            TabType::Console => console::show,
         };
 
         show_fn(ui, &mut self.state, &self.input);
@@ -95,6 +99,7 @@ pub fn hex_dock_state() -> DockState<TabType> {
     surface.set_focused_node(parsed_value);
     surface.push_to_focused_leaf(TabType::Search);
     surface.push_to_focused_leaf(TabType::Marking);
+    surface.push_to_focused_leaf(TabType::Console);
     surface.set_active_tab(parsed_value, 0).unwrap();
 
     dock_state

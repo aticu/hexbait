@@ -13,7 +13,7 @@ mod syntax;
 pub use {
     eval::*,
     ir::check_ir,
-    parser::parse,
+    parser::{parse_expr, parse_file},
     span::Span,
     syntax::{Language, NodeKind, SyntaxKind, SyntaxNode, SyntaxToken},
 };

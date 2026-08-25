@@ -3,7 +3,7 @@
 use std::fmt;
 
 use crate::{
-    ir::{ElsePart, File, IfChain, LetStatement, StructContent, StructField},
+    ir::{ElsePart, Expr, File, IfChain, LetStatement, StructContent, StructField},
     parse::{
         cursor::Cursor,
         diagnostics::{Diagnostics, Result},
@@ -13,7 +13,7 @@ use crate::{
 
 use super::{value::Value, view::View};
 
-use hexbait_common::RelativeOffset;
+use hexbait_common::{Endianness, RelativeOffset};
 
 pub use diagnostics::{Diagnostic, DiagnosticId, DiagnosticLevel};
 
@@ -25,6 +25,7 @@ mod parse_ty;
 mod struct_context;
 
 /// The result of parsing.
+#[derive(Debug, Clone)]
 pub struct ParseResult {
     /// The parsed value.
     pub value: Value,
@@ -36,7 +37,8 @@ pub struct ParseResult {
 pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseResult {
     let mut struct_ctx = StructContext::new();
     // the start offset should always be valid
-    let mut cursor = Cursor::new(view, start_offset).static_analysis_expect();
+    // static analysis makes sure that the endianness is set to the correct value before parsing
+    let mut cursor = Cursor::new(view, start_offset, Endianness::Little).static_analysis_expect();
 
     let mut parse_ctx = ParseContext {
         diagnostics: Diagnostics::new(),
@@ -49,6 +51,24 @@ pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseRe
     ParseResult {
         value: struct_ctx.into_value(),
         diagnostics: parse_ctx.diagnostics.into_diagnostics(),
+    }
+}
+
+/// Evaluates the given IR expression on the given view.
+pub fn eval_expr(expr: &Expr, endianness: Endianness, view: View) -> ParseResult {
+    let struct_ctx = StructContext::new();
+    let cursor = Cursor::new(view, RelativeOffset::ZERO, endianness).static_analysis_expect();
+
+    let mut parse_ctx = ParseContext {
+        diagnostics: Diagnostics::new(),
+    };
+
+    match parse_ctx.eval_expr(expr, &cursor, &struct_ctx, Default::default()) {
+        Ok(value) => ParseResult {
+            value,
+            diagnostics: parse_ctx.diagnostics.into_diagnostics(),
+        },
+        Err(_) => todo!(),
     }
 }
 

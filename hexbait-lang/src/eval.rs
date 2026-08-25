@@ -5,7 +5,7 @@ mod provenance;
 mod value;
 pub(crate) mod view;
 
-pub use parse::{Diagnostic, DiagnosticId, DiagnosticLevel, ParseResult, eval_ir};
+pub use parse::{Diagnostic, DiagnosticId, DiagnosticLevel, ParseResult, eval_expr, eval_ir};
 pub use provenance::Provenance;
 pub use value::{BytesValue, StructContent, Value, ValueKind};
 pub use view::View;
