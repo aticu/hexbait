@@ -27,7 +27,7 @@ fn cases() {
             let input =
                 parse_hex(&hex_text).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
             let debug_info = format!("\n=== Spec ===\n{spec}\n\n=== Hex ===\n{hex_text}");
-            insta::assert_snapshot!(name, render(&spec, &input), &debug_info);
+            insta::assert_snapshot!(name.clone(), render(&name, &spec, &input), &debug_info);
 
             tests_run += 1;
         }
@@ -39,13 +39,12 @@ fn cases() {
 }
 
 /// Renders the parsed JSON for later diffing.
-fn render(spec: &str, input: &[u8]) -> String {
-    let parse = hexbait_lang::parse_file(spec);
-    assert!(
-        parse.errors.is_empty(),
-        "spec failed to parse: {:?}",
-        parse.errors
-    );
+fn render(name: &str, spec: &str, input: &[u8]) -> String {
+    let parse = hexbait_lang::parse_file(name, spec);
+    parse.emit_diagnostics_to_stderr();
+    if !parse.diagnostics.is_empty() {
+        panic!("test case did not compile correctly");
+    }
 
     let ir = lower_file(parse.ast);
     let view = View::from_input(Input::from_bytes(input));

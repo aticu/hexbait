@@ -102,11 +102,13 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
                 state.parse_state.built_in_format_descriptions.get(builtin)
             }
             ParseType::Custom(path) => {
+                let source_name = path.display().to_string();
                 let Ok(content) = std::fs::read_to_string(path) else {
                     break 'parse_type None;
                 };
-                let parse = hexbait_lang::parse_file(&content);
-                if !parse.errors.is_empty() {
+                let parse = hexbait_lang::parse_file(&source_name, &content);
+                parse.emit_diagnostics_to_stderr();
+                if !parse.diagnostics.is_empty() {
                     break 'parse_type None;
                 }
                 ir = hexbait_lang::ir::lower_file(parse.ast);

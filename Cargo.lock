@@ -1731,6 +1731,7 @@ dependencies = [
 name = "hexbait-lang"
 version = "0.1.0"
 dependencies = [
+ "codespan-reporting",
  "heck",
  "hexbait-common",
  "logos",

@@ -3,7 +3,6 @@
 use crate::{
     ast::{AstNode, Expr, File},
     lexer::lex,
-    span::Span,
     syntax::SyntaxKind,
 };
 use infrastructure::{Event, Parser};
@@ -17,40 +16,48 @@ pub use diagnostics::Diagnostic;
 
 /// The result of parsing.
 #[derive(Debug)]
-pub struct Parse<Result> {
+pub struct Parse<'src, Result> {
+    /// The name of the source.
+    pub source_name: &'src str,
+    /// The source that was parsed from.
+    pub source: &'src str,
     /// The parsed result.
     pub ast: Result,
-    /// The errors that occurred during parsing.
-    pub errors: Vec<ParseError>,
+    /// The diagnostics that occurred during parsing.
+    pub diagnostics: Vec<Diagnostic>,
 }
 
-/// A single parsing error.
-#[derive(Debug, Clone)]
-pub struct ParseError {
-    /// The error message.
-    pub message: String,
-    /// The [`Span`] at which parsing failed.
-    pub span: Span,
-    /// The tokens that were expected instead of the found token.
-    pub expected: Vec<&'static str>,
+impl<Result> Parse<'_, Result> {
+    /// Emits the diagnostics to stderr.
+    pub fn emit_diagnostics_to_stderr(&self) {
+        for diagnostic in &self.diagnostics {
+            diagnostic
+                .emit_to_stderr(self.source_name, self.source)
+                .unwrap();
+        }
+    }
 }
 
 /// Parses the given file content.
-pub fn parse_file(src: &str) -> Parse<File> {
-    parse(src, implementation::root)
+pub fn parse_file<'src>(source_name: &'src str, source: &'src str) -> Parse<'src, File> {
+    parse(source_name, source, implementation::root)
 }
 
 /// Parses the given expression.
-pub fn parse_expr(src: &str) -> Parse<Expr> {
-    parse(src, |p| {
+pub fn parse_expr<'src>(source_name: &'src str, source: &'src str) -> Parse<'src, Expr> {
+    parse(source_name, source, |p| {
         implementation::expr(p);
     })
 }
 
 /// Parses the given text.
-fn parse<Result: AstNode>(src: &str, parse_fn: impl FnOnce(&mut Parser)) -> Parse<Result> {
-    let tokens = lex(src);
-    let mut p = Parser::new(src, &tokens);
+fn parse<'src, Result: AstNode>(
+    source_name: &'src str,
+    source: &'src str,
+    parse_fn: impl FnOnce(&mut Parser),
+) -> Parse<'src, Result> {
+    let tokens = lex(source);
+    let mut p = Parser::new(source, &tokens);
     parse_fn(&mut p);
 
     let mut builder = GreenNodeBuilder::new();
@@ -100,7 +107,7 @@ fn parse<Result: AstNode>(src: &str, parse_fn: impl FnOnce(&mut Parser)) -> Pars
                     <crate::syntax::Language as rowan::Language>::kind_to_raw(SyntaxKind::from(
                         t.kind,
                     )),
-                    &src[t.span.start..t.span.end],
+                    &source[t.span.start..t.span.end],
                 );
             }
             Event::Finish => builder.finish_node(),
@@ -108,7 +115,7 @@ fn parse<Result: AstNode>(src: &str, parse_fn: impl FnOnce(&mut Parser)) -> Pars
         }
     }
     let green = builder.finish();
-    let errors = p
+    let diagnostics = p
         .events()
         .iter()
         .filter_map(|e| match e {
@@ -119,7 +126,9 @@ fn parse<Result: AstNode>(src: &str, parse_fn: impl FnOnce(&mut Parser)) -> Pars
 
     let syntax_node = rowan::SyntaxNode::<crate::syntax::Language>::new_root(green);
     Parse {
+        source_name,
+        source,
         ast: Result::cast(syntax_node).expect("root node is always `File`"),
-        errors,
+        diagnostics,
     }
 }

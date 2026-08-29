@@ -3,10 +3,9 @@
 use crate::{
     NodeKind,
     lexer::{Token, TokenKind},
+    parser::{Diagnostic, diagnostics::Label},
     span::Span,
 };
-
-use super::ParseError;
 
 /// A marker for a started node.
 #[derive(Clone, Copy)]
@@ -65,7 +64,7 @@ pub(crate) enum Event {
     /// Consumes a single token.
     Token,
     /// Records a parsing error.
-    Error(ParseError),
+    Error(Diagnostic),
     /// Finishes the previously started node.
     Finish,
 }
@@ -309,11 +308,29 @@ impl<'src> Parser<'src> {
             end: self.src.len(),
         });
 
-        self.events.push(Event::Error(ParseError {
-            message: "expected something else".into(),
-            span,
-            expected,
-        }));
+        let message = match expected.len() {
+            0 => unreachable!(),
+            1 => format!("expected {}", expected[0]),
+            _ => format!(
+                "expected {} or {}",
+                expected[..expected.len() - 1].join(", "),
+                expected.last().unwrap()
+            ),
+        };
+
+        self.events.push(Event::Error(Diagnostic::error(
+            message,
+            Label::new(
+                format!(
+                    "found unexpected token {}",
+                    self.tokens
+                        .get(self.pos)
+                        .map(|token| format!("{}", token.kind))
+                        .unwrap_or_else(|| String::from("end of file"))
+                ),
+                span,
+            ),
+        )));
 
         self.recover(&[TokenKind::Semicolon]);
     }

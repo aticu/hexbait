@@ -51,11 +51,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let parser = match (config.custom, config.parse_as) {
         (Some(path), _) => {
-            let content = std::fs::read_to_string(path)?;
+            let content = std::fs::read_to_string(&path)?;
+            let source_name = path.display().to_string();
 
-            let parse = parse_file(&content);
-            // TODO: handle errors better here
-            assert!(parse.errors.is_empty());
+            let parse = parse_file(&source_name, &content);
+            parse.emit_diagnostics_to_stderr();
+            if !parse.diagnostics.is_empty() {
+                std::process::exit(1);
+            }
 
             lower_file(parse.ast)
         }

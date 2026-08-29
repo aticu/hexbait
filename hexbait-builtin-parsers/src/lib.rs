@@ -17,9 +17,11 @@ pub fn built_in_format_descriptions() -> BTreeMap<&'static str, File> {
         .map(|&(name, content)| {
             let name = name.strip_suffix(".hbl").unwrap_or(name);
 
-            let parse = parse_file(content);
-            // TODO: handle errors better here
-            assert!(parse.errors.is_empty());
+            let parse = parse_file(name, content);
+            parse.emit_diagnostics_to_stderr();
+            if !parse.diagnostics.is_empty() {
+                std::process::exit(1);
+            }
             let ir = lower_file(parse.ast);
             // TODO: use these
             let _resolved_names = check_ir(&ir).unwrap();

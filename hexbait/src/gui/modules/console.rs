@@ -19,10 +19,10 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
         state.console.current_text().clear();
 
         if !query.is_empty() {
-            let parse = parse_expr(&query);
-            if !parse.errors.is_empty() {
-                dbg!(query, parse.errors);
-                panic!();
+            let parse = parse_expr("console_input", &query);
+            parse.emit_diagnostics_to_stderr();
+            if !parse.diagnostics.is_empty() {
+                std::process::exit(1);
             }
             let ir = lower_expr(parse.ast);
 
