@@ -1,8 +1,8 @@
 //! Implements the console module.
 
 use egui::Ui;
-use hexbait_common::Input;
-use hexbait_lang::{View, ir::lower_expr, parse_expr};
+use hexbait_common::{AbsoluteOffset, Input, Len};
+use hexbait_lang::{ValueKind, View, ir::lower_expr, parse_expr};
 
 use crate::{
     gui::modules::parsed_value::show_value,
@@ -48,5 +48,15 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
             &entry.result.value,
             &entry.result.diagnostics,
         );
+
+        if let ValueKind::Integer(int) = &entry.result.value.kind
+            && let Ok(int) = u64::try_from(int)
+            && Len::from(int) < input.len()
+            && ui.button("Jump to offset").clicked()
+        {
+            state
+                .scroll_state
+                .rearrange_bars_for_point(0, AbsoluteOffset::from(int));
+        }
     }
 }
