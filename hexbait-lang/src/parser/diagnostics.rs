@@ -6,6 +6,10 @@ use std::io;
 
 use crate::Span;
 
+pub use custom_emitter::{DiagnosticEmitter, RgbColor, Style};
+
+mod custom_emitter;
+
 /// A diagnostic that occurred while parsing the hexbait language.
 #[derive(Debug, Clone)]
 pub struct Diagnostic {
@@ -97,7 +101,7 @@ impl Diagnostic {
             }))
     }
 
-    /// Emits the given diagnostic to the given writer.
+    /// Emits the diagnostic to the given writer.
     pub fn emit_to_stderr(&self, source_name: &str, source_text: &str) -> io::Result<()> {
         let file = codespan_reporting::files::SimpleFile::new(source_name, source_text);
         let diagnostic = self.to_codespan_reporting_diagnostic();
@@ -117,6 +121,29 @@ impl Diagnostic {
                 codespan_reporting::files::Error::Io(err) => Err(err),
                 _ => unreachable!("this is a bug"),
             },
+        }
+    }
+
+    /// Emits the diagnostic.
+    pub fn emit<E: DiagnosticEmitter>(
+        &self,
+        emitter: &mut E,
+        source_name: &str,
+        source_text: &str,
+    ) {
+        let file = codespan_reporting::files::SimpleFile::new(source_name, source_text);
+        let diagnostic = self.to_codespan_reporting_diagnostic();
+
+        let config = codespan_reporting::term::Config::default();
+
+        match codespan_reporting::term::emit_to_write_style(
+            &mut custom_emitter::Emitter(emitter),
+            &config,
+            &file,
+            &diagnostic,
+        ) {
+            Ok(()) => (),
+            Err(_) => unreachable!("this is a bug"),
         }
     }
 }

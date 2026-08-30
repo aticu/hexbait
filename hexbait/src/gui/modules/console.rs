@@ -5,7 +5,7 @@ use hexbait_common::{AbsoluteOffset, Input, Len};
 use hexbait_lang::{ValueKind, View, ir::lower_expr, parse_expr};
 
 use crate::{
-    gui::modules::parsed_value::show_value,
+    gui::{diagnostic_emitter::emit_diagnostics, modules::parsed_value::show_value},
     state::{ConsoleEntry, State},
 };
 
@@ -20,8 +20,9 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
 
         if !query.is_empty() {
             let parse = parse_expr("console_input", &query);
-            parse.emit_diagnostics_to_stderr();
+            emit_diagnostics(ui, &parse);
             if !parse.diagnostics.is_empty() {
+                parse.emit_diagnostics_to_stderr();
                 std::process::exit(1);
             }
             let ir = lower_expr(parse.ast);

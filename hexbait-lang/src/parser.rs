@@ -12,7 +12,7 @@ mod diagnostics;
 mod implementation;
 mod infrastructure;
 
-pub use diagnostics::Diagnostic;
+pub use diagnostics::{Diagnostic, DiagnosticEmitter, RgbColor, Style};
 
 /// The result of parsing.
 #[derive(Debug)]

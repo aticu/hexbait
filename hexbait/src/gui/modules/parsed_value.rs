@@ -11,6 +11,7 @@ use hexbait_lang::{
 };
 
 use crate::{
+    gui::diagnostic_emitter::emit_diagnostics,
     marking::MarkType,
     state::{ParseType, State},
 };
@@ -107,7 +108,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
                     break 'parse_type None;
                 };
                 let parse = hexbait_lang::parse_file(&source_name, &content);
-                parse.emit_diagnostics_to_stderr();
+                emit_diagnostics(ui, &parse);
                 if !parse.diagnostics.is_empty() {
                     break 'parse_type None;
                 }
