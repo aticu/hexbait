@@ -53,7 +53,7 @@ fn atom<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
                         }
                         Some(TokenKind::RParen) => break,
                         _ => {
-                            p.expect_error(vec!["`,`", "`)`"]);
+                            p.expect_error(&["`,`", "`)`"]);
                             break;
                         }
                     }
@@ -94,7 +94,9 @@ fn atom<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
                     ) => p.expect(lit),
                     _ => {
                         p.dbg();
-                        todo!("error")
+
+                        p.expect_error(&["a two character hex-literal like `00`, `0a` or `a0`"]);
+                        break;
                     }
                 }
             }
@@ -106,7 +108,7 @@ fn atom<'p, 'src>(p: &'p mut Parser<'src>) -> Completed<'p, 'src> {
             (NodeKind::ParenExpr, TokenKind::RParen)
         }
         _ => {
-            p.expect_error(vec![
+            p.expect_error(&[
                 "identifier",
                 "literal",
                 "`peek`",

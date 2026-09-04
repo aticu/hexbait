@@ -195,7 +195,9 @@ impl<'src> Parser<'src> {
 
             Some(&self.src[span.start..span.end])
         } else {
-            todo!("better error message here")
+            self.expect_error(&["contextual keyword"]);
+
+            None
         }
     }
 
@@ -209,7 +211,9 @@ impl<'src> Parser<'src> {
 
             Some(&self.src[span.start..span.end])
         } else {
-            todo!("better error message here")
+            self.expect_error(&["contextual keyword"]);
+
+            None
         }
     }
 
@@ -218,7 +222,7 @@ impl<'src> Parser<'src> {
         if self.cur() == Some(kind) {
             self.bump();
         } else {
-            self.expect_error(vec![kind.name()]);
+            self.expect_error(&[kind.name()]);
         }
     }
 
@@ -279,7 +283,7 @@ impl<'src> Parser<'src> {
         if self.cur() == Some(expected) {
             self.bump_raw();
         } else {
-            self.expect_error(vec![expected.name()]);
+            self.expect_error(&[expected.name()]);
         }
 
         let completed_marker = self.complete(m, kind);
@@ -303,7 +307,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Creates an error.
-    pub(crate) fn expect_error(&mut self, expected: Vec<&'static str>) {
+    pub(crate) fn expect_error(&mut self, expected: &[&'static str]) {
         let span = self.tokens.get(self.pos).map(|t| t.span).unwrap_or(Span {
             start: self.src.len(),
             end: self.src.len(),
