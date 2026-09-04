@@ -18,7 +18,7 @@ pub fn built_in_format_descriptions() -> BTreeMap<&'static str, File> {
                 CompileResult::WithWarnings { ir: _, diagnostics }
                 | CompileResult::Failure { diagnostics } => {
                     diagnostics.emit_to_stderr();
-                    std::process::exit(1);
+                    panic!("built-in format description contained diagnostics");
                 }
             };
 
