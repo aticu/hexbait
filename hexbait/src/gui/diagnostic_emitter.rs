@@ -2,17 +2,21 @@
 
 use egui::text::{LayoutJob, TextFormat};
 use egui::{Color32, FontId, Stroke, TextStyle, Ui};
-use hexbait_lang::parser::{DiagnosticEmitter, Parse, RgbColor, Style};
+use hexbait_lang::compile::{DiagnosticEmitter, Diagnostics, RgbColor, Style};
 
 /// Emits the given diagnostic into the [`Ui`].
-pub fn emit_diagnostics<T>(ui: &mut Ui, parse: &Parse<T>) {
-    for diagnostic in &parse.diagnostics {
+pub fn emit_diagnostics(ui: &mut Ui, diagnostics: &Diagnostics) {
+    for diagnostic in diagnostics {
         let mut emitter = LayoutJobEmitter::new(
             TextStyle::Monospace.resolve(ui.style()),
             ui.visuals().text_color(),
         );
 
-        diagnostic.emit(&mut emitter, parse.source_name, parse.source);
+        diagnostic.emit(
+            &mut emitter,
+            diagnostics.source_name(),
+            diagnostics.source_text(),
+        );
 
         ui.label(emitter.into_job());
     }

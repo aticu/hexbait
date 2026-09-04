@@ -2,11 +2,13 @@
 
 use crate::{
     Int,
-    ast::{self, AstNode as _},
+    compile::{
+        ast::{self, AstNode as _},
+        ir::{ConcatArg, ElsePart, IfChain, ParseTypeKind, ScopeKind, StructRef, StructRefPart},
+        lexer::TokenKind,
+        span::Span,
+    },
     int_from_str,
-    ir::{ConcatArg, ElsePart, IfChain, ParseTypeKind, ScopeKind, StructRef, StructRefPart},
-    lexer::TokenKind,
-    span::Span,
 };
 
 use super::{

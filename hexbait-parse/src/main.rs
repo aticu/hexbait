@@ -9,7 +9,10 @@ use std::path::PathBuf;
 use clap::Parser;
 use hexbait_builtin_parsers::built_in_format_descriptions;
 use hexbait_common::{Input, RelativeOffset};
-use hexbait_lang::{View, eval_ir, ir::lower_file, parse_file};
+use hexbait_lang::{
+    compile::{CompileResult, compile_file},
+    eval::{View, eval_ir},
+};
 use hexbait_parse::result_to_json;
 
 /// hexbait-parser - parses bytes to json according to .hbl-definitions
@@ -54,13 +57,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let content = std::fs::read_to_string(&path)?;
             let source_name = path.display().to_string();
 
-            let parse = parse_file(&source_name, &content);
-            parse.emit_diagnostics_to_stderr();
-            if !parse.diagnostics.is_empty() {
-                std::process::exit(1);
+            match compile_file(&source_name, &content) {
+                CompileResult::NoDiagnostics { ir } => ir,
+                CompileResult::WithWarnings { ir, diagnostics } => {
+                    diagnostics.emit_to_stderr();
+                    ir
+                }
+                CompileResult::Failure { diagnostics } => {
+                    diagnostics.emit_to_stderr();
+                    std::process::exit(1);
+                }
             }
-
-            lower_file(parse.ast)
         }
         (None, Some(name)) => {
             if let Some(parser) = builtin.remove(&*name) {

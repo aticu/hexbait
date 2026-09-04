@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::{Int, span::Span};
+use crate::{Int, compile::Span};
 
 use super::{ParseType, Spanned, Symbol};
 

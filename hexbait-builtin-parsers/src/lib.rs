@@ -2,11 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use hexbait_lang::{
-    check_ir,
-    ir::{File, lower_file},
-    parse_file,
-};
+use hexbait_lang::compile::{CompileResult, compile_file, ir::File};
 
 include!(concat!(env!("OUT_DIR"), "/built_in.gen.rs"));
 
@@ -17,14 +13,14 @@ pub fn built_in_format_descriptions() -> BTreeMap<&'static str, File> {
         .map(|&(name, content)| {
             let name = name.strip_suffix(".hbl").unwrap_or(name);
 
-            let parse = parse_file(name, content);
-            parse.emit_diagnostics_to_stderr();
-            if !parse.diagnostics.is_empty() {
-                std::process::exit(1);
-            }
-            let ir = lower_file(parse.ast);
-            // TODO: use these
-            let _resolved_names = check_ir(&ir).unwrap();
+            let ir = match compile_file(name, content) {
+                CompileResult::NoDiagnostics { ir } => ir,
+                CompileResult::WithWarnings { ir: _, diagnostics }
+                | CompileResult::Failure { diagnostics } => {
+                    diagnostics.emit_to_stderr();
+                    std::process::exit(1);
+                }
+            };
 
             (name, ir)
         })

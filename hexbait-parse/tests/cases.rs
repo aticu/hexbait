@@ -3,7 +3,10 @@
 use std::ffi::OsStr;
 
 use hexbait_common::{Input, RelativeOffset};
-use hexbait_lang::{View, eval_ir, ir::lower_file};
+use hexbait_lang::{
+    compile::{CompileResult, compile_file},
+    eval::{View, eval_ir},
+};
 use hexbait_parse::result_to_json;
 
 /// Goes through all test cases.
@@ -40,13 +43,15 @@ fn cases() {
 
 /// Renders the parsed JSON for later diffing.
 fn render(name: &str, spec: &str, input: &[u8]) -> String {
-    let parse = hexbait_lang::parse_file(name, spec);
-    parse.emit_diagnostics_to_stderr();
-    if !parse.diagnostics.is_empty() {
-        panic!("test case did not compile correctly");
-    }
+    let ir = match compile_file(name, spec) {
+        CompileResult::NoDiagnostics { ir } => ir,
+        CompileResult::WithWarnings { ir: _, diagnostics }
+        | CompileResult::Failure { diagnostics } => {
+            diagnostics.emit_to_stderr();
+            panic!("test case did not compile correctly");
+        }
+    };
 
-    let ir = lower_file(parse.ast);
     let view = View::from_input(Input::from_bytes(input));
     let result = eval_ir(&ir, view, RelativeOffset::ZERO);
 

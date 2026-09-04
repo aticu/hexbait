@@ -4,7 +4,7 @@ use std::{io, ops::Range, sync::Arc};
 
 use hexbait_common::{Input, Len, ReadBytes, RelativeOffset};
 
-use crate::BytesValue;
+use crate::eval::BytesValue;
 
 use super::provenance::Provenance;
 

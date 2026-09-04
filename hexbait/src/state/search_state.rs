@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use hexbait_common::Input;
-use hexbait_lang::ir::str_lit_content_to_bytes;
+use hexbait_lang::compile::ir::str_lit_content_to_bytes;
 
 use crate::search::Searcher;
 

@@ -3,14 +3,20 @@
 use hexbait_common::{Len, RelativeOffset};
 
 use crate::{
-    BytesValue, Diagnostic, DiagnosticLevel, Int, Provenance, Span, View,
-    ir::{Declaration, ScopeKind},
-    parse::{
-        ParseContext, StaticAnalysisImpossible as _,
-        cursor::Cursor,
-        diagnostics::{Result, SeekError},
-        static_analysis_impossible,
-        struct_context::{RecoveryStrategy, StructContext},
+    Int,
+    compile::{
+        Span,
+        ir::{Declaration, ScopeKind},
+    },
+    eval::{
+        BytesValue, Diagnostic, DiagnosticLevel, Provenance, View,
+        parse::{
+            ParseContext, StaticAnalysisImpossible as _,
+            cursor::Cursor,
+            diagnostics::{Result, SeekError},
+            static_analysis_impossible,
+            struct_context::{RecoveryStrategy, StructContext},
+        },
     },
 };
 

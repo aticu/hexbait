@@ -3,17 +3,20 @@
 use egui::{FontId, Key, Layout, Response, RichText, ScrollArea, TextStyle, Ui, UiBuilder};
 use hexbait_common::{AbsoluteOffset, Input, RelativeOffset};
 use hexbait_lang::{
-    Diagnostic, DiagnosticId, DiagnosticLevel, StructContent, Value, ValueKind, View,
-    ir::{
-        Symbol,
-        path::{Path, PathComponent},
+    compile::{
+        CompileResult, compile_file,
+        ir::{
+            Symbol,
+            path::{Path, PathComponent},
+        },
     },
+    eval::{Diagnostic, DiagnosticId, DiagnosticLevel, StructContent, Value, ValueKind, View},
 };
 
 use crate::{
     gui::diagnostic_emitter::emit_diagnostics,
     marking::MarkType,
-    state::{ParseType, State},
+    state::{ParseType, ScrollState, Settings, State},
 };
 
 /// Shows the parsed value module.
@@ -107,12 +110,22 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
                 let Ok(content) = std::fs::read_to_string(path) else {
                     break 'parse_type None;
                 };
-                let parse = hexbait_lang::parse_file(&source_name, &content);
-                emit_diagnostics(ui, &parse);
-                if !parse.diagnostics.is_empty() {
-                    break 'parse_type None;
+                match compile_file(&source_name, &content) {
+                    CompileResult::NoDiagnostics { ir: compiled_ir } => {
+                        ir = compiled_ir;
+                    }
+                    CompileResult::WithWarnings {
+                        ir: compiled_ir,
+                        diagnostics,
+                    } => {
+                        ir = compiled_ir;
+                        emit_diagnostics(ui, &diagnostics);
+                    }
+                    CompileResult::Failure { diagnostics } => {
+                        emit_diagnostics(ui, &diagnostics);
+                        break 'parse_type None;
+                    }
                 }
-                ir = hexbait_lang::ir::lower_file(parse.ast);
 
                 Some(&ir)
             }
@@ -131,15 +144,16 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
 
     let view = View::from_input(input.clone());
     let view = view.subview(parse_offset.to_relative()..view.len().as_relative_offset());
-    let result = hexbait_lang::eval_ir(parse_type, view, RelativeOffset::ZERO);
+    let result = hexbait_lang::eval::eval_ir(parse_type, view, RelativeOffset::ZERO);
 
     let hovered = ScrollArea::vertical()
         .auto_shrink([false, true])
         .show(ui, |ui| {
             show_value(
                 ui,
-                state,
-                hexbait_lang::ir::path::Path::new(),
+                &state.settings,
+                &mut state.scroll_state,
+                Path::new(),
                 None,
                 &result.value,
                 &result.diagnostics,
@@ -194,7 +208,8 @@ pub enum HoverInfo {
 /// The return value is the path of the hovered value.
 pub fn show_value(
     ui: &mut Ui,
-    state: &mut State,
+    settings: &Settings,
+    scroll_state: &mut ScrollState,
     path: Path,
     name: Option<&Symbol>,
     value: &Value,
@@ -243,7 +258,7 @@ pub fn show_value(
                                 ui.label(
                                     RichText::new(format!("{byte:02x}"))
                                         .font(hex_font.clone())
-                                        .color(state.settings.byte_color(*byte)),
+                                        .color(settings.byte_color(*byte)),
                                 ),
                             );
                             if i != bytes.len() - 1 {
@@ -261,7 +276,7 @@ pub fn show_value(
                                 ui.label(
                                     RichText::new(format!("{byte:02x} "))
                                         .font(hex_font.clone())
-                                        .color(state.settings.byte_color(*byte)),
+                                        .color(settings.byte_color(*byte)),
                                 ),
                             );
                         }
@@ -273,7 +288,7 @@ pub fn show_value(
                                 ui.label(
                                     RichText::new(format!(" {byte:02x}"))
                                         .font(hex_font.clone())
-                                        .color(state.settings.byte_color(*byte)),
+                                        .color(settings.byte_color(*byte)),
                                 ),
                             );
                         }
@@ -289,7 +304,7 @@ pub fn show_value(
                 handle_response(ui.label(format!("{name_prefix}{{")));
 
                 let mut child_rect = ui.cursor().intersect(ui.max_rect());
-                child_rect.min.x += state.settings.font_size();
+                child_rect.min.x += settings.font_size();
                 ui.scope_builder(
                     egui::UiBuilder::new()
                         .max_rect(child_rect)
@@ -301,8 +316,15 @@ pub fn show_value(
                                     let mut path = path.clone();
                                     path.push(PathComponent::FieldAccess(name.clone()));
 
-                                    let hovered =
-                                        show_value(ui, state, path, Some(name), value, diagnostics);
+                                    let hovered = show_value(
+                                        ui,
+                                        settings,
+                                        scroll_state,
+                                        path,
+                                        Some(name),
+                                        value,
+                                        diagnostics,
+                                    );
                                     if hovered != HoverInfo::Nothing {
                                         child_hovered = hovered;
                                     }
@@ -329,7 +351,7 @@ pub fn show_value(
                 handle_response(ui.label(format!("{name_prefix}[")));
 
                 let mut child_rect = ui.cursor().intersect(ui.max_rect());
-                child_rect.min.x += state.settings.font_size();
+                child_rect.min.x += settings.font_size();
                 ui.scope_builder(
                     UiBuilder::new()
                         .max_rect(child_rect)
@@ -339,7 +361,15 @@ pub fn show_value(
                             let mut path = path.clone();
                             path.push(PathComponent::Indexing(i));
 
-                            let hovered = show_value(ui, state, path, None, value, diagnostics);
+                            let hovered = show_value(
+                                ui,
+                                settings,
+                                scroll_state,
+                                path,
+                                None,
+                                value,
+                                diagnostics,
+                            );
                             if hovered != HoverInfo::Nothing {
                                 child_hovered = hovered;
                             }
@@ -358,9 +388,7 @@ pub fn show_value(
     }
 
     if this_clicked && let Some(byte_range) = value.provenance.byte_ranges().next() {
-        state
-            .scroll_state
-            .rearrange_bars_for_point(0, AbsoluteOffset::from(*byte_range.start()));
+        scroll_state.rearrange_bars_for_point(0, AbsoluteOffset::from(*byte_range.start()));
     }
 
     if child_hovered != HoverInfo::Nothing {

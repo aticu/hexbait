@@ -2,7 +2,7 @@
 
 use std::str::FromStr as _;
 
-use hexbait_lang::{DiagnosticLevel, ParseResult, Provenance, StructContent, ValueKind};
+use hexbait_lang::eval::{DiagnosticLevel, ParseResult, Provenance, StructContent, ValueKind};
 use serde_json::{Map, Number, Value};
 
 /// Converts the given parse result to JSON.
@@ -67,7 +67,7 @@ pub fn result_to_json(result: &ParseResult, detailed: bool) -> Value {
 }
 
 /// Converts the given parsed value to JSON.
-fn value_to_json(value: &hexbait_lang::Value, result: &ParseResult, detailed: bool) -> Value {
+fn value_to_json(value: &hexbait_lang::eval::Value, result: &ParseResult, detailed: bool) -> Value {
     let mut err = None;
 
     let val = match &value.kind {

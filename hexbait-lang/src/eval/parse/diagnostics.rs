@@ -2,7 +2,10 @@
 
 use hexbait_common::RelativeOffset;
 
-use crate::{Span, Value, eval::provenance::Provenance};
+use crate::{
+    compile::Span,
+    eval::{Value, provenance::Provenance},
+};
 
 /// The result of a parsing operation.
 pub type Result<T, E = ParseErr> = std::result::Result<T, E>;

@@ -3,15 +3,21 @@
 use hexbait_common::{Endianness, Len};
 
 use crate::{
-    BytesValue, Int, Provenance, Span, Value, ValueKind,
-    ir::{Expr, ParseType, ParseTypeKind, RepeatKind},
-    parse::{
-        ParseContext, StaticAnalysisImpossible,
-        cursor::Cursor,
-        diagnostics::{Diagnostics, Result, SeekError},
-        expr::AdditionalExprContext,
-        static_analysis_impossible,
-        struct_context::StructContext,
+    Int,
+    compile::{
+        Span,
+        ir::{Expr, ParseType, ParseTypeKind, RepeatKind},
+    },
+    eval::{
+        BytesValue, Provenance, Value, ValueKind,
+        parse::{
+            ParseContext, StaticAnalysisImpossible,
+            cursor::Cursor,
+            diagnostics::{Diagnostics, Result, SeekError},
+            expr::AdditionalExprContext,
+            static_analysis_impossible,
+            struct_context::StructContext,
+        },
     },
 };
 

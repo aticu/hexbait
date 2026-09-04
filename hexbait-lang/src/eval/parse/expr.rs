@@ -6,14 +6,17 @@ use hexbait_common::RelativeOffset;
 use num_traits::Zero as _;
 
 use crate::{
-    BytesValue, Int, Provenance, Value, ValueKind,
-    ir::{BinOp, ConcatArg, Expr, ExprKind, Lit, UnOp},
-    parse::{
-        ParseContext, StaticAnalysisImpossible as _,
-        cursor::Cursor,
-        diagnostics::{Result, SeekError},
-        static_analysis_impossible,
-        struct_context::StructContext,
+    Int,
+    compile::ir::{BinOp, ConcatArg, Expr, ExprKind, Lit, UnOp},
+    eval::{
+        BytesValue, Provenance, Value, ValueKind,
+        parse::{
+            ParseContext, StaticAnalysisImpossible as _,
+            cursor::Cursor,
+            diagnostics::{Result, SeekError},
+            static_analysis_impossible,
+            struct_context::StructContext,
+        },
     },
 };
 

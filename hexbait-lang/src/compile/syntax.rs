@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::lexer::TokenKind;
+use crate::compile::lexer::TokenKind;
 
 /// A syntax element.
 ///

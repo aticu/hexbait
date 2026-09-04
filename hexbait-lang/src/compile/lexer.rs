@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::span::Span;
+use crate::compile::Span;
 
 /// Describes all kinds of possible tokens.
 #[derive(

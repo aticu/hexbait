@@ -5,7 +5,7 @@ use std::fmt;
 use hexbait_common::Endianness;
 use smol_str::SmolStr;
 
-use crate::{SyntaxToken, span::Span};
+use crate::compile::{Span, syntax::SyntaxToken};
 
 pub use analysis::check_ir;
 pub use expr::*;

@@ -5,8 +5,11 @@ use std::ops::Range;
 use hexbait_common::{Endianness, Len, ReadBytes, RelativeOffset};
 
 use crate::{
-    Provenance, Span, View,
-    parse::{Diagnostics, Result, diagnostics::SeekError},
+    compile::Span,
+    eval::{
+        Provenance, View,
+        parse::{Diagnostics, Result, diagnostics::SeekError},
+    },
 };
 
 /// Reads the specified number of bytes without advancing the cursor.

@@ -1,10 +1,11 @@
 //! Implements the primitives that are used in the parser implementation.
 
-use crate::{
-    NodeKind,
+use crate::compile::{
+    diagnostics::Label,
     lexer::{Token, TokenKind},
-    parser::{Diagnostic, diagnostics::Label},
+    parser::Diagnostic,
     span::Span,
+    syntax::NodeKind,
 };
 
 /// A marker for a started node.

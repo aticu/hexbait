@@ -2,9 +2,9 @@
 //!
 //! This is different from diagnostics that occur while evaluating the language.
 
-use std::io;
+use std::{io, slice};
 
-use crate::Span;
+use crate::compile::Span;
 
 pub use custom_emitter::{DiagnosticEmitter, RgbColor, Style};
 
@@ -157,6 +157,16 @@ pub enum DiagnosticLevel {
     Error,
 }
 
+impl DiagnosticLevel {
+    /// Whether the diagnostic is an error.
+    pub fn is_err(self) -> bool {
+        match self {
+            DiagnosticLevel::Warning => false,
+            DiagnosticLevel::Error => true,
+        }
+    }
+}
+
 /// An label in a diagnostic.
 #[derive(Debug, Clone)]
 pub struct Label {
@@ -183,5 +193,88 @@ impl Label {
     /// The message of this label.
     pub fn message(&self) -> &str {
         &self.message
+    }
+}
+
+/// Contains multiple diagnostics.
+#[derive(Debug, Clone)]
+pub struct Diagnostics {
+    /// The name of the source for these diagnostics.
+    source_name: String,
+    /// The source text that these diagnostics are derived from.
+    source_text: String,
+    /// Whether the diagnostics contain any errors that cause a compilation failure.
+    contains_errors: bool,
+    /// The diagnostics themselves.
+    diagnostics: Vec<Diagnostic>,
+}
+
+impl Diagnostics {
+    /// Creates a new diagnostics store.
+    pub fn new(source_name: impl ToString, source_text: impl ToString) -> Diagnostics {
+        Diagnostics {
+            source_name: source_name.to_string(),
+            source_text: source_text.to_string(),
+            contains_errors: false,
+            diagnostics: Vec::new(),
+        }
+    }
+
+    /// Returns the source name for the diagnostics.
+    pub fn source_name(&self) -> &str {
+        &self.source_name
+    }
+
+    /// Returns the source text for the diagnostics.
+    pub fn source_text(&self) -> &str {
+        &self.source_text
+    }
+
+    /// Adds a diagnostic to the store.
+    pub fn add_diagnostic(&mut self, diagnostic: Diagnostic) {
+        if diagnostic.level().is_err() {
+            self.contains_errors = true;
+        }
+
+        self.diagnostics.push(diagnostic);
+    }
+
+    /// Adds multiple diagnostics to the store.
+    pub fn add_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
+        let iter = diagnostics.into_iter();
+        self.diagnostics.reserve(iter.size_hint().0);
+
+        for diagnostic in iter {
+            self.add_diagnostic(diagnostic);
+        }
+    }
+
+    /// Whether the diagnostics contain any errors fatal for compilation.
+    pub fn contains_errors(&self) -> bool {
+        self.contains_errors
+    }
+
+    /// Whether any diagnostics are contained.
+    pub fn is_empty(&self) -> bool {
+        self.diagnostics.is_empty()
+    }
+
+    /// Emits the diagnostics to stderr.
+    pub fn emit_to_stderr(&self) {
+        for diagnostic in &self.diagnostics {
+            diagnostic
+                .emit_to_stderr(&self.source_name, &self.source_text)
+                .unwrap();
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a Diagnostics {
+    type Item = &'a Diagnostic;
+
+    type IntoIter = slice::Iter<'a, Diagnostic>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.diagnostics.iter()
     }
 }

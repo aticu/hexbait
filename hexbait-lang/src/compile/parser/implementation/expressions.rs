@@ -1,9 +1,9 @@
 //! Implements parsing of expressions.
 
-use crate::{
-    NodeKind,
+use crate::compile::{
     lexer::TokenKind,
     parser::infrastructure::{Completed, CompletedMarker, Parser},
+    syntax::NodeKind,
 };
 
 use super::nested_parse_type;

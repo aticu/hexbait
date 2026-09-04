@@ -52,7 +52,7 @@ pub struct ParseState {
     /// Whether the parse offset should be synced to the start of the selection.
     pub sync_parse_offset_to_selection_start: bool,
     /// The built-in format description.
-    pub built_in_format_descriptions: BTreeMap<&'static str, hexbait_lang::ir::File>,
+    pub built_in_format_descriptions: BTreeMap<&'static str, hexbait_lang::compile::ir::File>,
     /// The path to the custom parser definitions.
     pub custom_parsers: Vec<PathBuf>,
 }

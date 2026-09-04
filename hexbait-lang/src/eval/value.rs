@@ -5,12 +5,12 @@ use std::{fmt, io, ops::Range, sync::Arc};
 use hexbait_common::{Len, ReadBytes, RelativeOffset};
 
 use crate::{
-    Int, View,
-    ir::{
+    Int,
+    compile::ir::{
         Lit, Symbol,
         path::{Path, PathComponent},
     },
-    parse::DiagnosticId,
+    eval::{View, parse::DiagnosticId},
 };
 
 use super::provenance::Provenance;

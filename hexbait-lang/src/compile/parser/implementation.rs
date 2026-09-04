@@ -2,7 +2,7 @@
 
 pub(crate) use expressions::expr;
 
-use crate::{NodeKind, lexer::TokenKind};
+use crate::compile::{lexer::TokenKind, syntax::NodeKind};
 
 use super::infrastructure::{Completed, Parser};
 

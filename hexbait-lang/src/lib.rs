@@ -2,21 +2,8 @@
 
 #![forbid(unsafe_code)]
 
-pub mod ast;
-mod eval;
-pub mod ir;
-mod lexer;
-pub mod parser;
-mod span;
-mod syntax;
-
-pub use {
-    eval::*,
-    ir::check_ir,
-    parser::{parse_expr, parse_file},
-    span::Span,
-    syntax::{Language, NodeKind, SyntaxKind, SyntaxNode, SyntaxToken},
-};
+pub mod compile;
+pub mod eval;
 
 /// The integer type used for arbitrary precision integers.
 pub type Int = num_bigint::BigInt;

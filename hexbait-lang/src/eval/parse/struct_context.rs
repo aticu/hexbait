@@ -3,14 +3,16 @@
 use hexbait_common::RelativeOffset;
 
 use crate::{
-    DiagnosticId, Provenance, Value, ValueKind,
-    eval::value::StructContent,
-    ir::{self, Symbol},
-    parse::{
-        StaticAnalysisImpossible as _,
-        cursor::Cursor,
-        diagnostics::{ParseErr, Result},
-        static_analysis_impossible,
+    compile::ir::{self, Symbol},
+    eval::{
+        DiagnosticId, Provenance, Value, ValueKind,
+        parse::{
+            StaticAnalysisImpossible as _,
+            cursor::Cursor,
+            diagnostics::{ParseErr, Result},
+            static_analysis_impossible,
+        },
+        value::StructContent,
     },
 };
 

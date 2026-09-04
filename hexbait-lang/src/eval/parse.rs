@@ -3,8 +3,8 @@
 use std::fmt;
 
 use crate::{
-    ir::{ElsePart, Expr, File, IfChain, LetStatement, StructContent, StructField},
-    parse::{
+    compile::ir::{ElsePart, Expr, File, IfChain, LetStatement, StructContent, StructField},
+    eval::parse::{
         cursor::Cursor,
         diagnostics::{Diagnostics, Result},
         struct_context::StructContext,

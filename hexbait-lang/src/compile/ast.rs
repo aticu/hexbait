@@ -1,6 +1,6 @@
 //! Implements the abstract syntax tree.
 
-use crate::{
+use crate::compile::{
     lexer::TokenKind::{self, *},
     span::Span,
     syntax::{NodeKind, SyntaxKind, SyntaxNode, SyntaxToken},

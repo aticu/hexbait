@@ -1,6 +1,6 @@
 //! Implements the state for the hexbait console.
 
-use hexbait_lang::ParseResult;
+use hexbait_lang::{compile::Diagnostics, eval::ParseResult};
 
 /// The state of the hexbait console.
 #[derive(Debug)]
@@ -47,6 +47,8 @@ impl Default for ConsoleState {
 pub struct ConsoleEntry {
     /// The query that produced this entry.
     pub query: String,
+    /// The diagnostics encountered during compilation.
+    pub diagnostics: Option<Diagnostics>,
     /// The result of executing the query.
-    pub result: ParseResult,
+    pub result: Option<ParseResult>,
 }
