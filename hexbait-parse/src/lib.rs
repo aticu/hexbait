@@ -71,6 +71,7 @@ fn value_to_json(value: &hexbait_lang::eval::Value, result: &ParseResult, detail
     let mut err = None;
 
     let val = match &value.kind {
+        ValueKind::Error(id) => Value::String(format!("{id:?}")),
         ValueKind::Boolean(val) => Value::Bool(*val),
         ValueKind::Integer(val) => {
             let num = if let Ok(num) = u128::try_from(val) {

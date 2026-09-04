@@ -44,6 +44,8 @@ impl fmt::Debug for Value {
 /// The different kinds of values that can be parsed.
 #[derive(Clone, PartialEq)]
 pub enum ValueKind {
+    /// An error.
+    Error(DiagnosticId),
     /// A boolean value.
     Boolean(bool),
     /// An integer value.
@@ -72,6 +74,7 @@ pub enum ValueKind {
 impl fmt::Debug for ValueKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Error(id) => write!(f, "Err({id:?})"),
             Self::Boolean(val) => write!(f, "{val:?}"),
             Self::Integer(int) => {
                 if int.sign() == num_bigint::Sign::Minus {

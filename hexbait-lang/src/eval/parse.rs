@@ -4,10 +4,13 @@ use std::fmt;
 
 use crate::{
     compile::ir::{ElsePart, Expr, File, IfChain, LetStatement, StructContent, StructField},
-    eval::parse::{
-        cursor::Cursor,
-        diagnostics::{Diagnostics, Result},
-        struct_context::StructContext,
+    eval::{
+        ValueKind,
+        parse::{
+            cursor::Cursor,
+            diagnostics::{Diagnostics, Result},
+            struct_context::StructContext,
+        },
     },
 };
 
@@ -68,7 +71,16 @@ pub fn eval_expr(expr: &Expr, endianness: Endianness, view: View) -> ParseResult
             value,
             diagnostics: parse_ctx.diagnostics.into_diagnostics(),
         },
-        Err(_) => todo!(),
+        Err(mut err) => {
+            let diagnostics = parse_ctx.diagnostics.into_diagnostics();
+            ParseResult {
+                value: err.take_partial_result().unwrap_or(Value {
+                    kind: ValueKind::Error(err.id()),
+                    provenance: diagnostics[err.id().raw_idx()].provenance.clone(),
+                }),
+                diagnostics,
+            }
+        }
     }
 }
 

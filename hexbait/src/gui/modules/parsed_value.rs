@@ -236,6 +236,10 @@ pub fn show_value(
     let mut hovered_diagnostic = None;
 
     match &value.kind {
+        ValueKind::Error(err) => {
+            hovered_diagnostic =
+                hovered_diagnostic.or(render_diagnostic_and_return_hovered(ui, *err, diagnostics));
+        }
         ValueKind::Boolean(_) | ValueKind::Integer(_) | ValueKind::Float(_) => {
             handle_response(ui.label(format!("{name_prefix}{:?},", value.kind)));
         }
