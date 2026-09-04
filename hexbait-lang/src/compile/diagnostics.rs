@@ -124,6 +124,23 @@ impl Diagnostic {
         }
     }
 
+    /// Emits the diagnostic to the given writer.
+    pub fn emit_to_str(&self, source_name: &str, source_text: &str) -> io::Result<String> {
+        let file = codespan_reporting::files::SimpleFile::new(source_name, source_text);
+        let diagnostic = self.to_codespan_reporting_diagnostic();
+
+        let config = codespan_reporting::term::Config::default();
+        let mut out = String::new();
+
+        match codespan_reporting::term::emit_to_string(&mut out, &config, &file, &diagnostic) {
+            Ok(()) => Ok(out),
+            Err(err) => match err {
+                codespan_reporting::files::Error::Io(err) => Err(err),
+                _ => unreachable!("this is a bug"),
+            },
+        }
+    }
+
     /// Emits the diagnostic.
     pub fn emit<E: DiagnosticEmitter>(
         &self,

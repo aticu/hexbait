@@ -1,0 +1,3 @@
+!endian le;
+
+let x = 1 * 2;

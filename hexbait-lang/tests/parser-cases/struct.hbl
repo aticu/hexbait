@@ -1,0 +1,11 @@
+!endian le;
+
+x {
+	len u32;
+	!scope at $offset {
+		as_bytes bytes len len;
+	}
+	!scope at $offset {
+		as_u8_arr [u8] len len;
+	}
+};

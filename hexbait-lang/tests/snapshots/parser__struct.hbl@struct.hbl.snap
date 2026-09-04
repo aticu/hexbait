@@ -1,0 +1,92 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: result
+input_file: hexbait-lang/tests/parser-cases/struct.hbl
+---
+File@0..130
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  StructField@13..129
+    Identifier@13..14 "x"
+    Whitespace@14..15 " "
+    AnonymousStructParseType@15..128
+      StructBlock@15..128
+        LBrace@15..16 "{"
+        Whitespace@16..18 "\n\t"
+        StructField@18..26
+          Identifier@18..21 "len"
+          Whitespace@21..22 " "
+          NamedParseType@22..25
+            Identifier@22..25 "u32"
+          Semicolon@25..26 ";"
+        Whitespace@26..28 "\n\t"
+        ScopeAtDeclaration@28..76
+          ExclamationMark@28..29 "!"
+          Identifier@29..34 "scope"
+          Whitespace@34..35 " "
+          Identifier@35..37 "at"
+          Whitespace@37..38 " "
+          Metavar@38..45
+            Dollar@38..39 "$"
+            Identifier@39..45 "offset"
+          Whitespace@45..46 " "
+          StructBlock@46..76
+            LBrace@46..47 "{"
+            Whitespace@47..50 "\n\t\t"
+            StructField@50..73
+              Identifier@50..58 "as_bytes"
+              Whitespace@58..59 " "
+              BytesParseType@59..72
+                BytesKw@59..64 "bytes"
+                Whitespace@64..65 " "
+                RepeatLenDecl@65..72
+                  Identifier@65..68 "len"
+                  Whitespace@68..69 " "
+                  Atom@69..72
+                    Identifier@69..72 "len"
+              Semicolon@72..73 ";"
+            Whitespace@73..75 "\n\t"
+            RBrace@75..76 "}"
+        Whitespace@76..78 "\n\t"
+        ScopeAtDeclaration@78..126
+          ExclamationMark@78..79 "!"
+          Identifier@79..84 "scope"
+          Whitespace@84..85 " "
+          Identifier@85..87 "at"
+          Whitespace@87..88 " "
+          Metavar@88..95
+            Dollar@88..89 "$"
+            Identifier@89..95 "offset"
+          Whitespace@95..96 " "
+          StructBlock@96..126
+            LBrace@96..97 "{"
+            Whitespace@97..100 "\n\t\t"
+            StructField@100..123
+              Identifier@100..109 "as_u8_arr"
+              Whitespace@109..110 " "
+              RepeatParseType@110..122
+                LBracket@110..111 "["
+                NamedParseType@111..113
+                  Identifier@111..113 "u8"
+                RBracket@113..114 "]"
+                Whitespace@114..115 " "
+                RepeatLenDecl@115..122
+                  Identifier@115..118 "len"
+                  Whitespace@118..119 " "
+                  Atom@119..122
+                    Identifier@119..122 "len"
+              Semicolon@122..123 ";"
+            Whitespace@123..125 "\n\t"
+            RBrace@125..126 "}"
+        Whitespace@126..127 "\n"
+        RBrace@127..128 "}"
+    Semicolon@128..129 ";"
+  Whitespace@129..130 "\n"
+
+--- diagnostics ---
+no diagnostics

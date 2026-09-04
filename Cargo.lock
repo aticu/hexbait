@@ -1734,6 +1734,7 @@ dependencies = [
  "codespan-reporting",
  "heck",
  "hexbait-common",
+ "insta",
  "logos",
  "num-bigint",
  "num-traits",
