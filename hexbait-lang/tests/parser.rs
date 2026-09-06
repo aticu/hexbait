@@ -39,4 +39,10 @@ fn snapshot_file_parse_tree(path: &Path) {
     }
 
     insta::assert_snapshot!(name, result);
+
+    assert_eq!(
+        parse.ast.syntax().to_string(),
+        content,
+        "parsing should be lossless"
+    );
 }
