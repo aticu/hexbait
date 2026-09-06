@@ -1,0 +1,17 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: result
+input_file: hexbait-lang/tests/parser-cases/trivia_start_end.hbl
+---
+File@0..14
+  Whitespace@0..1 "\n"
+  EndiannessDeclaration@1..12
+    ExclamationMark@1..2 "!"
+    Identifier@2..8 "endian"
+    Whitespace@8..9 " "
+    Identifier@9..11 "le"
+    Semicolon@11..12 ";"
+  Whitespace@12..14 "\n\n"
+
+--- diagnostics ---
+no diagnostics

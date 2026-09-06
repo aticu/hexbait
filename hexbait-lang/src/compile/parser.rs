@@ -3,8 +3,8 @@
 use crate::compile::{
     Diagnostic,
     ast::{AstNode, Expr, File},
-    lexer::lex,
-    syntax::SyntaxKind,
+    lexer::{Token, lex},
+    syntax::{NodeKind, SyntaxKind},
 };
 use infrastructure::{Event, Parser};
 use rowan::GreenNodeBuilder;
@@ -39,8 +39,34 @@ fn parse<Result: AstNode>(source: &str, parse_fn: impl FnOnce(&mut Parser)) -> P
     let mut p = Parser::new(source, &tokens);
     parse_fn(&mut p);
 
+    let token = |t: &Token, builder: &mut GreenNodeBuilder| {
+        builder.token(
+            <crate::compile::syntax::Language as rowan::Language>::kind_to_raw(SyntaxKind::from(
+                t.kind,
+            )),
+            &source[t.span.start..t.span.end],
+        );
+    };
+    let start_node = |kind: Option<NodeKind>, builder: &mut GreenNodeBuilder| {
+        let kind = kind.expect("nodes should always be finished in the parser");
+        builder.start_node(
+            <crate::compile::syntax::Language as rowan::Language>::kind_to_raw(SyntaxKind::from(
+                kind,
+            )),
+        )
+    };
+    let flush_trivia = |tok_idx: &mut usize, builder: &mut GreenNodeBuilder| {
+        while *tok_idx < tokens.len() && tokens[*tok_idx].kind.is_trivia() {
+            let t = &tokens[*tok_idx];
+            *tok_idx += 1;
+
+            token(t, builder);
+        }
+    };
+
     let mut builder = GreenNodeBuilder::new();
     let mut tok_idx = 0;
+    let mut depth = 0;
     for ev in p.events() {
         match ev {
             Event::Start {
@@ -66,34 +92,35 @@ fn parse<Result: AstNode>(source: &str, parse_fn: impl FnOnce(&mut Parser)) -> P
                     forward_parent = new_forward_parent;
                 }
 
-                // reverse parents so the last preceding node is started first
-                for parent_kind in parents.iter().rev() {
-                    let kind = parent_kind.expect("nodes should always be finished in the parser");
-                    builder.start_node(
-                        <crate::compile::syntax::Language as rowan::Language>::kind_to_raw(
-                            SyntaxKind::from(kind),
-                        ),
-                    )
+                // don't try to put trivia before the root node
+                if depth > 0 {
+                    flush_trivia(&mut tok_idx, &mut builder);
                 }
 
-                let kind = kind.expect("nodes should always be finished in the parser");
-                builder.start_node(
-                    <crate::compile::syntax::Language as rowan::Language>::kind_to_raw(
-                        SyntaxKind::from(kind),
-                    ),
-                )
+                // reverse parents so the last preceding node is started first
+                for parent_kind in parents.iter().rev() {
+                    start_node(**parent_kind, &mut builder);
+                    depth += 1;
+                }
+
+                start_node(*kind, &mut builder);
+                depth += 1;
             }
             Event::Token => {
+                flush_trivia(&mut tok_idx, &mut builder);
+
                 let t = &tokens[tok_idx];
                 tok_idx += 1;
-                builder.token(
-                    <crate::compile::syntax::Language as rowan::Language>::kind_to_raw(
-                        SyntaxKind::from(t.kind),
-                    ),
-                    &source[t.span.start..t.span.end],
-                );
+                token(t, &mut builder);
             }
-            Event::Finish => builder.finish_node(),
+            Event::Finish => {
+                depth -= 1;
+                if depth == 0 {
+                    // flush trailing trivia into the root
+                    flush_trivia(&mut tok_idx, &mut builder);
+                }
+                builder.finish_node();
+            }
             Event::Error(_) => (),
         }
     }

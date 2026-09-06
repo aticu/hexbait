@@ -9,8 +9,7 @@ use crate::compile::{
 };
 
 /// A marker for a started node.
-#[derive(Clone, Copy)]
-pub(crate) struct Marker {
+struct Marker {
     /// The index into the event stream where the node was started.
     idx: usize,
 }
@@ -18,7 +17,6 @@ pub(crate) struct Marker {
 /// A marker for a completed node.
 ///
 /// Can be used to precede earlier started nodes.
-#[derive(Clone, Copy)]
 pub(crate) struct CompletedMarker {
     /// The index into the event stream where the node was started.
     idx: usize,
@@ -26,7 +24,7 @@ pub(crate) struct CompletedMarker {
 
 impl CompletedMarker {
     /// Make a new parent that will wrap this node.
-    pub(crate) fn precede(self, p: &mut Parser) -> Marker {
+    fn precede(self, p: &mut Parser) -> Marker {
         // Start a new parent node
         let parent_start = p.events.len();
         p.events.push(Event::Start {
@@ -70,56 +68,14 @@ pub(crate) enum Event {
     Finish,
 }
 
-/// Bumps trivia in the given parser if dropped.
-///
-/// Allows to complete parent nodes before bumping trivia.
-pub(crate) struct TriviaBumper<'parser, 'src> {
-    /// The parser in which trivia is to be dumped.
-    parser: &'parser mut Parser<'src>,
-}
-
-impl TriviaBumper<'_, '_> {
-    /// Bumps the trivia in the parser.
-    pub(crate) fn bump(self) {}
-
-    /// Handles trivia_bumping manually.
-    pub(crate) fn handle_manually(self) {
-        std::mem::forget(self)
-    }
-}
-
-impl Drop for TriviaBumper<'_, '_> {
-    fn drop(&mut self) {
-        self.parser.bump_past_trivia();
-    }
-}
-
-/// A completed node.
-pub(crate) struct Completed<'parser, 'src> {
-    /// The trivia bumper after the node.
-    ///
-    /// Allows to complete parent nodes before bumping trivia.
-    trivia_bumper: TriviaBumper<'parser, 'src>,
-    /// The completed marker of the finished node.
-    completed_marker: CompletedMarker,
-}
-
-impl Completed<'_, '_> {
-    /// Completes the given marker with the given node kind in the underlying parser.
-    pub(crate) fn and_complete(self, m: Marker, kind: NodeKind) -> Self {
-        let completed_marker = self.trivia_bumper.parser.complete(m, kind);
-
-        Completed {
-            completed_marker,
-            ..self
-        }
-    }
-
-    /// Returns the completed marker and handles trivia manually.
-    pub(crate) fn handle_trivia_manually(self) -> CompletedMarker {
-        self.trivia_bumper.handle_manually();
-        self.completed_marker
-    }
+/// A peeked token.
+pub(crate) struct PeekedToken<'src> {
+    /// The kind of the token.
+    pub(crate) kind: TokenKind,
+    /// The source text of the token.
+    pub(crate) text: &'src str,
+    /// Whether this token was preceeded by trivia.
+    pub(crate) preceeded_by_trivia: bool,
 }
 
 /// Contains the driving state for the parser.
@@ -137,44 +93,46 @@ pub(crate) struct Parser<'src> {
 impl<'src> Parser<'src> {
     /// Creates a new parser for the given tokens.
     pub(crate) fn new(src: &'src str, tokens: &'src [Token]) -> Parser<'src> {
-        Parser {
+        let mut parser = Parser {
             src,
             tokens,
             pos: 0,
             events: Vec::with_capacity(tokens.len() * 2),
+        };
+
+        // skip initial trivia
+        while let Some(t) = parser.cur()
+            && t.is_trivia()
+        {
+            parser.pos += 1;
         }
+
+        parser
     }
 
-    /// Peeks all upcoming non-trivia tokens, returning their kind and whether they were preceded
-    /// by trivia.
-    ///
-    /// Returns the token kind along with the index of the token.
-    /// The current token is included.
-    pub(crate) fn peek(&self) -> impl Iterator<Item = (usize, TokenKind)> {
-        self.tokens
-            .get(self.pos..)
-            .unwrap_or(&[])
-            .iter()
-            .enumerate()
-            .filter(|(_, t)| !t.kind.is_trivia())
-            .map(|(i, t)| (self.pos + i, t.kind))
+    /// Peeks all upcoming non-trivia tokens.
+    pub(crate) fn peek(&self) -> impl Iterator<Item = PeekedToken<'src>> {
+        (0..self.tokens.len())
+            .skip(self.pos)
+            .filter(|&i| !self.tokens[i].kind.is_trivia())
+            .map(|i| {
+                let preceeded_by_trivia = i
+                    .checked_sub(1)
+                    .map(|prev_idx| self.tokens[prev_idx].kind.is_trivia())
+                    .unwrap_or(false);
+                let token = &self.tokens[i];
+
+                PeekedToken {
+                    kind: token.kind,
+                    text: &self.src[token.span.start..token.span.end],
+                    preceeded_by_trivia,
+                }
+            })
     }
 
-    /// Returns the current token.
+    /// The current token kind.
     pub(crate) fn cur(&self) -> Option<TokenKind> {
         self.tokens.get(self.pos).map(|t| t.kind)
-    }
-
-    /// Returns the text of the token at the given token index.
-    pub(crate) fn text_at(&self, index: usize) -> Option<&str> {
-        self.tokens
-            .get(index)
-            .map(|t| &self.src[t.span.start..t.span.end])
-    }
-
-    /// Returns the text of the current token.
-    pub(crate) fn cur_text(&self) -> Option<&str> {
-        self.text_at(self.pos)
     }
 
     /// Checks if the parser is currently at the given token.
@@ -184,7 +142,7 @@ impl<'src> Parser<'src> {
 
     /// Checks if the parser is currently at the given contextual keyword.
     pub(crate) fn at_contextual_kw(&self, kw: &str) -> bool {
-        self.at(TokenKind::Identifier) && self.cur_text() == Some(kw)
+        self.at(TokenKind::Identifier) && self.peek().next().map(|t| t.text) == Some(kw)
     }
 
     /// Expects a contextual keyword, returning the text of the keyword.
@@ -228,38 +186,49 @@ impl<'src> Parser<'src> {
 
     /// Bumps the parser forward to the next non-trivia token.
     pub(crate) fn bump(&mut self) {
-        self.bump_raw();
-        self.bump_past_trivia();
-    }
+        self.events.push(Event::Token);
+        self.pos += 1;
 
-    /// Bumps while the current token is a trivia token.
-    fn bump_past_trivia(&mut self) {
         while let Some(t) = self.cur()
             && t.is_trivia()
         {
-            self.bump_raw();
+            self.pos += 1;
         }
     }
 
-    /// Bumps the parser exactly one token forward.
-    fn bump_raw(&mut self) {
-        self.events.push(Event::Token);
-        self.pos += 1;
-    }
-
-    /// Starts a new node.
-    pub(crate) fn start(&mut self) -> Marker {
+    /// Parses a node.
+    pub(crate) fn node(
+        &mut self,
+        parse_node: impl FnOnce(&mut Self) -> NodeKind,
+    ) -> CompletedMarker {
         let idx = self.events.len();
         self.events.push(Event::Start {
             kind: None,
             forward_parent: None,
             is_forward_parent: false,
         });
-        Marker { idx }
+        let m = Marker { idx };
+
+        let kind = parse_node(self);
+
+        self.complete(m, kind)
+    }
+
+    /// Wraps the given completed node in a new parent node.
+    pub(crate) fn precede_with(
+        &mut self,
+        completed_node: CompletedMarker,
+        parse_parent: impl FnOnce(&mut Self) -> NodeKind,
+    ) -> CompletedMarker {
+        let m = completed_node.precede(self);
+
+        let kind = parse_parent(self);
+
+        self.complete(m, kind)
     }
 
     /// Completes the given node.
-    pub(crate) fn complete(&mut self, m: Marker, kind: NodeKind) -> CompletedMarker {
+    fn complete(&mut self, m: Marker, kind: NodeKind) -> CompletedMarker {
         match &mut self.events[m.idx] {
             Event::Start {
                 kind: kind_to_set, ..
@@ -269,41 +238,6 @@ impl<'src> Parser<'src> {
         self.events.push(Event::Finish);
 
         CompletedMarker { idx: m.idx }
-    }
-
-    /// Completes the given node after the given expected token.
-    ///
-    /// The trivia will need to be bumped manually afterwards, in order to
-    pub(crate) fn complete_after<'this>(
-        &'this mut self,
-        m: Marker,
-        kind: NodeKind,
-        expected: TokenKind,
-    ) -> Completed<'this, 'src> {
-        if self.cur() == Some(expected) {
-            self.bump_raw();
-        } else {
-            self.expect_error(&[expected.name()]);
-        }
-
-        let completed_marker = self.complete(m, kind);
-        self.completed_from_marker(completed_marker)
-    }
-
-    /// Returns a completed node from the given completed marker.
-    pub(crate) fn completed_from_marker<'this>(
-        &'this mut self,
-        completed_marker: CompletedMarker,
-    ) -> Completed<'this, 'src> {
-        Completed {
-            trivia_bumper: self.trivia_bumper(),
-            completed_marker,
-        }
-    }
-
-    /// Returns a trivia bumper for the current state.
-    pub(crate) fn trivia_bumper<'this>(&'this mut self) -> TriviaBumper<'this, 'src> {
-        TriviaBumper { parser: self }
     }
 
     /// Creates an error.
