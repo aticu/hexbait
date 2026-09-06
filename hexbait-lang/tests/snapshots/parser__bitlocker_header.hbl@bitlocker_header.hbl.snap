@@ -1,0 +1,177 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: result
+input_file: format_descriptions/bitlocker_header.hbl
+---
+File@0..429
+  StructField@0..29
+    Identifier@0..16 "boot_entry_point"
+    Whitespace@16..17 " "
+    BytesParseType@17..28
+      BytesKw@17..22 "bytes"
+      Whitespace@22..23 " "
+      RepeatLenDecl@23..28
+        Identifier@23..26 "len"
+        Whitespace@26..27 " "
+        Atom@27..28
+          DecimalIntegerLiteral@27..28 "3"
+    Semicolon@28..29 ";"
+  Whitespace@29..30 "\n"
+  StructField@30..71
+    Identifier@30..51 "file_system_signature"
+    Whitespace@51..52 " "
+    BytesParseType@52..57
+      BytesKw@52..57 "bytes"
+    Whitespace@57..58 " "
+    Equals@58..59 "="
+    Whitespace@59..60 " "
+    Atom@60..70
+      StringLiteral@60..70 "\"-FVE-FS-\""
+    Semicolon@70..71 ";"
+  Whitespace@71..72 "\n"
+  StructField@72..93
+    Identifier@72..88 "bytes_per_sector"
+    Whitespace@88..89 " "
+    NamedParseType@89..92
+      Identifier@89..92 "u16"
+    Semicolon@92..93 ";"
+  Whitespace@93..94 "\n"
+  StructField@94..123
+    Identifier@94..119 "sectors_per_cluster_b ..."
+    Whitespace@119..120 " "
+    NamedParseType@120..122
+      Identifier@120..122 "u8"
+    Semicolon@122..123 ";"
+  Whitespace@123..125 "\n\n"
+  SeekToDeclaration@125..137
+    ExclamationMark@125..126 "!"
+    Identifier@126..130 "seek"
+    Whitespace@130..131 " "
+    Identifier@131..133 "to"
+    Whitespace@133..134 " "
+    Atom@134..136
+      DecimalIntegerLiteral@134..136 "40"
+    Semicolon@136..137 ";"
+  Whitespace@137..138 "\n"
+  StructField@138..160
+    Identifier@138..155 "number_of_sectors"
+    Whitespace@155..156 " "
+    NamedParseType@156..159
+      Identifier@156..159 "u64"
+    Semicolon@159..160 ";"
+  Whitespace@160..161 "\n"
+  StructField@161..190
+    Identifier@161..185 "mft_cluster_block_number"
+    Whitespace@185..186 " "
+    NamedParseType@186..189
+      Identifier@186..189 "u64"
+    Semicolon@189..190 ";"
+  Whitespace@190..191 "\n"
+  StructField@191..225
+    Identifier@191..220 "mft_mirr_cluster_bloc ..."
+    Whitespace@220..221 " "
+    NamedParseType@221..224
+      Identifier@221..224 "u64"
+    Semicolon@224..225 ";"
+  Whitespace@225..226 "\n"
+  StructField@226..244
+    Identifier@226..240 "mft_entry_size"
+    Whitespace@240..241 " "
+    NamedParseType@241..243
+      Identifier@241..243 "u8"
+    Semicolon@243..244 ";"
+  Whitespace@244..246 "\n\n"
+  SeekToDeclaration@246..259
+    ExclamationMark@246..247 "!"
+    Identifier@247..251 "seek"
+    Whitespace@251..252 " "
+    Identifier@252..254 "to"
+    Whitespace@254..255 " "
+    Atom@255..258
+      DecimalIntegerLiteral@255..258 "160"
+    Semicolon@258..259 ";"
+  Whitespace@259..260 "\n"
+  StructField@260..294
+    Identifier@260..280 "volume_serial_number"
+    Whitespace@280..281 " "
+    BytesParseType@281..293
+      BytesKw@281..286 "bytes"
+      Whitespace@286..287 " "
+      RepeatLenDecl@287..293
+        Identifier@287..290 "len"
+        Whitespace@290..291 " "
+        Atom@291..293
+          DecimalIntegerLiteral@291..293 "16"
+    Semicolon@293..294 ";"
+  Whitespace@294..296 "\n\n"
+  SeekToDeclaration@296..309
+    ExclamationMark@296..297 "!"
+    Identifier@297..301 "seek"
+    Whitespace@301..302 " "
+    Identifier@302..304 "to"
+    Whitespace@304..305 " "
+    Atom@305..308
+      DecimalIntegerLiteral@305..308 "176"
+    Semicolon@308..309 ";"
+  Whitespace@309..310 "\n"
+  StructField@310..342
+    Identifier@310..329 "information_offsets"
+    Whitespace@329..330 " "
+    RepeatParseType@330..341
+      LBracket@330..331 "["
+      NamedParseType@331..334
+        Identifier@331..334 "u64"
+      RBracket@334..335 "]"
+      Whitespace@335..336 " "
+      RepeatLenDecl@336..341
+        Identifier@336..339 "len"
+        Whitespace@339..340 " "
+        Atom@340..341
+          DecimalIntegerLiteral@340..341 "3"
+    Semicolon@341..342 ";"
+  Whitespace@342..343 "\n"
+  StructField@343..379
+    Identifier@343..366 "eow_information_offsets"
+    Whitespace@366..367 " "
+    RepeatParseType@367..378
+      LBracket@367..368 "["
+      NamedParseType@368..371
+        Identifier@368..371 "u64"
+      RBracket@371..372 "]"
+      Whitespace@372..373 " "
+      RepeatLenDecl@373..378
+        Identifier@373..376 "len"
+        Whitespace@376..377 " "
+        Atom@377..378
+          DecimalIntegerLiteral@377..378 "2"
+    Semicolon@378..379 ";"
+  Whitespace@379..381 "\n\n"
+  SeekToDeclaration@381..394
+    ExclamationMark@381..382 "!"
+    Identifier@382..386 "seek"
+    Whitespace@386..387 " "
+    Identifier@387..389 "to"
+    Whitespace@389..390 " "
+    Atom@390..393
+      DecimalIntegerLiteral@390..393 "510"
+    Semicolon@393..394 ";"
+  Whitespace@394..395 "\n"
+  StructField@395..428
+    Identifier@395..411 "sector_signature"
+    Whitespace@411..412 " "
+    BytesParseType@412..417
+      BytesKw@412..417 "bytes"
+    Whitespace@417..418 " "
+    Equals@418..419 "="
+    Whitespace@419..420 " "
+    ByteConcat@420..427
+      LAngle@420..421 "<"
+      DecimalIntegerLiteral@421..423 "55"
+      Whitespace@423..424 " "
+      Identifier@424..426 "aa"
+      RAngle@426..427 ">"
+    Semicolon@427..428 ";"
+  Whitespace@428..429 "\n"
+
+--- diagnostics ---
+no diagnostics

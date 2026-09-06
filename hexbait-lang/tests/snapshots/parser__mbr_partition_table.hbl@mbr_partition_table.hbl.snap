@@ -1,0 +1,94 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: result
+input_file: format_descriptions/mbr_partition_table.hbl
+---
+File@0..202
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  StructField@13..32
+    Identifier@13..27 "disk_signature"
+    Whitespace@27..28 " "
+    NamedParseType@28..31
+      Identifier@28..31 "u32"
+    Semicolon@31..32 ";"
+  Whitespace@32..34 "\n\n"
+  SeekByDeclaration@34..45
+    ExclamationMark@34..35 "!"
+    Identifier@35..39 "seek"
+    Whitespace@39..40 " "
+    Identifier@40..42 "by"
+    Whitespace@42..43 " "
+    Atom@43..44
+      DecimalIntegerLiteral@43..44 "2"
+    Semicolon@44..45 ";"
+  Whitespace@45..47 "\n\n"
+  StructField@47..201
+    Identifier@47..64 "partition_records"
+    Whitespace@64..65 " "
+    RepeatParseType@65..200
+      LBracket@65..66 "["
+      AnonymousStructParseType@66..193
+        StructBlock@66..193
+          LBrace@66..67 "{"
+          Whitespace@67..72 "\n    "
+          StructField@72..90
+            Identifier@72..86 "boot_indicator"
+            Whitespace@86..87 " "
+            NamedParseType@87..89
+              Identifier@87..89 "u8"
+            Semicolon@89..90 ";"
+          Whitespace@90..95 "\n    "
+          StructField@95..112
+            Identifier@95..107 "starting_chs"
+            Whitespace@107..108 " "
+            NamedParseType@108..111
+              Identifier@108..111 "u24"
+            Semicolon@111..112 ";"
+          Whitespace@112..117 "\n    "
+          StructField@117..128
+            Identifier@117..124 "os_type"
+            Whitespace@124..125 " "
+            NamedParseType@125..127
+              Identifier@125..127 "u8"
+            Semicolon@127..128 ";"
+          Whitespace@128..133 "\n    "
+          StructField@133..148
+            Identifier@133..143 "ending_chs"
+            Whitespace@143..144 " "
+            NamedParseType@144..147
+              Identifier@144..147 "u24"
+            Semicolon@147..148 ";"
+          Whitespace@148..153 "\n    "
+          StructField@153..170
+            Identifier@153..165 "starting_lba"
+            Whitespace@165..166 " "
+            NamedParseType@166..169
+              Identifier@166..169 "u32"
+            Semicolon@169..170 ";"
+          Whitespace@170..175 "\n    "
+          StructField@175..191
+            Identifier@175..186 "size_in_lba"
+            Whitespace@186..187 " "
+            NamedParseType@187..190
+              Identifier@187..190 "u32"
+            Semicolon@190..191 ";"
+          Whitespace@191..192 "\n"
+          RBrace@192..193 "}"
+      RBracket@193..194 "]"
+      Whitespace@194..195 " "
+      RepeatLenDecl@195..200
+        Identifier@195..198 "len"
+        Whitespace@198..199 " "
+        Atom@199..200
+          DecimalIntegerLiteral@199..200 "4"
+    Semicolon@200..201 ";"
+  Whitespace@201..202 "\n"
+
+--- diagnostics ---
+no diagnostics

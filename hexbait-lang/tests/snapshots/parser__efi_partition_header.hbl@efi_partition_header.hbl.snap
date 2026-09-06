@@ -1,0 +1,151 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: result
+input_file: format_descriptions/efi_partition_header.hbl
+---
+File@0..371
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  StructField@13..42
+    Identifier@13..22 "signature"
+    Whitespace@22..23 " "
+    BytesParseType@23..28
+      BytesKw@23..28 "bytes"
+    Whitespace@28..29 " "
+    Equals@29..30 "="
+    Whitespace@30..31 " "
+    Atom@31..41
+      StringLiteral@31..41 "\"EFI PART\""
+    Semicolon@41..42 ";"
+  Whitespace@42..43 "\n"
+  StructField@43..69
+    Identifier@43..51 "revision"
+    Whitespace@51..52 " "
+    NamedParseType@52..55
+      Identifier@52..55 "u32"
+    Whitespace@55..56 " "
+    Equals@56..57 "="
+    Whitespace@57..58 " "
+    Atom@58..68
+      HexadecimalIntegerLiteral@58..68 "0x00010000"
+    Semicolon@68..69 ";"
+  Whitespace@69..70 "\n"
+  StructField@70..86
+    Identifier@70..81 "header_size"
+    Whitespace@81..82 " "
+    NamedParseType@82..85
+      Identifier@82..85 "u32"
+    Semicolon@85..86 ";"
+  Whitespace@86..88 "\n\n"
+  AssertDeclaration@88..114
+    ExclamationMark@88..89 "!"
+    Identifier@89..95 "assert"
+    Whitespace@95..96 " "
+    InfixExpr@96..113
+      Atom@96..107
+        Identifier@96..107 "header_size"
+      Whitespace@107..108 " "
+      Op@108..110
+        RAngle@108..109 ">"
+        Equals@109..110 "="
+      Whitespace@110..111 " "
+      Atom@111..113
+        DecimalIntegerLiteral@111..113 "92"
+    Semicolon@113..114 ";"
+  Whitespace@114..116 "\n\n"
+  StructField@116..133
+    Identifier@116..128 "header_crc32"
+    Whitespace@128..129 " "
+    NamedParseType@129..132
+      Identifier@129..132 "u32"
+    Semicolon@132..133 ";"
+  Whitespace@133..134 "\n"
+  StructField@134..151
+    Identifier@134..142 "reserved"
+    Whitespace@142..143 " "
+    NamedParseType@143..146
+      Identifier@143..146 "u32"
+    Whitespace@146..147 " "
+    Equals@147..148 "="
+    Whitespace@148..149 " "
+    Atom@149..150
+      DecimalIntegerLiteral@149..150 "0"
+    Semicolon@150..151 ";"
+  Whitespace@151..152 "\n"
+  StructField@152..163
+    Identifier@152..158 "my_lba"
+    Whitespace@158..159 " "
+    NamedParseType@159..162
+      Identifier@159..162 "u64"
+    Semicolon@162..163 ";"
+  Whitespace@163..164 "\n"
+  StructField@164..182
+    Identifier@164..177 "alternate_lba"
+    Whitespace@177..178 " "
+    NamedParseType@178..181
+      Identifier@178..181 "u64"
+    Semicolon@181..182 ";"
+  Whitespace@182..183 "\n"
+  StructField@183..204
+    Identifier@183..199 "first_usable_lba"
+    Whitespace@199..200 " "
+    NamedParseType@200..203
+      Identifier@200..203 "u64"
+    Semicolon@203..204 ";"
+  Whitespace@204..205 "\n"
+  StructField@205..225
+    Identifier@205..220 "last_usable_lba"
+    Whitespace@220..221 " "
+    NamedParseType@221..224
+      Identifier@221..224 "u64"
+    Semicolon@224..225 ";"
+  Whitespace@225..226 "\n"
+  StructField@226..249
+    Identifier@226..235 "disk_guid"
+    Whitespace@235..236 " "
+    BytesParseType@236..248
+      BytesKw@236..241 "bytes"
+      Whitespace@241..242 " "
+      RepeatLenDecl@242..248
+        Identifier@242..245 "len"
+        Whitespace@245..246 " "
+        Atom@246..248
+          DecimalIntegerLiteral@246..248 "16"
+    Semicolon@248..249 ";"
+  Whitespace@249..251 "\n\n"
+  StructField@251..275
+    Identifier@251..270 "partition_entry_lba"
+    Whitespace@270..271 " "
+    NamedParseType@271..274
+      Identifier@271..274 "u64"
+    Semicolon@274..275 ";"
+  Whitespace@275..276 "\n"
+  StructField@276..308
+    Identifier@276..303 "number_of_partition_e ..."
+    Whitespace@303..304 " "
+    NamedParseType@304..307
+      Identifier@304..307 "u32"
+    Semicolon@307..308 ";"
+  Whitespace@308..309 "\n"
+  StructField@309..337
+    Identifier@309..332 "size_of_partition_entry"
+    Whitespace@332..333 " "
+    NamedParseType@333..336
+      Identifier@333..336 "u32"
+    Semicolon@336..337 ";"
+  Whitespace@337..338 "\n"
+  StructField@338..370
+    Identifier@338..365 "partition_entry_array ..."
+    Whitespace@365..366 " "
+    NamedParseType@366..369
+      Identifier@366..369 "u32"
+    Semicolon@369..370 ";"
+  Whitespace@370..371 "\n"
+
+--- diagnostics ---
+no diagnostics

@@ -1,0 +1,76 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: result
+input_file: format_descriptions/efi_partition_entry.hbl
+---
+File@0..162
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  StructField@13..46
+    Identifier@13..32 "partition_type_guid"
+    Whitespace@32..33 " "
+    BytesParseType@33..45
+      BytesKw@33..38 "bytes"
+      Whitespace@38..39 " "
+      RepeatLenDecl@39..45
+        Identifier@39..42 "len"
+        Whitespace@42..43 " "
+        Atom@43..45
+          DecimalIntegerLiteral@43..45 "16"
+    Semicolon@45..46 ";"
+  Whitespace@46..47 "\n"
+  StructField@47..82
+    Identifier@47..68 "unique_partition_guid"
+    Whitespace@68..69 " "
+    BytesParseType@69..81
+      BytesKw@69..74 "bytes"
+      Whitespace@74..75 " "
+      RepeatLenDecl@75..81
+        Identifier@75..78 "len"
+        Whitespace@78..79 " "
+        Atom@79..81
+          DecimalIntegerLiteral@79..81 "16"
+    Semicolon@81..82 ";"
+  Whitespace@82..83 "\n"
+  StructField@83..100
+    Identifier@83..95 "starting_lba"
+    Whitespace@95..96 " "
+    NamedParseType@96..99
+      Identifier@96..99 "u64"
+    Semicolon@99..100 ";"
+  Whitespace@100..101 "\n"
+  StructField@101..116
+    Identifier@101..111 "ending_lba"
+    Whitespace@111..112 " "
+    NamedParseType@112..115
+      Identifier@112..115 "u64"
+    Semicolon@115..116 ";"
+  Whitespace@116..117 "\n"
+  StructField@117..132
+    Identifier@117..127 "attributes"
+    Whitespace@127..128 " "
+    NamedParseType@128..131
+      Identifier@128..131 "u64"
+    Semicolon@131..132 ";"
+  Whitespace@132..133 "\n"
+  StructField@133..161
+    Identifier@133..147 "partition_name"
+    Whitespace@147..148 " "
+    BytesParseType@148..160
+      BytesKw@148..153 "bytes"
+      Whitespace@153..154 " "
+      RepeatLenDecl@154..160
+        Identifier@154..157 "len"
+        Whitespace@157..158 " "
+        Atom@158..160
+          DecimalIntegerLiteral@158..160 "72"
+    Semicolon@160..161 ";"
+  Whitespace@161..162 "\n"
+
+--- diagnostics ---
+no diagnostics
