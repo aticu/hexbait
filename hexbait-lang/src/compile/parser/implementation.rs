@@ -12,7 +12,9 @@ mod expressions;
 pub(crate) fn root(p: &mut Parser) {
     p.node(|p| {
         while p.cur().is_some() {
-            struct_content(p);
+            p.ensure_progress(|p| {
+                struct_content(p);
+            });
         }
 
         NodeKind::File
@@ -37,10 +39,13 @@ fn struct_content(p: &mut Parser) {
 fn struct_block(p: &mut Parser) {
     p.node(|p| {
         p.expect(TokenKind::LBrace);
-        while p.cur().is_some_and(|t| t != TokenKind::RBrace) {
-            struct_content(p);
-        }
-        p.expect(TokenKind::RBrace);
+        p.with_consuming_recovery(TokenKind::RBrace, |p| {
+            while !p.at_recovery_token() {
+                p.ensure_progress(|p| {
+                    struct_content(p);
+                });
+            }
+        });
 
         NodeKind::StructBlock
     });
@@ -61,11 +66,12 @@ fn r#struct(p: &mut Parser) {
 /// Parses a `let` statement.
 fn r#let(p: &mut Parser) {
     p.node(|p| {
-        p.expect(TokenKind::LetKw);
-        p.expect(TokenKind::Identifier);
-        p.expect(TokenKind::Equals);
-        expr(p);
-        p.expect(TokenKind::Semicolon);
+        p.with_consuming_recovery(TokenKind::Semicolon, |p| {
+            p.expect(TokenKind::LetKw);
+            p.expect(TokenKind::Identifier);
+            p.expect(TokenKind::Equals);
+            expr(p);
+        });
 
         NodeKind::LetStatement
     });
@@ -74,9 +80,10 @@ fn r#let(p: &mut Parser) {
 /// Parses an `if` chain.
 fn if_chain(p: &mut Parser) {
     p.node(|p| {
-        if p.expect_and_bump_contextual_kw() != Some("if") {
-            todo!()
+        if p.peek_contextual_kw() != Some("if") {
+            unreachable!("if chain is only parsed when it starts with `if`");
         }
+        p.bump();
 
         expr(p);
 
@@ -106,100 +113,151 @@ fn decl(p: &mut Parser) {
     p.node(|p| {
         p.expect(TokenKind::ExclamationMark);
 
-        match p.expect_peek_contextual_kw() {
+        match p.peek_contextual_kw() {
             Some("endian") => {
-                p.bump();
-                match p.expect_and_bump_contextual_kw() {
-                    Some("le") | Some("be") => (),
-                    _ => todo!("error"),
-                }
+                p.with_consuming_recovery(TokenKind::Semicolon, |p| {
+                    p.bump();
+                    match p.peek_contextual_kw() {
+                        Some("le") | Some("be") => p.bump(),
+                        // let lowering deal with the error
+                        Some(_) => p.bump(),
+                        _ => p.expect_error(&["`le`", "`be`"]),
+                    }
+                });
 
-                p.expect(TokenKind::Semicolon);
                 NodeKind::EndiannessDeclaration
             }
-            Some("seek") => {
+            Some("seek") => p.with_consuming_recovery(TokenKind::Semicolon, |p| {
                 p.bump();
-                let kind = match p.expect_and_bump_contextual_kw() {
-                    Some("by") => NodeKind::SeekByDeclaration,
-                    Some("to") => NodeKind::SeekToDeclaration,
-                    _ => todo!("error"),
+                let kind = match p.peek_contextual_kw() {
+                    Some("by") => {
+                        p.bump();
+                        Some(NodeKind::SeekByDeclaration)
+                    }
+                    Some("to") => {
+                        p.bump();
+                        Some(NodeKind::SeekToDeclaration)
+                    }
+                    _ => {
+                        p.expect_error(&["`by`", "`to`"]);
+                        p.recover();
+                        None
+                    }
                 };
-                expr(p);
 
-                p.expect(TokenKind::Semicolon);
-                kind
-            }
+                if let Some(kind) = kind {
+                    expr(p);
+                    kind
+                } else {
+                    NodeKind::Error
+                }
+            }),
             Some("scope") => {
                 p.bump();
-                let kind = match p.expect_and_bump_contextual_kw() {
-                    Some("at") => NodeKind::ScopeAtDeclaration,
-                    Some("in") => NodeKind::ScopeInDeclaration,
-                    _ => todo!("error"),
+                let kind = match p.peek_contextual_kw() {
+                    Some("at") => {
+                        p.bump();
+                        Some(NodeKind::ScopeAtDeclaration)
+                    }
+                    Some("in") => {
+                        p.bump();
+                        Some(NodeKind::ScopeInDeclaration)
+                    }
+                    _ => {
+                        p.expect_error(&["`at`", "`in`"]);
+                        None
+                    }
                 };
 
-                expr(p);
-
-                if kind == NodeKind::ScopeAtDeclaration && p.at_contextual_kw("until") {
-                    p.bump();
+                if let Some(kind) = kind {
                     expr(p);
-                }
 
-                struct_block(p);
-                kind
+                    if kind == NodeKind::ScopeAtDeclaration && p.at_contextual_kw("until") {
+                        p.bump();
+                        p.with_unconsuming_recovery(TokenKind::LBrace, |p| {
+                            expr(p);
+                        });
+                    }
+
+                    struct_block(p);
+                    kind
+                } else {
+                    NodeKind::Error
+                }
             }
             Some("if") => {
                 if_chain(p);
                 NodeKind::IfDeclaration
             }
             Some("align") => {
-                p.bump();
-                expr(p);
-                p.expect(TokenKind::Semicolon);
+                p.with_consuming_recovery(TokenKind::Semicolon, |p| {
+                    p.bump();
+                    expr(p);
+                });
 
                 NodeKind::AlignDeclaration
             }
             Some("assert") => {
-                p.bump();
-                expr(p);
-                if p.at(TokenKind::Colon) {
-                    p.expect(TokenKind::Colon);
+                p.with_consuming_recovery(TokenKind::Semicolon, |p| {
+                    p.bump();
                     expr(p);
-                }
-                p.expect(TokenKind::Semicolon);
+                    if p.at(TokenKind::Colon) {
+                        p.expect(TokenKind::Colon);
+                        expr(p);
+                    }
+                });
 
                 NodeKind::AssertDeclaration
             }
             Some("warn") => {
-                p.bump();
-                if p.at_contextual_kw("if") {
+                p.with_consuming_recovery(TokenKind::Semicolon, |p| {
                     p.bump();
-                } else {
-                    todo!("warn requires if");
-                }
+                    if p.at_contextual_kw("if") {
+                        p.bump();
+                    } else {
+                        p.expect_error(&["`if`"]);
+                    }
 
-                expr(p);
-                if p.at(TokenKind::Colon) {
-                    p.expect(TokenKind::Colon);
                     expr(p);
-                }
-                p.expect(TokenKind::Semicolon);
+                    if p.at(TokenKind::Colon) {
+                        p.expect(TokenKind::Colon);
+                        expr(p);
+                    }
+                });
 
                 NodeKind::WarnIfDeclaration
             }
             Some("recover") => {
-                p.bump();
-                if p.at_contextual_kw("at") {
+                p.with_consuming_recovery(TokenKind::Semicolon, |p| {
                     p.bump();
-                } else {
-                    todo!("recover currently requires at");
-                }
+                    if p.at_contextual_kw("at") {
+                        p.bump();
+                    } else {
+                        p.expect_error(&["`at`"]);
+                    }
 
-                expr(p);
-                p.expect(TokenKind::Semicolon);
+                    expr(p);
+                });
 
                 NodeKind::RecoveryDeclaration
             }
-            _ => todo!("error"),
+            _ => {
+                p.expect_error(&[
+                    "`endian`",
+                    "`seek`",
+                    "`scope`",
+                    "`if`",
+                    "`align`",
+                    "`assert`",
+                    "`warn`",
+                    "`recover`",
+                ]);
+                p.with_consuming_recovery(TokenKind::Semicolon, |p| {
+                    p.recover();
+                });
+
+                NodeKind::Error
+            }
         }
     });
 }
@@ -207,13 +265,14 @@ fn decl(p: &mut Parser) {
 /// Parses a struct field.
 fn struct_field(p: &mut Parser) {
     p.node(|p| {
-        p.expect(TokenKind::Identifier);
-        top_level_parse_type(p);
-        if p.cur() == Some(TokenKind::Equals) {
-            p.expect(TokenKind::Equals);
-            expr(p);
-        }
-        p.expect(TokenKind::Semicolon);
+        p.with_consuming_recovery(TokenKind::Semicolon, |p| {
+            p.expect(TokenKind::Identifier);
+            top_level_parse_type(p);
+            if p.cur() == Some(TokenKind::Equals) {
+                p.expect(TokenKind::Equals);
+                expr(p);
+            }
+        });
 
         NodeKind::StructField
     });
@@ -246,15 +305,17 @@ fn parse_type_raw(p: &mut Parser, nested: bool) {
             if matches!(p.peek().next().map(|t| t.text), Some("u" | "i"))
                 && matches!(p.peek().nth(1).map(|t| t.kind), Some(TokenKind::LParen)) =>
         {
-            let kind = match p.expect_and_bump_contextual_kw() {
+            let kind = match p.peek_contextual_kw() {
                 Some("i") => NodeKind::DynamicSizeIntParseType,
                 Some("u") => NodeKind::DynamicSizeUIntParseType,
                 _ => unreachable!(),
             };
+            p.bump();
 
             p.expect(TokenKind::LParen);
-            expr(p);
-            p.expect(TokenKind::RParen);
+            p.with_consuming_recovery(TokenKind::RParen, |p| {
+                expr(p);
+            });
 
             kind
         }
@@ -278,49 +339,62 @@ fn parse_type_raw(p: &mut Parser, nested: bool) {
             p.expect(TokenKind::SwitchKw);
             expr(p);
             p.expect(TokenKind::LBrace);
+            p.with_consuming_recovery(TokenKind::RBrace, |p| {
+                p.with_consuming_recovery(TokenKind::Underscore, |p| {
+                    while !p.at_recovery_token() {
+                        p.ensure_progress(|p| {
+                            p.node(|p| {
+                                p.with_consuming_recovery(TokenKind::Comma, |p| {
+                                    expr(p);
+                                    p.expect(TokenKind::Equals);
+                                    p.expect(TokenKind::RAngle);
+                                    nested_parse_type(p);
+                                });
 
-            while p.cur().is_some_and(|t| t != TokenKind::Underscore) {
-                p.node(|p| {
-                    expr(p);
-                    p.expect(TokenKind::Equals);
-                    p.expect(TokenKind::RAngle);
-                    nested_parse_type(p);
-                    p.expect(TokenKind::Comma);
-
-                    NodeKind::SwitchParseTypeArm
+                                NodeKind::SwitchParseTypeArm
+                            });
+                        });
+                    }
                 });
-            }
 
-            p.expect(TokenKind::Underscore);
-            p.expect(TokenKind::Equals);
-            p.expect(TokenKind::RAngle);
-            nested_parse_type(p);
+                p.expect(TokenKind::Equals);
+                p.expect(TokenKind::RAngle);
+                nested_parse_type(p);
 
-            if p.at(TokenKind::Comma) {
-                p.expect(TokenKind::Comma);
-            }
-            p.expect(TokenKind::RBrace);
+                if p.at(TokenKind::Comma) {
+                    p.expect(TokenKind::Comma);
+                }
+            });
 
             NodeKind::SwitchParseType
         }
         _ => {
-            p.dbg();
-            todo!("error")
+            p.expect_error(&["an identifier", "`{`", "`[`", "`bytes`", "`switch`"]);
+            p.recover();
+
+            NodeKind::Error
         }
     });
 }
 
 /// Parses a repeating declaration.
 fn repeat_decl(p: &mut Parser) {
-    p.node(|p| match p.expect_and_bump_contextual_kw() {
+    p.node(|p| match p.peek_contextual_kw() {
         Some("len") => {
+            p.bump();
             expr(p);
             NodeKind::RepeatLenDecl
         }
         Some("while") => {
+            p.bump();
             expr(p);
             NodeKind::RepeatWhileDecl
         }
-        _ => todo!("error"),
+        _ => {
+            p.expect_error(&["`len`", "`while`"]);
+            p.recover();
+
+            NodeKind::Error
+        }
     });
 }

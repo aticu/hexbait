@@ -11,81 +11,88 @@ use super::nested_parse_type;
 /// Parses an atomic expression.
 fn atom(p: &mut Parser) -> CompletedMarker {
     p.node(|p| {
-        let (node_kind, next) = match p.cur() {
+        match p.cur() {
             Some(
-                kind @ (TokenKind::Identifier
+                TokenKind::Identifier
                 | TokenKind::BinaryIntegerLiteral
                 | TokenKind::OctalIntegerLiteral
                 | TokenKind::DecimalIntegerLiteral
                 | TokenKind::HexadecimalIntegerLiteral
                 | TokenKind::TrueKw
                 | TokenKind::FalseKw
-                | TokenKind::StringLiteral),
-            ) => (NodeKind::Atom, kind),
+                | TokenKind::StringLiteral,
+            ) => {
+                p.bump();
+                NodeKind::Atom
+            }
             Some(TokenKind::Dollar) => {
                 p.expect(TokenKind::Dollar);
-                (NodeKind::Metavar, TokenKind::Identifier)
+                p.expect(TokenKind::Identifier);
+                NodeKind::Metavar
             }
             Some(TokenKind::PeekKw) => {
                 p.expect(TokenKind::PeekKw);
                 p.expect(TokenKind::LParen);
+                p.with_consuming_recovery(TokenKind::RParen, |p| {
+                    nested_parse_type(p);
 
-                nested_parse_type(p);
+                    if p.at_contextual_kw("at") {
+                        p.bump();
+                        expr(p);
+                    }
+                });
 
-                if p.at_contextual_kw("at") {
-                    p.bump();
-                    expr(p);
-                }
-
-                (NodeKind::PeekExpr, TokenKind::RParen)
+                NodeKind::PeekExpr
             }
             Some(TokenKind::ConcatKw) => {
                 p.expect(TokenKind::ConcatKw);
                 p.expect(TokenKind::LParen);
+                p.with_consuming_recovery(TokenKind::RParen, |p| {
+                    let mut needs_comma = false;
+                    loop {
+                        if needs_comma {
+                            match p.cur() {
+                                Some(TokenKind::Comma) => {
+                                    p.expect(TokenKind::Comma);
+                                }
+                                Some(TokenKind::RParen) => break,
+                                _ => {
+                                    p.expect_error(&["`,`", "`)`"]);
+                                    break;
+                                }
+                            }
+                        }
 
-                let mut needs_comma = false;
-                loop {
-                    if needs_comma {
                         match p.cur() {
-                            Some(TokenKind::Comma) => {
-                                p.expect(TokenKind::Comma);
-                            }
                             Some(TokenKind::RParen) => break,
+                            Some(TokenKind::Dot) => {
+                                p.node(|p| {
+                                    p.expect(TokenKind::Dot);
+                                    p.expect(TokenKind::Dot);
+
+                                    expr(p);
+                                    NodeKind::ConcatArgExpanding
+                                });
+                            }
                             _ => {
-                                p.expect_error(&["`,`", "`)`"]);
-                                break;
+                                p.node(|p| {
+                                    expr(p);
+                                    NodeKind::ConcatArgDirect
+                                });
                             }
                         }
+
+                        needs_comma = true;
                     }
+                });
 
-                    match p.cur() {
-                        Some(TokenKind::RParen) => break,
-                        Some(TokenKind::Dot) => {
-                            p.node(|p| {
-                                p.expect(TokenKind::Dot);
-                                p.expect(TokenKind::Dot);
-
-                                expr(p);
-                                NodeKind::ConcatArgExpanding
-                            });
-                        }
-                        _ => {
-                            p.node(|p| {
-                                expr(p);
-                                NodeKind::ConcatArgDirect
-                            });
-                        }
-                    }
-
-                    needs_comma = true;
-                }
-
-                (NodeKind::ConcatExpr, TokenKind::RParen)
+                NodeKind::ConcatExpr
             }
             Some(TokenKind::LAngle) => {
                 p.expect(TokenKind::LAngle);
-                loop {
-                    match p.cur() {
+                p.with_consuming_recovery(TokenKind::RAngle, |p| {
+                    loop {
+                        match p.cur() {
                     Some(TokenKind::RAngle) => break,
                     Some(
                         lit @ (TokenKind::StringLiteral
@@ -100,13 +107,16 @@ fn atom(p: &mut Parser) -> CompletedMarker {
                         break;
                     }
                 }
-                }
-                (NodeKind::ByteConcat, TokenKind::RAngle)
+                    }
+                });
+                NodeKind::ByteConcat
             }
             Some(TokenKind::LParen) => {
                 p.expect(TokenKind::LParen);
-                expr(p);
-                (NodeKind::ParenExpr, TokenKind::RParen)
+                p.with_consuming_recovery(TokenKind::RParen, |p| {
+                    expr(p);
+                });
+                NodeKind::ParenExpr
             }
             _ => {
                 p.expect_error(&[
@@ -118,12 +128,9 @@ fn atom(p: &mut Parser) -> CompletedMarker {
                     "`<`",
                     "`(`",
                 ]);
-                return NodeKind::Atom;
+                NodeKind::Atom
             }
-        };
-        p.expect(next);
-
-        node_kind
+        }
     })
 }
 

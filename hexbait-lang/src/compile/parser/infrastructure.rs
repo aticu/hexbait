@@ -5,7 +5,7 @@ use crate::compile::{
     lexer::{Token, TokenKind},
     parser::Diagnostic,
     span::Span,
-    syntax::NodeKind,
+    syntax::{NodeKind, TokenKindSet},
 };
 
 /// A marker for a started node.
@@ -88,6 +88,10 @@ pub(crate) struct Parser<'src> {
     pos: usize,
     /// The current parsing events that the parser already produced.
     events: Vec<Event>,
+    /// The current recovery token set.
+    recovery: TokenKindSet,
+    /// The position of the last error.
+    last_err_pos: Option<usize>,
 }
 
 impl<'src> Parser<'src> {
@@ -98,6 +102,8 @@ impl<'src> Parser<'src> {
             tokens,
             pos: 0,
             events: Vec::with_capacity(tokens.len() * 2),
+            recovery: TokenKindSet::empty(),
+            last_err_pos: None,
         };
 
         // skip initial trivia
@@ -111,7 +117,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Peeks all upcoming non-trivia tokens.
-    pub(crate) fn peek(&self) -> impl Iterator<Item = PeekedToken<'src>> {
+    pub(crate) fn peek(&self) -> impl Iterator<Item = PeekedToken<'src>> + 'src {
         (0..self.tokens.len())
             .skip(self.pos)
             .filter(|&i| !self.tokens[i].kind.is_trivia())
@@ -140,39 +146,24 @@ impl<'src> Parser<'src> {
         self.cur() == Some(kind)
     }
 
+    /// Checks if the parser is at a recovery token.
+    pub(crate) fn at_recovery_token(&self) -> bool {
+        self.cur()
+            .map(|t| self.recovery.contains(t))
+            .unwrap_or(true) // EOF always implicitly recovers
+    }
+
     /// Checks if the parser is currently at the given contextual keyword.
     pub(crate) fn at_contextual_kw(&self, kw: &str) -> bool {
         self.at(TokenKind::Identifier) && self.peek().next().map(|t| t.text) == Some(kw)
     }
 
-    /// Expects a contextual keyword, returning the text of the keyword.
-    #[track_caller]
-    pub(crate) fn expect_peek_contextual_kw(&mut self) -> Option<&str> {
-        if self.at(TokenKind::Identifier) {
-            let span = self.tokens[self.pos].span;
-
-            Some(&self.src[span.start..span.end])
-        } else {
-            self.expect_error(&["contextual keyword"]);
-
-            None
-        }
-    }
-
-    /// Expects a contextual keyword, returning the text of the keyword.
-    #[track_caller]
-    pub(crate) fn expect_and_bump_contextual_kw(&mut self) -> Option<&str> {
-        if self.at(TokenKind::Identifier) {
-            let span = self.tokens[self.pos].span;
-
-            self.bump();
-
-            Some(&self.src[span.start..span.end])
-        } else {
-            self.expect_error(&["contextual keyword"]);
-
-            None
-        }
+    /// Peeks a contextual keyword, returning the text of the keyword.
+    pub(crate) fn peek_contextual_kw(&mut self) -> Option<&str> {
+        self.peek()
+            .next()
+            .filter(|t| t.kind == TokenKind::Identifier)
+            .map(|t| t.text)
     }
 
     /// Expects the given token next.
@@ -240,8 +231,54 @@ impl<'src> Parser<'src> {
         CompletedMarker { idx: m.idx }
     }
 
+    /// Continues parsing with the new recovery set.
+    ///
+    /// This does not consume the recovery token.
+    pub(crate) fn with_unconsuming_recovery<T>(
+        &mut self,
+        recovery_token: TokenKind,
+        parse: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let prev = self.recovery;
+        self.recovery = self.recovery.union(TokenKindSet::from(recovery_token));
+
+        let result = parse(self);
+
+        self.recovery = prev;
+        result
+    }
+
+    /// Continues parsing with the new recovery set.
+    ///
+    /// This consumes the recovery token afterwards.
+    pub(crate) fn with_consuming_recovery<T>(
+        &mut self,
+        recovery_token: TokenKind,
+        parse: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let result = self.with_unconsuming_recovery(recovery_token, parse);
+        self.expect(recovery_token);
+        result
+    }
+
+    /// Ensures that the parser must make progress.
+    #[track_caller]
+    pub(crate) fn ensure_progress<T>(&mut self, parse: impl FnOnce(&mut Self) -> T) -> T {
+        let start_pos = self.pos;
+        let result = parse(self);
+        if self.pos == start_pos {
+            panic!("the parser must make progress here");
+        }
+        result
+    }
+
     /// Creates an error.
     pub(crate) fn expect_error(&mut self, expected: &[&'static str]) {
+        if Some(self.pos) == self.last_err_pos {
+            // don't report many errors for the same position
+            return;
+        }
+
         let span = self.tokens.get(self.pos).map(|t| t.span).unwrap_or(Span {
             start: self.src.len(),
             end: self.src.len(),
@@ -257,6 +294,7 @@ impl<'src> Parser<'src> {
             ),
         };
 
+        self.last_err_pos = Some(self.pos);
         self.events.push(Event::Error(Diagnostic::error(
             message,
             Label::new(
@@ -270,16 +308,17 @@ impl<'src> Parser<'src> {
                 span,
             ),
         )));
-
-        self.recover(&[TokenKind::Semicolon]);
     }
 
-    /// Recovers from a previous error, by looking for one of the given sync tokens.
-    fn recover(&mut self, sync: &[TokenKind]) {
-        while let Some(token) = self.cur()
-            && !sync.contains(&token)
-        {
-            self.bump();
+    /// Recovers from a previous error, by looking for a recovery token.
+    pub(crate) fn recover(&mut self) {
+        if !self.at_recovery_token() {
+            self.node(|p| {
+                while !p.at_recovery_token() {
+                    p.bump();
+                }
+                NodeKind::Error
+            });
         }
     }
 

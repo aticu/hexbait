@@ -183,6 +183,62 @@ pub enum NodeKind {
     _Last,
 }
 
+/// Ensures that the token kind set still fits without widening the type.
+const _: () = assert!(TokenKind::_Last as u16 <= 64);
+
+/// A set of token kinds.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct TokenKindSet(u64);
+
+impl TokenKindSet {
+    /// Creates an empty token kind set.
+    pub const fn empty() -> TokenKindSet {
+        TokenKindSet(0)
+    }
+
+    /// Creates a set containing the given single token kind.
+    pub const fn from(value: TokenKind) -> TokenKindSet {
+        TokenKindSet(1 << (value as u16))
+    }
+
+    /// Computes the union of this set and the other set.
+    pub const fn union(self, other: TokenKindSet) -> TokenKindSet {
+        TokenKindSet(self.0 | other.0)
+    }
+
+    /// Whether this set contains the given token kind.
+    pub const fn contains(self, token: TokenKind) -> bool {
+        let as_set = TokenKindSet::from(token);
+        self.0 & as_set.0 != 0
+    }
+}
+
+impl fmt::Debug for TokenKindSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut printed = false;
+        for i in 0..u16::MAX {
+            let Ok(kind) = TokenKind::try_from(i) else {
+                break;
+            };
+
+            if self.contains(kind) {
+                if printed {
+                    write!(f, " | ")?;
+                }
+
+                write!(f, "{kind:?}")?;
+                printed = true;
+            }
+        }
+
+        if printed {
+            Ok(())
+        } else {
+            write!(f, "<empty set>")
+        }
+    }
+}
+
 /// The type that `rowan::Language` is implemented for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Language {}

@@ -1,0 +1,87 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: result
+input_file: hexbait-lang/tests/parser-cases/basic_recovery.hbl
+---
+File@0..57
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  LetStatement@13..17
+    LetKw@13..16 "let"
+    Atom@16..16
+    Semicolon@16..17 ";"
+  Whitespace@17..18 "\n"
+  LetStatement@18..24
+    LetKw@18..21 "let"
+    Whitespace@21..22 " "
+    Identifier@22..23 "x"
+    Atom@23..23
+    Semicolon@23..24 ";"
+  Whitespace@24..25 "\n"
+  LetStatement@25..33
+    LetKw@25..28 "let"
+    Whitespace@28..29 " "
+    Identifier@29..30 "x"
+    Whitespace@30..31 " "
+    Equals@31..32 "="
+    Atom@32..32
+    Semicolon@32..33 ";"
+  Whitespace@33..34 "\n"
+  StructField@34..50
+    Identifier@34..35 "x"
+    Whitespace@35..36 " "
+    AnonymousStructParseType@36..49
+      StructBlock@36..49
+        LBrace@36..37 "{"
+        Whitespace@37..39 "\n\t"
+        LetStatement@39..48
+          LetKw@39..42 "let"
+          Whitespace@42..43 " "
+          Identifier@43..44 "x"
+          Whitespace@44..45 " "
+          Equals@45..46 "="
+          Whitespace@46..48 " \n"
+          Atom@48..48
+        RBrace@48..49 "}"
+    Semicolon@49..50 ";"
+  Whitespace@50..51 "\n"
+  StructField@51..56
+    Identifier@51..52 "y"
+    Whitespace@52..53 " "
+    NamedParseType@53..55
+      Identifier@53..55 "u8"
+    Semicolon@55..56 ";"
+  Whitespace@56..57 "\n"
+
+--- diagnostics ---
+error: expected identifier
+  ┌─ basic_recovery.hbl:3:4
+  │
+3 │ let;
+  │    ^ found unexpected token `;`
+
+
+error: expected `=`
+  ┌─ basic_recovery.hbl:4:6
+  │
+4 │ let x;
+  │      ^ found unexpected token `;`
+
+
+error: expected identifier, literal, `peek`, `concat`, `$`, `<` or `(`
+  ┌─ basic_recovery.hbl:5:8
+  │
+5 │ let x =;
+  │        ^ found unexpected token `;`
+
+
+error: expected identifier, literal, `peek`, `concat`, `$`, `<` or `(`
+  ┌─ basic_recovery.hbl:8:1
+  │
+8 │ };
+  │ ^ found unexpected token `}`
