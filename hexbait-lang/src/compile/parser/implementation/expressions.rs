@@ -126,7 +126,7 @@ fn atom(p: &mut Parser) -> CompletedMarker {
                     "`<`",
                     "`(`",
                 ]);
-                // this is deliberately still an atom, so that `Error` does not need be be an expression kind in grammar.ungram
+                // this is deliberately still an atom, so that `Error` does not need be an expression kind in grammar.ungram
                 NodeKind::Atom
             }
         }
