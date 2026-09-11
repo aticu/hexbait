@@ -1,0 +1,35 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: result
+input_file: hexbait-lang/tests/parser-cases/recover_decl.hbl
+---
+File@0..29
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  Error@13..22
+    ExclamationMark@13..14 "!"
+    Error@14..21
+      Identifier@14..17 "foo"
+      Whitespace@17..18 " "
+      Identifier@18..21 "bar"
+    Semicolon@21..22 ";"
+  Whitespace@22..23 "\n"
+  StructField@23..28
+    Identifier@23..24 "a"
+    Whitespace@24..25 " "
+    NamedParseType@25..27
+      Identifier@25..27 "u8"
+    Semicolon@27..28 ";"
+  Whitespace@28..29 "\n"
+
+--- diagnostics ---
+error: expected `endian`, `seek`, `scope`, `if`, `align`, `assert`, `warn` or `recover`
+  ┌─ recover_decl.hbl:3:2
+  │
+3 │ !foo bar;
+  │  ^^^ found unexpected token identifier

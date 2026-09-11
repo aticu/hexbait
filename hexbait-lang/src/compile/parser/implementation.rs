@@ -83,9 +83,10 @@ fn if_chain(p: &mut Parser) {
         if p.peek_contextual_kw() != Some("if") {
             unreachable!("if chain is only parsed when it starts with `if`");
         }
-        p.bump();
-
-        expr(p);
+        p.with_unconsuming_recovery(TokenKind::LBrace, |p| {
+            p.bump();
+            expr(p);
+        });
 
         struct_block(p);
 
@@ -95,7 +96,7 @@ fn if_chain(p: &mut Parser) {
             p.bump();
 
             if p.at_contextual_kw("if") {
-                if_chain(p)
+                if_chain(p);
             } else {
                 p.node(|p| {
                     struct_block(p);
@@ -140,7 +141,6 @@ fn decl(p: &mut Parser) {
                     }
                     _ => {
                         p.expect_error(&["`by`", "`to`"]);
-                        p.recover();
                         None
                     }
                 };
@@ -169,21 +169,20 @@ fn decl(p: &mut Parser) {
                     }
                 };
 
-                if let Some(kind) = kind {
-                    expr(p);
+                p.with_unconsuming_recovery(TokenKind::LBrace, |p| match kind {
+                    Some(kind) => {
+                        expr(p);
 
-                    if kind == NodeKind::ScopeAtDeclaration && p.at_contextual_kw("until") {
-                        p.bump();
-                        p.with_unconsuming_recovery(TokenKind::LBrace, |p| {
+                        if kind == NodeKind::ScopeAtDeclaration && p.at_contextual_kw("until") {
+                            p.bump();
                             expr(p);
-                        });
+                        }
                     }
+                    None => p.recover(),
+                });
+                struct_block(p);
 
-                    struct_block(p);
-                    kind
-                } else {
-                    NodeKind::Error
-                }
+                kind.unwrap_or(NodeKind::Error)
             }
             Some("if") => {
                 if_chain(p);

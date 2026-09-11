@@ -256,7 +256,11 @@ impl<'src> Parser<'src> {
         recovery_token: TokenKind,
         parse: impl FnOnce(&mut Self) -> T,
     ) -> T {
-        let result = self.with_unconsuming_recovery(recovery_token, parse);
+        let result = self.with_unconsuming_recovery(recovery_token, |p| {
+            let result = parse(p);
+            p.recover();
+            result
+        });
         self.expect(recovery_token);
         result
     }
@@ -325,25 +329,5 @@ impl<'src> Parser<'src> {
     /// Returns a reference to the events of the parser.
     pub(crate) fn events(&self) -> &[Event] {
         &self.events
-    }
-
-    /// Print debug information about the current parser state.
-    #[allow(unused)]
-    pub(crate) fn dbg(&self) {
-        eprintln!("DEBUG:");
-        eprintln!("  token_position = {}", self.pos);
-        eprintln!("  token = {:?}", self.cur());
-        eprintln!(
-            "  token_ctx = {:#?}",
-            &self.tokens
-                [self.pos.saturating_sub(2)..std::cmp::min(self.pos + 3, self.tokens.len() - 1)]
-        );
-        eprintln!(
-            "  rest_text = {:?}",
-            self.tokens
-                .get(self.pos)
-                .map(|t| &self.src[t.span.start..])
-                .unwrap_or("")
-        );
     }
 }

@@ -337,6 +337,9 @@ impl LoweringCtx {
 
     /// Lowers the given AST atom to IR.
     fn lower_atom(&mut self, atom: ast::Atom) -> ExprKind {
+        if atom.child().is_none() {
+            return ExprKind::Error;
+        }
         let token = atom.child().parser_expect();
         let kind = atom.child_kind().parser_expect();
 

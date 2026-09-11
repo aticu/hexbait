@@ -93,20 +93,18 @@ fn atom(p: &mut Parser) -> CompletedMarker {
                 p.with_consuming_recovery(TokenKind::RAngle, |p| {
                     loop {
                         match p.cur() {
-                    Some(TokenKind::RAngle) => break,
-                    Some(
-                        lit @ (TokenKind::StringLiteral
-                        | TokenKind::ByteLiteral // for things like 1a
-                        | TokenKind::DecimalIntegerLiteral // for things like 10
-                        | TokenKind::Identifier), // for things like a1
-                    ) => p.expect(lit),
-                    _ => {
-                        p.dbg();
-
-                        p.expect_error(&["a two character hex-literal like `00`, `0a` or `a0`"]);
-                        break;
-                    }
-                }
+                            Some(TokenKind::RAngle) => break,
+                            Some(
+                                TokenKind::StringLiteral
+                                | TokenKind::ByteLiteral // for things like 1a
+                                | TokenKind::DecimalIntegerLiteral // for things like 10
+                                | TokenKind::Identifier // for things like a1
+                            ) => p.bump(),
+                            _ => {
+                                p.expect_error(&["a two character hex-literal like `00`, `0a` or `a0`"]);
+                                break;
+                            }
+                        }
                     }
                 });
                 NodeKind::ByteConcat
@@ -128,6 +126,7 @@ fn atom(p: &mut Parser) -> CompletedMarker {
                     "`<`",
                     "`(`",
                 ]);
+                // this is deliberately still an atom, so that `Error` does not need be be an expression kind in grammar.ungram
                 NodeKind::Atom
             }
         }
