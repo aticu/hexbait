@@ -1,0 +1,43 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "!endian le;\n\nlet x = peek() + 1;\n"
+input_file: hexbait-lang/tests/parser-cases/empty_peek.hbl
+---
+File@0..33
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  LetStatement@13..32
+    LetKw@13..16 "let"
+    Whitespace@16..17 " "
+    Identifier@17..18 "x"
+    Whitespace@18..19 " "
+    Equals@19..20 "="
+    Whitespace@20..21 " "
+    InfixExpr@21..31
+      PeekExpr@21..27
+        PeekKw@21..25 "peek"
+        LParen@25..26 "("
+        Error@26..26
+        RParen@26..27 ")"
+      Whitespace@27..28 " "
+      Op@28..29
+        Plus@28..29 "+"
+      Whitespace@29..30 " "
+      Atom@30..31
+        DecimalIntegerLiteral@30..31 "1"
+    Semicolon@31..32 ";"
+  Whitespace@32..33 "\n"
+
+--- diagnostics ---
+error: expected an identifier, `{`, `[`, `bytes` or `switch`
+  ┌─ empty_peek.hbl:3:14
+  │
+2 │ 
+3 │ let x = peek() + 1;
+  │              ^ found unexpected token `)`
+4 │

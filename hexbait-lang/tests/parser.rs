@@ -45,7 +45,7 @@ fn snapshot_file_parse_tree(path: &Path) {
         result.push_str("no diagnostics");
     }
 
-    insta::assert_snapshot!(name, result);
+    insta::assert_snapshot!(name, result, &content);
 
     assert_eq!(
         parse.ast.syntax().to_string(),

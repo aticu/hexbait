@@ -1,0 +1,3 @@
+!endian le;
+
+a u8 = $foo;

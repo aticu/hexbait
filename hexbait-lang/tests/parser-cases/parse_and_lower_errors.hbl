@@ -1,0 +1,9 @@
+!endian le;
+
+a switch 1 {
+    0 => u8,
+};
+b switch a {
+    a => u8,
+    _ => u16,
+};

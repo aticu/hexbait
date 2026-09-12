@@ -1,0 +1,35 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "!endian le;\n\na u8 = $foo;\n"
+input_file: hexbait-lang/tests/parser-cases/unknown_metavar.hbl
+---
+File@0..26
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  StructField@13..25
+    Identifier@13..14 "a"
+    Whitespace@14..15 " "
+    NamedParseType@15..17
+      Identifier@15..17 "u8"
+    Whitespace@17..18 " "
+    Equals@18..19 "="
+    Whitespace@19..20 " "
+    Metavar@20..24
+      Dollar@20..21 "$"
+      Identifier@21..24 "foo"
+    Semicolon@24..25 ";"
+  Whitespace@25..26 "\n"
+
+--- diagnostics ---
+error: metavariable `$foo` is unknown
+  ┌─ unknown_metavar.hbl:3:8
+  │
+2 │ 
+3 │ a u8 = $foo;
+  │        ^^^^ unknown metavariable
+4 │

@@ -173,7 +173,12 @@ impl LoweringCtx<'_> {
                 } else {
                     let expected = expected.as_ref().parser_expect();
                     let ExprKind::Lit(Lit::Bytes(bytes)) = &expected.kind else {
-                        self.add_diagnostic(Diagnostic::error("expected bytes value as the expected value for bytes type", Label::new("found unexpected type", expected.span)));
+                        if !matches!(expected.kind, ExprKind::Error) {
+                            self.add_diagnostic(Diagnostic::error(
+                                "expected bytes value as the expected value for bytes type",
+                                Label::new("found unexpected type", expected.span)
+                            ));
+                        }
                         return ParseTypeKind::Error
                     };
                     RepeatKind::Len {

@@ -1,0 +1,43 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: result
+input_file: hexbait-lang/tests/parser-cases/repeat_decl_bad_kw.hbl
+---
+File@0..31
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  StructField@13..24
+    Identifier@13..14 "a"
+    Whitespace@14..15 " "
+    RepeatParseType@15..23
+      LBracket@15..16 "["
+      NamedParseType@16..18
+        Identifier@16..18 "u8"
+      RBracket@18..19 "]"
+      Whitespace@19..20 " "
+      Error@20..23
+        Error@20..23
+          Identifier@20..23 "foo"
+    Semicolon@23..24 ";"
+  Whitespace@24..25 "\n"
+  StructField@25..30
+    Identifier@25..26 "b"
+    Whitespace@26..27 " "
+    NamedParseType@27..29
+      Identifier@27..29 "u8"
+    Semicolon@29..30 ";"
+  Whitespace@30..31 "\n"
+
+--- diagnostics ---
+error: expected `len` or `while`
+  ┌─ repeat_decl_bad_kw.hbl:3:8
+  │
+2 │ 
+3 │ a [u8] foo;
+  │        ^^^ found unexpected token identifier
+4 │ b u8;

@@ -1,0 +1,28 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "!endian ge;\n\na u8;\n"
+input_file: hexbait-lang/tests/parser-cases/bad_endianness.hbl
+---
+File@0..19
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "ge"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  StructField@13..18
+    Identifier@13..14 "a"
+    Whitespace@14..15 " "
+    NamedParseType@15..17
+      Identifier@15..17 "u8"
+    Semicolon@17..18 ";"
+  Whitespace@18..19 "\n"
+
+--- diagnostics ---
+error: expected `be` or `le`
+  ┌─ bad_endianness.hbl:1:1
+  │
+1 │ !endian ge;
+  │ ^^^^^^^^^^^ unexpected endianness value
+2 │

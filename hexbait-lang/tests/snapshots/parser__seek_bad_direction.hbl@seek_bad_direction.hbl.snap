@@ -1,0 +1,39 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "!endian le;\n\n!seek foo 1;\na u8;\n"
+input_file: hexbait-lang/tests/parser-cases/seek_bad_direction.hbl
+---
+File@0..32
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  Error@13..25
+    ExclamationMark@13..14 "!"
+    Identifier@14..18 "seek"
+    Whitespace@18..19 " "
+    Error@19..24
+      Identifier@19..22 "foo"
+      Whitespace@22..23 " "
+      DecimalIntegerLiteral@23..24 "1"
+    Semicolon@24..25 ";"
+  Whitespace@25..26 "\n"
+  StructField@26..31
+    Identifier@26..27 "a"
+    Whitespace@27..28 " "
+    NamedParseType@28..30
+      Identifier@28..30 "u8"
+    Semicolon@30..31 ";"
+  Whitespace@31..32 "\n"
+
+--- diagnostics ---
+error: expected `by` or `to`
+  ┌─ seek_bad_direction.hbl:3:7
+  │
+2 │ 
+3 │ !seek foo 1;
+  │       ^^^ found unexpected token identifier
+4 │ a u8;

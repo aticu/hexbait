@@ -1,0 +1,4 @@
+!endian le;
+
+a {
+    b u8;

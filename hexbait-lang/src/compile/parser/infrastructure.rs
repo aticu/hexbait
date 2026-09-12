@@ -256,13 +256,16 @@ impl<'src> Parser<'src> {
         recovery_token: TokenKind,
         parse: impl FnOnce(&mut Self) -> T,
     ) -> T {
-        let result = self.with_unconsuming_recovery(recovery_token, |p| {
+        self.with_unconsuming_recovery(recovery_token, |p| {
             let result = parse(p);
-            p.recover();
+            if !p.at(recovery_token) {
+                p.expect(recovery_token);
+                p.recover();
+            }
+            p.expect(recovery_token);
+
             result
-        });
-        self.expect(recovery_token);
-        result
+        })
     }
 
     /// Ensures that the parser must make progress.
@@ -316,6 +319,8 @@ impl<'src> Parser<'src> {
     }
 
     /// Recovers from a previous error, by looking for a recovery token.
+    ///
+    /// This does not itself report an error, so please ensure you have emitted an error before calling.
     pub(crate) fn recover(&mut self) {
         if !self.at_recovery_token() {
             self.node(|p| {

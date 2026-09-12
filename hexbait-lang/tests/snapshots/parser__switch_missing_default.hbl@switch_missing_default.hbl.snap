@@ -1,0 +1,48 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: result
+input_file: hexbait-lang/tests/parser-cases/switch_missing_default.hbl
+---
+File@0..42
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  StructField@13..41
+    Identifier@13..14 "a"
+    Whitespace@14..15 " "
+    SwitchParseType@15..40
+      SwitchKw@15..21 "switch"
+      Whitespace@21..22 " "
+      Atom@22..23
+        DecimalIntegerLiteral@22..23 "1"
+      Whitespace@23..24 " "
+      LBrace@24..25 "{"
+      Whitespace@25..30 "\n    "
+      SwitchParseTypeArm@30..38
+        Atom@30..31
+          DecimalIntegerLiteral@30..31 "0"
+        Whitespace@31..32 " "
+        Equals@32..33 "="
+        RAngle@33..34 ">"
+        Whitespace@34..35 " "
+        NamedParseType@35..37
+          Identifier@35..37 "u8"
+        Comma@37..38 ","
+      Whitespace@38..39 "\n"
+      Error@39..39
+      RBrace@39..40 "}"
+    Semicolon@40..41 ";"
+  Whitespace@41..42 "\n"
+
+--- diagnostics ---
+error: expected `_`
+  ┌─ switch_missing_default.hbl:5:1
+  │
+4 │     0 => u8,
+5 │ };
+  │ ^ found unexpected token `}`
+6 │

@@ -1,0 +1,4 @@
+!endian le;
+
+!seek foo 1;
+a u8;

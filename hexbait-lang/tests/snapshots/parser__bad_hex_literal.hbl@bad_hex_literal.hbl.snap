@@ -1,0 +1,59 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "!endian le;\n\na bytes = <zz>;\nb bytes = <abc>;\n"
+input_file: hexbait-lang/tests/parser-cases/bad_hex_literal.hbl
+---
+File@0..46
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  StructField@13..28
+    Identifier@13..14 "a"
+    Whitespace@14..15 " "
+    BytesParseType@15..20
+      BytesKw@15..20 "bytes"
+    Whitespace@20..21 " "
+    Equals@21..22 "="
+    Whitespace@22..23 " "
+    ByteConcat@23..27
+      LAngle@23..24 "<"
+      Identifier@24..26 "zz"
+      RAngle@26..27 ">"
+    Semicolon@27..28 ";"
+  Whitespace@28..29 "\n"
+  StructField@29..45
+    Identifier@29..30 "b"
+    Whitespace@30..31 " "
+    BytesParseType@31..36
+      BytesKw@31..36 "bytes"
+    Whitespace@36..37 " "
+    Equals@37..38 "="
+    Whitespace@38..39 " "
+    ByteConcat@39..44
+      LAngle@39..40 "<"
+      Identifier@40..43 "abc"
+      RAngle@43..44 ">"
+    Semicolon@44..45 ";"
+  Whitespace@45..46 "\n"
+
+--- diagnostics ---
+error: expected two hexdecimal digits
+  ┌─ bad_hex_literal.hbl:3:12
+  │
+2 │ 
+3 │ a bytes = <zz>;
+  │            ^^ found invalid hexadecimal literal
+4 │ b bytes = <abc>;
+
+
+error: expected hex byte liteal to be of length two
+  ┌─ bad_hex_literal.hbl:4:12
+  │
+3 │ a bytes = <zz>;
+4 │ b bytes = <abc>;
+  │            ^^^ unexpected byte literal size
+5 │

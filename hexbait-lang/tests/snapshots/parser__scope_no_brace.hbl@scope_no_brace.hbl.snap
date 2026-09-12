@@ -1,0 +1,44 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "!endian le;\n\n!scope xyz;\na u8;\n"
+input_file: hexbait-lang/tests/parser-cases/scope_no_brace.hbl
+---
+File@0..31
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  Error@13..31
+    ExclamationMark@13..14 "!"
+    Identifier@14..19 "scope"
+    Whitespace@19..20 " "
+    Error@20..30
+      Identifier@20..23 "xyz"
+      Semicolon@23..24 ";"
+      Whitespace@24..25 "\n"
+      Identifier@25..26 "a"
+      Whitespace@26..27 " "
+      Identifier@27..29 "u8"
+      Semicolon@29..30 ";"
+    Whitespace@30..31 "\n"
+    StructBlock@31..31
+
+--- diagnostics ---
+error: expected `at` or `in`
+  ┌─ scope_no_brace.hbl:3:8
+  │
+2 │ 
+3 │ !scope xyz;
+  │        ^^^ found unexpected token identifier
+4 │ a u8;
+
+
+error: expected `{`
+  ┌─ scope_no_brace.hbl:5:1
+  │
+4 │ a u8;
+5 │ 
+  │ ^ found unexpected token end of file

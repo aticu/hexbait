@@ -1,0 +1,91 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "!endian le;\n\na switch 1 {\n    0 => u8,\n};\nb switch a {\n    a => u8,\n    _ => u16,\n};\n"
+input_file: hexbait-lang/tests/parser-cases/parse_and_lower_errors.hbl
+---
+File@0..85
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  StructField@13..41
+    Identifier@13..14 "a"
+    Whitespace@14..15 " "
+    SwitchParseType@15..40
+      SwitchKw@15..21 "switch"
+      Whitespace@21..22 " "
+      Atom@22..23
+        DecimalIntegerLiteral@22..23 "1"
+      Whitespace@23..24 " "
+      LBrace@24..25 "{"
+      Whitespace@25..30 "\n    "
+      SwitchParseTypeArm@30..38
+        Atom@30..31
+          DecimalIntegerLiteral@30..31 "0"
+        Whitespace@31..32 " "
+        Equals@32..33 "="
+        RAngle@33..34 ">"
+        Whitespace@34..35 " "
+        NamedParseType@35..37
+          Identifier@35..37 "u8"
+        Comma@37..38 ","
+      Whitespace@38..39 "\n"
+      Error@39..39
+      RBrace@39..40 "}"
+    Semicolon@40..41 ";"
+  Whitespace@41..42 "\n"
+  StructField@42..84
+    Identifier@42..43 "b"
+    Whitespace@43..44 " "
+    SwitchParseType@44..83
+      SwitchKw@44..50 "switch"
+      Whitespace@50..51 " "
+      Atom@51..52
+        Identifier@51..52 "a"
+      Whitespace@52..53 " "
+      LBrace@53..54 "{"
+      Whitespace@54..59 "\n    "
+      SwitchParseTypeArm@59..67
+        Atom@59..60
+          Identifier@59..60 "a"
+        Whitespace@60..61 " "
+        Equals@61..62 "="
+        RAngle@62..63 ">"
+        Whitespace@63..64 " "
+        NamedParseType@64..66
+          Identifier@64..66 "u8"
+        Comma@66..67 ","
+      Whitespace@67..72 "\n    "
+      Underscore@72..73 "_"
+      Whitespace@73..74 " "
+      Equals@74..75 "="
+      RAngle@75..76 ">"
+      Whitespace@76..77 " "
+      NamedParseType@77..80
+        Identifier@77..80 "u16"
+      Comma@80..81 ","
+      Whitespace@81..82 "\n"
+      RBrace@82..83 "}"
+    Semicolon@83..84 ";"
+  Whitespace@84..85 "\n"
+
+--- diagnostics ---
+error: expected `_`
+  ┌─ parse_and_lower_errors.hbl:5:1
+  │
+4 │     0 => u8,
+5 │ };
+  │ ^ found unexpected token `}`
+6 │ b switch a {
+
+
+error: switch branch must be a literal
+  ┌─ parse_and_lower_errors.hbl:7:5
+  │
+6 │ b switch a {
+7 │     a => u8,
+  │     ^ not a literal
+8 │     _ => u16,
