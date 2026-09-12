@@ -44,11 +44,11 @@ pub fn compile_file(name: &str, content: &str) -> CompileResult<ir::File> {
     let parse = parse_file(content);
     diagnostics.add_diagnostics(parse.diagnostics);
 
+    let ir = lower_file(parse.ast, &mut diagnostics);
     if diagnostics.contains_errors() {
         return CompileResult::Failure { diagnostics };
     }
 
-    let ir = lower_file(parse.ast);
     // TODO: use these
     let _resolved_names = check_ir(&ir).unwrap();
 
@@ -70,7 +70,10 @@ pub fn compile_expr(name: &str, content: &str) -> CompileResult<ir::Expr> {
         return CompileResult::Failure { diagnostics };
     }
 
-    let ir = lower_expr(parse.ast);
+    let ir = lower_expr(parse.ast, &mut diagnostics);
+    if diagnostics.contains_errors() {
+        return CompileResult::Failure { diagnostics };
+    }
 
     if diagnostics.is_empty() {
         CompileResult::NoDiagnostics { ir }

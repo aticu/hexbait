@@ -13,6 +13,13 @@ pub struct Span {
     pub(crate) end: usize,
 }
 
+impl Span {
+    /// Whether two spans overlap.
+    pub fn contains(self, other: Span) -> bool {
+        self.start <= other.start && other.end <= self.end
+    }
+}
+
 impl fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}..{}", self.start, self.end)

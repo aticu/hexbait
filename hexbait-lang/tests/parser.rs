@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use hexbait_lang::compile::{ast::AstNode as _, parser::parse_file};
+use hexbait_lang::compile::{CompileResult, ast::AstNode as _, compile_file, parser::parse_file};
 
 /// Goes through all parser test cases and snapshots their parse trees.
 #[test]
@@ -29,13 +29,20 @@ fn snapshot_file_parse_tree(path: &Path) {
 
     let mut result = format!("{:#?}\n--- diagnostics ---\n", parse.ast.syntax());
 
-    if parse.diagnostics.is_empty() {
-        result.push_str("no diagnostics");
-    } else {
-        for diagnostic in parse.diagnostics {
+    // use the diagnostics of later stages too
+    let diagnostics = match compile_file(name, &content) {
+        CompileResult::NoDiagnostics { ir: _ } => None,
+        CompileResult::WithWarnings { ir: _, diagnostics }
+        | CompileResult::Failure { diagnostics } => Some(diagnostics),
+    };
+
+    if let Some(diagnostics) = diagnostics {
+        for diagnostic in &diagnostics {
             result.push_str(&diagnostic.emit_to_str(name, &content).unwrap());
             result.push('\n');
         }
+    } else {
+        result.push_str("no diagnostics");
     }
 
     insta::assert_snapshot!(name, result);

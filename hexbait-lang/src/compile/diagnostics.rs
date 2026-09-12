@@ -271,6 +271,17 @@ impl Diagnostics {
         self.contains_errors
     }
 
+    /// Whether the diagnostics contain an error within the given `Span`.
+    pub fn contains_error_in(&self, span: Span) -> bool {
+        for diagnostic in &self.diagnostics {
+            if span.contains(diagnostic.main_label().span()) && diagnostic.level().is_err() {
+                return true;
+            }
+        }
+
+        false
+    }
+
     /// Whether any diagnostics are contained.
     pub fn is_empty(&self) -> bool {
         self.diagnostics.is_empty()
