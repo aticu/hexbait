@@ -89,7 +89,13 @@ impl LoweringCtx<'_> {
             ast::StructContent::StructField(struct_field) => self
                 .lower_struct_field(struct_field)
                 .map(StructContent::Field),
-            ast::StructContent::Struct(_) => todo!(),
+            ast::StructContent::Struct(_) => {
+                self.add_diagnostic(Diagnostic::error(
+                    "named `struct`s currently unsupported",
+                    Label::new("unsupported language feature", struct_content.span()),
+                ));
+                None
+            }
             ast::StructContent::LetStatement(let_statement) => self
                 .lower_let_statement(let_statement)
                 .map(StructContent::LetStatement),
@@ -167,7 +173,8 @@ impl LoweringCtx<'_> {
                 } else {
                     let expected = expected.as_ref().parser_expect();
                     let ExprKind::Lit(Lit::Bytes(bytes)) = &expected.kind else {
-                        todo!()
+                        self.add_diagnostic(Diagnostic::error("expected bytes value as the expected value for bytes type", Label::new("found unexpected type", expected.span)));
+                        return ParseTypeKind::Error
                     };
                     RepeatKind::Len {
                         count: Expr {
