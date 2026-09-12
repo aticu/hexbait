@@ -62,26 +62,34 @@ File@0..57
 error: expected identifier
   ┌─ basic_recovery.hbl:3:4
   │
+2 │ 
 3 │ let;
   │    ^ found unexpected token `;`
+4 │ let x;
 
 
 error: expected `=`
   ┌─ basic_recovery.hbl:4:6
   │
+3 │ let;
 4 │ let x;
   │      ^ found unexpected token `;`
+5 │ let x =;
 
 
 error: expected identifier, literal, `peek`, `concat`, `$`, `<` or `(`
   ┌─ basic_recovery.hbl:5:8
   │
+4 │ let x;
 5 │ let x =;
   │        ^ found unexpected token `;`
+6 │ x {
 
 
 error: expected identifier, literal, `peek`, `concat`, `$`, `<` or `(`
   ┌─ basic_recovery.hbl:8:1
   │
+7 │     let x = 
 8 │ };
   │ ^ found unexpected token `}`
+9 │ y u8;

@@ -34,5 +34,7 @@ File@0..27
 error: expected an identifier, `{`, `[`, `bytes` or `switch`
   ┌─ recover_parse_type.hbl:3:3
   │
+2 │ 
 3 │ a ) ) ;
   │   ^ found unexpected token `)`
+4 │ b u8;

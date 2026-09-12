@@ -38,5 +38,7 @@ File@0..29
 error: expected identifier, literal, `peek`, `concat`, `$`, `<` or `(`
   ┌─ double_asterisk.hbl:3:12
   │
+2 │ 
 3 │ let x = 1 ** 2;
   │            ^ found unexpected token `*`
+4 │

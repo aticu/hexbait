@@ -31,5 +31,7 @@ File@0..29
 error: expected `endian`, `seek`, `scope`, `if`, `align`, `assert`, `warn` or `recover`
   ┌─ recover_decl.hbl:3:2
   │
+2 │ 
 3 │ !foo bar;
   │  ^^^ found unexpected token identifier
+4 │ a u8;

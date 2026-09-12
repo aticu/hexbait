@@ -75,6 +75,15 @@ impl Diagnostic {
         self.additional_labels.iter()
     }
 
+    /// The config used for reporting errors.
+    fn reporting_config() -> codespan_reporting::term::Config {
+        codespan_reporting::term::Config {
+            before_label_lines: 1,
+            after_label_lines: 1,
+            ..Default::default()
+        }
+    }
+
     /// Turns this diagnostic into a `codespan_reporting` diagnostic.
     fn to_codespan_reporting_diagnostic(&self) -> codespan_reporting::diagnostic::Diagnostic<()> {
         use codespan_reporting::diagnostic::Severity;
@@ -104,7 +113,7 @@ impl Diagnostic {
         let file = codespan_reporting::files::SimpleFile::new(source_name, source_text);
         let diagnostic = self.to_codespan_reporting_diagnostic();
 
-        let config = codespan_reporting::term::Config::default();
+        let config = Diagnostic::reporting_config();
 
         match codespan_reporting::term::emit_to_write_style(
             &mut codespan_reporting::term::termcolor::StandardStream::stderr(
@@ -127,7 +136,7 @@ impl Diagnostic {
         let file = codespan_reporting::files::SimpleFile::new(source_name, source_text);
         let diagnostic = self.to_codespan_reporting_diagnostic();
 
-        let config = codespan_reporting::term::Config::default();
+        let config = Diagnostic::reporting_config();
         let mut out = String::new();
 
         match codespan_reporting::term::emit_to_string(&mut out, &config, &file, &diagnostic) {
@@ -149,7 +158,7 @@ impl Diagnostic {
         let file = codespan_reporting::files::SimpleFile::new(source_name, source_text);
         let diagnostic = self.to_codespan_reporting_diagnostic();
 
-        let config = codespan_reporting::term::Config::default();
+        let config = Diagnostic::reporting_config();
 
         match codespan_reporting::term::emit_to_write_style(
             &mut custom_emitter::Emitter(emitter),
