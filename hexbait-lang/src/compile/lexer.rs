@@ -327,13 +327,13 @@ pub fn lex(input: &str) -> Vec<Token> {
 
                 tokens.push(Token {
                     kind: TokenKind::BlockComment,
-                    span: Span { start, end },
+                    span: Span::from_start_end(start, end),
                 });
             }
             _ => {
                 tokens.push(Token {
                     kind,
-                    span: Span { start, end },
+                    span: Span::from_start_end(start, end),
                 });
             }
         }

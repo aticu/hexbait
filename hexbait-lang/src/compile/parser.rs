@@ -44,7 +44,7 @@ fn parse<Result: AstNode>(source: &str, parse_fn: impl FnOnce(&mut Parser)) -> P
             <crate::compile::syntax::Language as rowan::Language>::kind_to_raw(SyntaxKind::from(
                 t.kind,
             )),
-            &source[t.span.start..t.span.end],
+            &source[t.span.range()],
         );
     };
     let start_node = |kind: Option<NodeKind>, builder: &mut GreenNodeBuilder| {

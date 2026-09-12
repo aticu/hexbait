@@ -130,7 +130,7 @@ impl<'src> Parser<'src> {
 
                 PeekedToken {
                     kind: token.kind,
-                    text: &self.src[token.span.start..token.span.end],
+                    text: &self.src[token.span.range()],
                     preceeded_by_trivia,
                 }
             })
@@ -283,10 +283,11 @@ impl<'src> Parser<'src> {
             return;
         }
 
-        let span = self.tokens.get(self.pos).map(|t| t.span).unwrap_or(Span {
-            start: self.src.len(),
-            end: self.src.len(),
-        });
+        let span = self
+            .tokens
+            .get(self.pos)
+            .map(|t| t.span)
+            .unwrap_or(Span::from_start_end(self.src.len(), self.src.len()));
 
         let message = match expected.len() {
             0 => unreachable!(),

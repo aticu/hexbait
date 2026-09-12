@@ -84,19 +84,17 @@ impl Diagnostic {
             DiagnosticLevel::Error => Severity::Error,
         };
 
-        let map_span = |span: Span| span.start..span.end;
-
         codespan_reporting::diagnostic::Diagnostic::new(severity)
             .with_message(self.message())
             .with_label(
                 codespan_reporting::diagnostic::Label::primary(
                     (),
-                    map_span(self.main_label().span()),
+                    self.main_label().span().range(),
                 )
                 .with_message(self.main_label().message()),
             )
             .with_labels_iter(self.additional_labels().map(|label| {
-                codespan_reporting::diagnostic::Label::secondary((), map_span(label.span()))
+                codespan_reporting::diagnostic::Label::secondary((), label.span().range())
                     .with_message(label.message())
             }))
     }
@@ -273,13 +271,9 @@ impl Diagnostics {
 
     /// Whether the diagnostics contain an error within the given `Span`.
     pub fn contains_error_in(&self, span: Span) -> bool {
-        for diagnostic in &self.diagnostics {
-            if span.contains(diagnostic.main_label().span()) && diagnostic.level().is_err() {
-                return true;
-            }
-        }
-
-        false
+        self.diagnostics.iter().any(|diagnostic| {
+            span.contains(diagnostic.main_label().span()) && diagnostic.level().is_err()
+        })
     }
 
     /// Whether any diagnostics are contained.

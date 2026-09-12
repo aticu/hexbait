@@ -66,10 +66,6 @@ pub fn compile_expr(name: &str, content: &str) -> CompileResult<ir::Expr> {
     let parse = parse_expr(content);
     diagnostics.add_diagnostics(parse.diagnostics);
 
-    if diagnostics.contains_errors() {
-        return CompileResult::Failure { diagnostics };
-    }
-
     let ir = lower_expr(parse.ast, &mut diagnostics);
     if diagnostics.contains_errors() {
         return CompileResult::Failure { diagnostics };
