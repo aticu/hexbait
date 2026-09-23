@@ -1,95 +1,102 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: result
+expression: "!endian le;\n\nsignature bytes = \"regi\";\nchecksum u32;\nnumber_of_entries u32;\nreserved u32;\n\nentries [{\n    region_type_identifier bytes len 16;\n    region_data_offset u64;\n    region_data_size u32;\n    is_required_flag u32;\n}] len number_of_entries;\n"
 input_file: format_descriptions/vhdx_region_table.hbl
 ---
-File@0..236
-  StructField@0..25
-    Identifier@0..9 "signature"
-    Whitespace@9..10 " "
-    BytesParseType@10..15
-      BytesKw@10..15 "bytes"
-    Whitespace@15..16 " "
-    Equals@16..17 "="
-    Whitespace@17..18 " "
-    Atom@18..24
-      StringLiteral@18..24 "\"regi\""
-    Semicolon@24..25 ";"
-  Whitespace@25..26 "\n"
-  StructField@26..39
-    Identifier@26..34 "checksum"
-    Whitespace@34..35 " "
-    NamedParseType@35..38
-      Identifier@35..38 "u32"
-    Semicolon@38..39 ";"
-  Whitespace@39..40 "\n"
-  StructField@40..62
-    Identifier@40..57 "number_of_entries"
-    Whitespace@57..58 " "
-    NamedParseType@58..61
-      Identifier@58..61 "u32"
-    Semicolon@61..62 ";"
-  Whitespace@62..63 "\n"
-  StructField@63..76
-    Identifier@63..71 "reserved"
-    Whitespace@71..72 " "
-    NamedParseType@72..75
-      Identifier@72..75 "u32"
-    Semicolon@75..76 ";"
-  Whitespace@76..78 "\n\n"
-  StructField@78..235
-    Identifier@78..85 "entries"
-    Whitespace@85..86 " "
-    RepeatParseType@86..234
-      LBracket@86..87 "["
-      AnonymousStructParseType@87..211
-        StructBlock@87..211
-          LBrace@87..88 "{"
-          Whitespace@88..93 "\n    "
-          StructField@93..129
-            Identifier@93..115 "region_type_identifier"
-            Whitespace@115..116 " "
-            BytesParseType@116..128
-              BytesKw@116..121 "bytes"
-              Whitespace@121..122 " "
-              RepeatLenDecl@122..128
-                Identifier@122..125 "len"
-                Whitespace@125..126 " "
-                Atom@126..128
-                  DecimalIntegerLiteral@126..128 "16"
-            Semicolon@128..129 ";"
-          Whitespace@129..134 "\n    "
-          StructField@134..157
-            Identifier@134..152 "region_data_offset"
-            Whitespace@152..153 " "
-            NamedParseType@153..156
-              Identifier@153..156 "u64"
-            Semicolon@156..157 ";"
-          Whitespace@157..162 "\n    "
-          StructField@162..183
-            Identifier@162..178 "region_data_size"
-            Whitespace@178..179 " "
-            NamedParseType@179..182
-              Identifier@179..182 "u32"
-            Semicolon@182..183 ";"
-          Whitespace@183..188 "\n    "
-          StructField@188..209
-            Identifier@188..204 "is_required_flag"
-            Whitespace@204..205 " "
-            NamedParseType@205..208
-              Identifier@205..208 "u32"
-            Semicolon@208..209 ";"
-          Whitespace@209..210 "\n"
-          RBrace@210..211 "}"
-      RBracket@211..212 "]"
-      Whitespace@212..213 " "
-      RepeatLenDecl@213..234
-        Identifier@213..216 "len"
-        Whitespace@216..217 " "
-        Atom@217..234
-          Identifier@217..234 "number_of_entries"
-    Semicolon@234..235 ";"
-  Whitespace@235..236 "\n"
+File@0..249
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  StructField@13..38
+    Identifier@13..22 "signature"
+    Whitespace@22..23 " "
+    BytesParseType@23..28
+      BytesKw@23..28 "bytes"
+    Whitespace@28..29 " "
+    Equals@29..30 "="
+    Whitespace@30..31 " "
+    Atom@31..37
+      StringLiteral@31..37 "\"regi\""
+    Semicolon@37..38 ";"
+  Whitespace@38..39 "\n"
+  StructField@39..52
+    Identifier@39..47 "checksum"
+    Whitespace@47..48 " "
+    NamedParseType@48..51
+      Identifier@48..51 "u32"
+    Semicolon@51..52 ";"
+  Whitespace@52..53 "\n"
+  StructField@53..75
+    Identifier@53..70 "number_of_entries"
+    Whitespace@70..71 " "
+    NamedParseType@71..74
+      Identifier@71..74 "u32"
+    Semicolon@74..75 ";"
+  Whitespace@75..76 "\n"
+  StructField@76..89
+    Identifier@76..84 "reserved"
+    Whitespace@84..85 " "
+    NamedParseType@85..88
+      Identifier@85..88 "u32"
+    Semicolon@88..89 ";"
+  Whitespace@89..91 "\n\n"
+  StructField@91..248
+    Identifier@91..98 "entries"
+    Whitespace@98..99 " "
+    RepeatParseType@99..247
+      LBracket@99..100 "["
+      AnonymousStructParseType@100..224
+        StructBlock@100..224
+          LBrace@100..101 "{"
+          Whitespace@101..106 "\n    "
+          StructField@106..142
+            Identifier@106..128 "region_type_identifier"
+            Whitespace@128..129 " "
+            BytesParseType@129..141
+              BytesKw@129..134 "bytes"
+              Whitespace@134..135 " "
+              RepeatLenDecl@135..141
+                Identifier@135..138 "len"
+                Whitespace@138..139 " "
+                Atom@139..141
+                  DecimalIntegerLiteral@139..141 "16"
+            Semicolon@141..142 ";"
+          Whitespace@142..147 "\n    "
+          StructField@147..170
+            Identifier@147..165 "region_data_offset"
+            Whitespace@165..166 " "
+            NamedParseType@166..169
+              Identifier@166..169 "u64"
+            Semicolon@169..170 ";"
+          Whitespace@170..175 "\n    "
+          StructField@175..196
+            Identifier@175..191 "region_data_size"
+            Whitespace@191..192 " "
+            NamedParseType@192..195
+              Identifier@192..195 "u32"
+            Semicolon@195..196 ";"
+          Whitespace@196..201 "\n    "
+          StructField@201..222
+            Identifier@201..217 "is_required_flag"
+            Whitespace@217..218 " "
+            NamedParseType@218..221
+              Identifier@218..221 "u32"
+            Semicolon@221..222 ";"
+          Whitespace@222..223 "\n"
+          RBrace@223..224 "}"
+      RBracket@224..225 "]"
+      Whitespace@225..226 " "
+      RepeatLenDecl@226..247
+        Identifier@226..229 "len"
+        Whitespace@229..230 " "
+        Atom@230..247
+          Identifier@230..247 "number_of_entries"
+    Semicolon@247..248 ";"
+  Whitespace@248..249 "\n"
 
 --- diagnostics ---
 no diagnostics

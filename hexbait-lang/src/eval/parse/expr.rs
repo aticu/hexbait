@@ -46,7 +46,6 @@ impl ParseContext {
                 kind: ValueKind::Integer(Int::from(cursor.offset().as_u64())),
                 provenance: Provenance::empty(),
             }),
-            ExprKind::Parent => Ok(struct_ctx.parent().static_analysis_expect().as_value()),
             ExprKind::Last => Ok(additional_ctx.last.static_analysis_expect().clone()),
             ExprKind::Len => Ok(additional_ctx.len.static_analysis_expect().clone()),
             ExprKind::UnOp { op, operand } => {

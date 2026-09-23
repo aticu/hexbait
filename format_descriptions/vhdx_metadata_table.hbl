@@ -1,3 +1,5 @@
+!endian le;
+
 signature bytes = "metadata";
 unknown u16;
 number_of_entries u16;

@@ -1,6 +1,6 @@
 //! Implements a test harness for the parser output.
 
-use std::ffi::OsStr;
+use std::{ffi::OsStr, path::Path};
 
 use hexbait_common::{Input, RelativeOffset};
 use hexbait_lang::{
@@ -30,7 +30,11 @@ fn cases() {
             let input =
                 parse_hex(&hex_text).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
             let debug_info = format!("\n=== Spec ===\n{spec}\n\n=== Hex ===\n{hex_text}");
-            insta::assert_snapshot!(name.clone(), render(&name, &spec, &input), &debug_info);
+            insta::assert_snapshot!(
+                name.clone(),
+                render(&name, &spec, &input, spec_path),
+                &debug_info
+            );
 
             tests_run += 1;
         }
@@ -42,13 +46,13 @@ fn cases() {
 }
 
 /// Renders the parsed JSON for later diffing.
-fn render(name: &str, spec: &str, input: &[u8]) -> String {
+fn render(name: &str, spec: &str, input: &[u8], path: &Path) -> String {
     let ir = match compile_file(name, spec) {
         CompileResult::NoDiagnostics { ir } => ir,
         CompileResult::WithWarnings { ir: _, diagnostics }
         | CompileResult::Failure { diagnostics } => {
             diagnostics.emit_to_stderr();
-            panic!("test case did not compile correctly");
+            panic!("test case {} did not compile correctly", path.display());
         }
     };
 

@@ -1,3 +1,5 @@
+!endian le;
+
 boot_entry_point bytes len 3;
 file_system_signature bytes = "-FVE-FS-";
 bytes_per_sector u16;

@@ -12,7 +12,7 @@ pub use diagnostics::{Diagnostic, DiagnosticEmitter, Diagnostics, RgbColor, Styl
 pub use span::Span;
 
 use crate::compile::{
-    ir::{check_ir, lower_expr, lower_file},
+    ir::{check_expr, check_file, lower_expr, lower_file},
     parser::{parse_expr, parse_file},
 };
 
@@ -43,16 +43,12 @@ pub fn compile_file(name: &str, content: &str) -> CompileResult<ir::File> {
 
     let parse = parse_file(content);
     diagnostics.add_diagnostics(parse.diagnostics);
-
     let ir = lower_file(parse.ast, &mut diagnostics);
+    check_file(&ir, &mut diagnostics);
+
     if diagnostics.contains_errors() {
-        return CompileResult::Failure { diagnostics };
-    }
-
-    // TODO: use these
-    let _resolved_names = check_ir(&ir).unwrap();
-
-    if diagnostics.is_empty() {
+        CompileResult::Failure { diagnostics }
+    } else if diagnostics.is_empty() {
         CompileResult::NoDiagnostics { ir }
     } else {
         CompileResult::WithWarnings { ir, diagnostics }
@@ -65,13 +61,12 @@ pub fn compile_expr(name: &str, content: &str) -> CompileResult<ir::Expr> {
 
     let parse = parse_expr(content);
     diagnostics.add_diagnostics(parse.diagnostics);
-
     let ir = lower_expr(parse.ast, &mut diagnostics);
-    if diagnostics.contains_errors() {
-        return CompileResult::Failure { diagnostics };
-    }
+    check_expr(&ir, &mut diagnostics);
 
-    if diagnostics.is_empty() {
+    if diagnostics.contains_errors() {
+        CompileResult::Failure { diagnostics }
+    } else if diagnostics.is_empty() {
         CompileResult::NoDiagnostics { ir }
     } else {
         CompileResult::WithWarnings { ir, diagnostics }

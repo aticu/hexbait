@@ -7,7 +7,7 @@ use smol_str::SmolStr;
 
 use crate::compile::{Span, syntax::SyntaxToken};
 
-pub use analysis::check_ir;
+pub use analysis::{check_expr, check_file};
 pub use expr::*;
 pub use lowering::{lower_expr, lower_file};
 pub use str::str_lit_content_to_bytes;
@@ -72,9 +72,18 @@ pub struct File {
     pub content: Vec<StructContent>,
 }
 
-/// The possible content of a `struct` in the hexbait language.
+/// The content of a struct.
 #[derive(Debug)]
-pub enum StructContent {
+pub struct StructContent {
+    /// The kind of the content.
+    pub kind: StructContentKind,
+    /// The span of the content.
+    pub span: Span,
+}
+
+/// The possible kind of a `struct` content in the hexbait language.
+#[derive(Debug)]
+pub enum StructContentKind {
     /// A field of the `struct`.
     Field(StructField),
     /// A declaration in the `struct`.
@@ -83,6 +92,15 @@ pub enum StructContent {
     LetStatement(LetStatement),
     /// A `struct` content that contained an error during parsing.
     Error,
+}
+
+/// A single block with struct content.
+#[derive(Debug)]
+pub struct Block {
+    /// The content of the block.
+    pub content: Vec<StructContent>,
+    /// The span of the block.
+    pub span: Span,
 }
 
 /// A field of a `struct`.
@@ -124,7 +142,16 @@ pub enum ScopeKind {
 
 /// A declaration found in a `struct`.
 #[derive(Debug)]
-pub enum Declaration {
+pub struct Declaration {
+    /// The kind of the declaration.
+    pub kind: DeclarationKind,
+    /// The span of the declaration.
+    pub span: Span,
+}
+
+/// The kind of a declaration found in a `struct`.
+#[derive(Debug)]
+pub enum DeclarationKind {
     /// Declares the endianness.
     Endianness(Endianness),
     /// Aligns to a certain number of bytes.
@@ -137,8 +164,8 @@ pub enum Declaration {
     Scope {
         /// The kind of the scope.
         kind: ScopeKind,
-        /// The content of the scope.
-        content: Vec<StructContent>,
+        /// The content block of the scope.
+        block: Block,
     },
     If(IfChain),
     /// Asserts that the given expression is true.
@@ -165,21 +192,21 @@ pub enum Declaration {
 /// A chain of `if` statements.
 #[derive(Debug)]
 pub struct IfChain {
-    /// The condition that decides which branch to take.
-    pub condition: Expr,
-    /// The content to parse if the condition is true.
-    pub then_block: Vec<StructContent>,
+    /// The `if` blocks.
+    ///
+    /// These are executed in order and execution stops once the first is discovered.
+    pub if_blocks: Vec<IfBlock>,
     /// The else part of the if chain.
-    pub else_part: Option<ElsePart>,
+    pub else_block: Option<Block>,
 }
 
-/// The `else` part of an if chain.
+/// A conditionally executed block.
 #[derive(Debug)]
-pub enum ElsePart {
-    /// An else block that is the end of the chain.
-    ElseBlock(Vec<StructContent>),
-    /// Another nested if chain.
-    IfChain(Box<IfChain>),
+pub struct IfBlock {
+    /// The expression that determines if the block is executed.
+    pub condition: Expr,
+    /// The block that is executed if the condition is `true`.
+    pub block: Block,
 }
 
 /// A description of a parsing type.
@@ -216,26 +243,26 @@ pub enum ParseTypeKind {
     /// Parses an array of contiguous bytes.
     Bytes {
         /// The repetition that determines the number of bytes to parse.
-        repetition_kind: RepeatKind,
+        repetition: Repetition,
     },
     /// Parses another parse type repeatedly with a given repetition kind.
     Repeating {
         /// The parse type to parse.
         parse_type: Box<ParseType>,
-        /// The repetition kind.
-        repetition_kind: RepeatKind,
+        /// The repetition.
+        repetition: Repetition,
     },
     /// Parses an anonymous `struct` declaration.
     Struct {
         /// The content of the `struct`.
-        content: Vec<StructContent>,
+        block: Block,
     },
     /// Parses one of multiple other parse types depending on the value of `scrutinee`.
     Switch {
         /// The value determining which branch to take.
         scrutinee: Expr,
         /// The branches of the `switch` parse type.
-        branches: Vec<(Lit, ParseType)>,
+        branches: Vec<(Lit, Span, ParseType)>,
         /// The default branch if no other branch matches.
         default: Box<ParseType>,
     },
@@ -243,7 +270,16 @@ pub enum ParseTypeKind {
     Error,
 }
 
-/// The type of repetition of a repeating parse type.
+/// The type of a repetition of a repeating parse type.
+#[derive(Debug)]
+pub struct Repetition {
+    /// The kind of the repetition.
+    pub kind: RepeatKind,
+    /// The span of the repetition declaration.
+    pub span: Span,
+}
+
+/// The kind of a repetition.
 #[derive(Debug)]
 pub enum RepeatKind {
     /// Repeats a fixed number of times.

@@ -6,7 +6,7 @@ use crate::{
     Int,
     compile::{
         Span,
-        ir::{Declaration, ScopeKind},
+        ir::{Declaration, DeclarationKind, ScopeKind},
     },
     eval::{
         BytesValue, Diagnostic, DiagnosticLevel, Provenance, View,
@@ -61,22 +61,30 @@ impl ParseContext {
         cursor: &mut Cursor,
         struct_ctx: &mut StructContext,
     ) -> Result<()> {
-        match declaration {
-            Declaration::Endianness(endianness) => cursor.set_endianness(*endianness),
-            Declaration::Align(expr) => {
+        match &declaration.kind {
+            DeclarationKind::Endianness(endianness) => cursor.set_endianness(*endianness),
+            DeclarationKind::Align(expr) => {
                 let value = self.eval_expr(expr, cursor, struct_ctx, Default::default())?;
                 let align = value.kind.expect_int();
-                let align = Len::from(u64::try_from(align).static_analysis_expect());
+                let align = u64::try_from(align).static_analysis_expect();
+
+                if !align.is_power_of_two() {
+                    return Err(self.diagnostics.new_err(
+                        "non-power-of-two alignment".to_string(),
+                        value.provenance.clone(),
+                        expr.span,
+                    ));
+                }
 
                 self.set_offset(
                     cursor,
-                    |offset| Ok(offset.align_up(align)),
+                    |offset| Ok(offset.align_up(Len::from(align))),
                     &value.provenance,
                     expr.span,
                     "during alignment",
                 )?;
             }
-            Declaration::SeekBy(expr) => {
+            DeclarationKind::SeekBy(expr) => {
                 let value = self.eval_expr(expr, cursor, struct_ctx, Default::default())?;
                 let offset = value.kind.expect_int();
 
@@ -92,7 +100,7 @@ impl ParseContext {
                     "during seek",
                 )?;
             }
-            Declaration::SeekTo(expr) => {
+            DeclarationKind::SeekTo(expr) => {
                 let value = self.eval_expr(expr, cursor, struct_ctx, Default::default())?;
                 let offset = value.kind.expect_int();
 
@@ -108,7 +116,7 @@ impl ParseContext {
                     "during seek",
                 )?;
             }
-            Declaration::Scope { kind, content } => {
+            DeclarationKind::Scope { kind, block } => {
                 let (view, span) = match kind {
                     ScopeKind::At { start, end } => {
                         let span = start.span;
@@ -158,14 +166,12 @@ impl ParseContext {
                             .seek_err(err, &Provenance::empty(), span, "for scope")
                     })?;
 
-                for single_content in content {
-                    self.eval_single_struct_content(single_content, &mut subcursor, struct_ctx)?;
-                }
+                self.eval_block(block, &mut subcursor, struct_ctx)?;
             }
-            Declaration::If(if_chain) => {
+            DeclarationKind::If(if_chain) => {
                 self.eval_if_chain(if_chain, cursor, struct_ctx)?;
             }
-            Declaration::Assert { condition, message } => {
+            DeclarationKind::Assert { condition, message } => {
                 let condition_value =
                     self.eval_expr(condition, cursor, struct_ctx, Default::default())?;
                 if !condition_value.kind.expect_bool() {
@@ -192,7 +198,7 @@ impl ParseContext {
                     ));
                 }
             }
-            Declaration::WarnIf { condition, message } => {
+            DeclarationKind::WarnIf { condition, message } => {
                 let condition_value =
                     self.eval_expr(condition, cursor, struct_ctx, Default::default())?;
                 if condition_value.kind.expect_bool() {
@@ -221,7 +227,7 @@ impl ParseContext {
                     struct_ctx.push_diagnostic(id);
                 }
             }
-            Declaration::Recover { at } => {
+            DeclarationKind::Recover { at } => {
                 let offset = self.eval_expr(at, cursor, struct_ctx, Default::default())?;
                 let offset = self.probe_seek(
                     offset.kind.expect_int(),

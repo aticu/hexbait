@@ -6,7 +6,10 @@ use crate::{
         Diagnostic, Diagnostics,
         ast::{self, AstNode as _},
         diagnostics::Label,
-        ir::{ConcatArg, ElsePart, IfChain, ParseTypeKind, ScopeKind, StructRef, StructRefPart},
+        ir::{
+            Block, ConcatArg, DeclarationKind, IfBlock, IfChain, ParseTypeKind, Repetition,
+            ScopeKind, StructContentKind, StructRef, StructRefPart,
+        },
         lexer::TokenKind,
         span::Span,
     },
@@ -82,13 +85,14 @@ impl LoweringCtx<'_> {
 
     /// Lowers the given `struct` content AST to IR.
     fn lower_struct_content(&mut self, struct_content: ast::StructContent) -> StructContent {
-        match struct_content {
+        let span = struct_content.span();
+        let kind = match struct_content {
             ast::StructContent::Declaration(declaration) => self
                 .lower_declaration(declaration)
-                .map(StructContent::Declaration),
+                .map(StructContentKind::Declaration),
             ast::StructContent::StructField(struct_field) => self
                 .lower_struct_field(struct_field)
-                .map(StructContent::Field),
+                .map(StructContentKind::Field),
             ast::StructContent::Struct(_) => {
                 self.add_diagnostic(Diagnostic::error(
                     "named `struct`s currently unsupported",
@@ -98,9 +102,22 @@ impl LoweringCtx<'_> {
             }
             ast::StructContent::LetStatement(let_statement) => self
                 .lower_let_statement(let_statement)
-                .map(StructContent::LetStatement),
+                .map(StructContentKind::LetStatement),
         }
-        .unwrap_or(StructContent::Error)
+        .unwrap_or(StructContentKind::Error);
+
+        StructContent { kind, span }
+    }
+
+    /// Lowers the given `struct` block AST to IR.
+    fn lower_block(&mut self, block: ast::StructBlock) -> Block {
+        Block {
+            content: block
+                .struct_content()
+                .map(|content| self.lower_struct_content(content))
+                .collect(),
+            span: block.span(),
+        }
     }
 
     /// Lowers the given AST `struct` field to IR.
@@ -168,7 +185,7 @@ impl LoweringCtx<'_> {
                 }
             }
             ast::ParseType::BytesParseType(bytes_parse_type) => {
-                let repetition_kind = if let Some(repeat_decl) = bytes_parse_type.repeat_decl() {
+                let repetition = if let Some(repeat_decl) = bytes_parse_type.repeat_decl() {
                     self.lower_repetition(repeat_decl)
                 } else {
                     let expected = expected.as_ref().parser_expect();
@@ -181,15 +198,18 @@ impl LoweringCtx<'_> {
                         }
                         return ParseTypeKind::Error
                     };
-                    RepeatKind::Len {
-                        count: Expr {
-                            kind: ExprKind::Lit(Lit::Int(Int::from(bytes.len()))),
-                            span: expected.span
-                        }
+                    Repetition {
+                        kind: RepeatKind::Len {
+                            count: Expr {
+                                kind: ExprKind::Lit(Lit::Int(Int::from(bytes.len()))),
+                                span: expected.span
+                            }
+                        },
+                        span: expected.span
                     }
                 };
 
-                ParseTypeKind::Bytes { repetition_kind }
+                ParseTypeKind::Bytes { repetition }
             }
             ast::ParseType::RepeatParseType(repeat_parse_type) => {
                 ParseTypeKind::Repeating {
@@ -197,15 +217,14 @@ impl LoweringCtx<'_> {
                         required_field!(repeat_parse_type => ty ? self => ParseTypeKind::Error),
                         &None,
                     )),
-                    repetition_kind: self.lower_repetition(
+                    repetition: self.lower_repetition(
                         required_field!(repeat_parse_type => repetition ? self => ParseTypeKind::Error)
                     ),
                 }
             }
             ast::ParseType::AnonymousStructParseType(struct_parse_type) => {
                 ParseTypeKind::Struct {
-                    content: required_field!(struct_parse_type => struct_block ? self => ParseTypeKind::Error)
-                        .struct_content().map(|content| self.lower_struct_content(content)).collect(),
+                    block: self.lower_block(required_field!(struct_parse_type => struct_block ? self => ParseTypeKind::Error))
                 }
             }
             ast::ParseType::SwitchParseType(switch_parse_type) => {
@@ -225,7 +244,7 @@ impl LoweringCtx<'_> {
                     );
 
                     if let ExprKind::Lit(lit) = value.kind {
-                        branches.push((lit, parse_ty));
+                        branches.push((lit, value.span, parse_ty));
                     } else {
                         self.add_diagnostic(Diagnostic::error("switch branch must be a literal", Label::new("not a literal", value.span)));
                     }
@@ -242,18 +261,22 @@ impl LoweringCtx<'_> {
     }
 
     /// Lowers the given AST repetition to IR.
-    fn lower_repetition(&mut self, repetition: ast::RepeatDecl) -> RepeatKind {
-        match repetition {
-            ast::RepeatDecl::RepeatLenDecl(repeat_len_decl) => RepeatKind::Len {
-                count: self.lower_expr(
-                    required_field!(repeat_len_decl => count ? self => RepeatKind::Error),
-                ),
+    fn lower_repetition(&mut self, repetition: ast::RepeatDecl) -> Repetition {
+        let span = repetition.span();
+        Repetition {
+            kind: match repetition {
+                ast::RepeatDecl::RepeatLenDecl(repeat_len_decl) => RepeatKind::Len {
+                    count: self.lower_expr(
+                        required_field!(repeat_len_decl => count ? self => Repetition { kind: RepeatKind::Error, span }),
+                    ),
+                },
+                ast::RepeatDecl::RepeatWhileDecl(repeat_while_decl) => RepeatKind::While {
+                    condition: self.lower_expr(
+                        required_field!(repeat_while_decl => condition ? self => Repetition { kind: RepeatKind::Error, span }),
+                    ),
+                },
             },
-            ast::RepeatDecl::RepeatWhileDecl(repeat_while_decl) => RepeatKind::While {
-                condition: self.lower_expr(
-                    required_field!(repeat_while_decl => condition ? self => RepeatKind::Error),
-                ),
-            },
+            span
         }
     }
 
@@ -273,7 +296,6 @@ impl LoweringCtx<'_> {
                 let name = required_field!(metavar => name ? self => ExprKind::Error);
                 match name.text() {
                     "offset" => ExprKind::Offset,
-                    "parent" => ExprKind::Parent,
                     "last" => ExprKind::Last,
                     "len" => ExprKind::Len,
                     var => {
@@ -460,7 +482,11 @@ impl LoweringCtx<'_> {
             required_field!(field_access => field ? self => ExprKind::Error),
         );
 
-        fn lower_struct_ref(lowering_ctx: &mut LoweringCtx, expr: ast::Expr) -> Option<StructRef> {
+        fn lower_struct_ref(
+            lowering_ctx: &mut LoweringCtx,
+            parts: &mut Vec<Spanned<StructRefPart>>,
+            expr: ast::Expr,
+        ) -> Option<()> {
             let span = expr.span();
             let mut err = || {
                 lowering_ctx.add_diagnostic(Diagnostic::error(
@@ -469,44 +495,58 @@ impl LoweringCtx<'_> {
                 ));
             };
 
+            let span = expr.span();
+
             match expr {
                 ast::Expr::Atom(atom) if atom.child_kind() == Some(TokenKind::Identifier) => {
-                    let name = Spanned::<Symbol>::from(atom.child().parser_expect());
-
-                    Some(StructRef::Root(StructRefPart::Named(name)))
+                    parts.push(Spanned {
+                        inner: StructRefPart::Named(Symbol::from(atom.child().parser_expect())),
+                        span,
+                    });
                 }
                 ast::Expr::Metavar(metavar) => {
                     if metavar.text() == "$parent" {
-                        Some(StructRef::Root(StructRefPart::Parent))
+                        parts.push(Spanned {
+                            inner: StructRefPart::Parent,
+                            span,
+                        });
                     } else if metavar.text() == "$last" {
-                        Some(StructRef::Root(StructRefPart::Last))
+                        parts.push(Spanned {
+                            inner: StructRefPart::Last,
+                            span,
+                        });
                     } else {
                         err();
-                        None
+                        return None;
                     }
                 }
-                ast::Expr::FieldAccess(field_access) => Some(StructRef::Chained {
-                    parent: Box::new(lower_struct_ref(
-                        lowering_ctx,
-                        field_access.expr().parser_expect(),
-                    )?),
-                    field: StructRefPart::Named(Spanned::<Symbol>::from(
-                        required_field!(field_access => field ? lowering_ctx => None),
-                    )),
-                }),
+                ast::Expr::FieldAccess(field_access) => {
+                    lower_struct_ref(lowering_ctx, parts, field_access.expr().parser_expect())?;
+                    let field = required_field!(field_access => field ? lowering_ctx => None);
+                    let span = Span::from(field.text_range());
+                    parts.push(Spanned {
+                        inner: StructRefPart::Named(Symbol::from(field)),
+                        span,
+                    });
+                }
                 _ => {
                     err();
-                    None
+                    return None;
                 }
             }
+
+            Some(())
         }
 
-        let struct_ref = match lower_struct_ref(self, expr) {
-            Some(struct_ref) => struct_ref,
-            None => return ExprKind::Error,
+        let mut parts = Vec::new();
+        let Some(()) = lower_struct_ref(self, &mut parts, expr) else {
+            return ExprKind::Error;
         };
 
-        ExprKind::FieldAccess { struct_ref, field }
+        ExprKind::FieldAccess {
+            struct_ref: StructRef { parts },
+            field,
+        }
     }
 
     /// Lowers the given AST `peek` expression to IR.
@@ -592,7 +632,10 @@ impl LoweringCtx<'_> {
             }
         };
 
-        Some(Declaration::Endianness(endianness))
+        Some(Declaration {
+            kind: DeclarationKind::Endianness(endianness),
+            span: endianness_declaration.span(),
+        })
     }
 
     /// Lowers the given AST `align` declaration to IR.
@@ -600,9 +643,12 @@ impl LoweringCtx<'_> {
         &mut self,
         align_declaration: ast::AlignDeclaration,
     ) -> Option<Declaration> {
-        Some(Declaration::Align(self.lower_expr(
-            required_field!(align_declaration => amount ? self => None),
-        )))
+        Some(Declaration {
+            kind: DeclarationKind::Align(
+                self.lower_expr(required_field!(align_declaration => amount ? self => None)),
+            ),
+            span: align_declaration.span(),
+        })
     }
 
     /// Lowers the given AST `seek by` declaration to IR.
@@ -610,9 +656,12 @@ impl LoweringCtx<'_> {
         &mut self,
         seek_by: ast::SeekByDeclaration,
     ) -> Option<Declaration> {
-        Some(Declaration::SeekBy(self.lower_expr(
-            required_field!(seek_by => amount ? self => None),
-        )))
+        Some(Declaration {
+            kind: DeclarationKind::SeekBy(
+                self.lower_expr(required_field!(seek_by => amount ? self => None)),
+            ),
+            span: seek_by.span(),
+        })
     }
 
     /// Lowers the given AST `seek to` declaration to IR.
@@ -620,9 +669,12 @@ impl LoweringCtx<'_> {
         &mut self,
         seek_to: ast::SeekToDeclaration,
     ) -> Option<Declaration> {
-        Some(Declaration::SeekTo(self.lower_expr(
-            required_field!(seek_to => amount ? self => None),
-        )))
+        Some(Declaration {
+            kind: DeclarationKind::SeekTo(
+                self.lower_expr(required_field!(seek_to => amount ? self => None)),
+            ),
+            span: seek_to.span(),
+        })
     }
 
     /// Lowers the given AST `scope at` declaration to IR.
@@ -632,19 +684,13 @@ impl LoweringCtx<'_> {
     ) -> Option<Declaration> {
         let start = self.lower_expr(required_field!(scope_at => start ? self => None));
         let end = scope_at.end().map(|expr| self.lower_expr(expr));
-        let mut content = Vec::new();
 
-        for single_content in scope_at
-            .struct_block()
-            .iter()
-            .flat_map(|block| block.struct_content())
-        {
-            content.push(self.lower_struct_content(single_content));
-        }
-
-        Some(Declaration::Scope {
-            kind: ScopeKind::At { start, end },
-            content,
+        Some(Declaration {
+            kind: DeclarationKind::Scope {
+                kind: ScopeKind::At { start, end },
+                block: self.lower_block(required_field!(scope_at => struct_block ? self => None)),
+            },
+            span: scope_at.span(),
         })
     }
 
@@ -654,63 +700,68 @@ impl LoweringCtx<'_> {
         scope_in: ast::ScopeInDeclaration,
     ) -> Option<Declaration> {
         let bytes = self.lower_expr(required_field!(scope_in => bytes ? self => None));
-        let mut content = Vec::new();
 
-        for single_content in scope_in
-            .struct_block()
-            .iter()
-            .flat_map(|block| block.struct_content())
-        {
-            content.push(self.lower_struct_content(single_content));
-        }
-
-        Some(Declaration::Scope {
-            kind: ScopeKind::In { bytes },
-            content,
+        Some(Declaration {
+            kind: DeclarationKind::Scope {
+                kind: ScopeKind::In { bytes },
+                block: self.lower_block(required_field!(scope_in => struct_block ? self => None)),
+            },
+            span: scope_in.span(),
         })
     }
 
     /// Lowers the given AST `if` declaration to IR.
     fn lower_if_declaration(&mut self, if_decl: ast::IfDeclaration) -> Option<Declaration> {
-        Some(Declaration::If(self.lower_if_chain(
-            required_field!(if_decl => if_chain ? self => None),
-        )?))
+        Some(Declaration {
+            kind: DeclarationKind::If(
+                self.lower_if_chain(required_field!(if_decl => if_chain ? self => None))?,
+            ),
+            span: if_decl.span(),
+        })
     }
 
     /// Lowers the given AST `if` chain to IR.
     fn lower_if_chain(&mut self, if_chain: ast::IfChain) -> Option<IfChain> {
-        let condition = self.lower_expr(required_field!(if_chain => condition ? self => None));
-        let then_block = required_field!(if_chain => then_block ? self => None)
-            .struct_content()
-            .map(|content| self.lower_struct_content(content))
-            .collect();
+        fn lower_into(
+            this: &mut LoweringCtx,
+            if_blocks: &mut Vec<IfBlock>,
+            if_chain: ast::IfChain,
+        ) -> Option<Option<Block>> {
+            let condition = this.lower_expr(required_field!(if_chain => condition ? this => None));
+            let block = this.lower_block(required_field!(if_chain => then_block ? this => None));
 
-        let else_part = if_chain.else_part().and_then(|else_part| {
-            Some(match else_part {
-                ast::ElsePart::IfChain(if_chain) => {
-                    ElsePart::IfChain(Box::new(self.lower_if_chain(if_chain)?))
+            if_blocks.push(IfBlock { condition, block });
+
+            Some(match if_chain.else_part() {
+                Some(else_part) => {
+                    match else_part {
+                        ast::ElsePart::IfChain(if_chain) => lower_into(this, if_blocks, if_chain)?,
+                        ast::ElsePart::ElseBlock(else_block) => Some(this.lower_block(
+                            required_field!(else_block => struct_block ? this => None),
+                        )),
+                    }
                 }
-                ast::ElsePart::ElseBlock(else_block) => ElsePart::ElseBlock(
-                    required_field!(else_block => struct_block ? self => None)
-                        .struct_content()
-                        .map(|content| self.lower_struct_content(content))
-                        .collect(),
-                ),
+                None => None,
             })
-        });
+        }
+
+        let mut if_blocks = Vec::new();
+        let else_block = lower_into(self, &mut if_blocks, if_chain)?;
 
         Some(IfChain {
-            condition,
-            then_block,
-            else_part,
+            if_blocks,
+            else_block,
         })
     }
 
     /// Lowers the given AST `assert` declaration to IR.
     fn lower_assert_declaration(&mut self, assert: ast::AssertDeclaration) -> Option<Declaration> {
-        Some(Declaration::Assert {
-            condition: self.lower_expr(required_field!(assert => expr ? self => None)),
-            message: assert.message().map(|expr| self.lower_expr(expr)),
+        Some(Declaration {
+            kind: DeclarationKind::Assert {
+                condition: self.lower_expr(required_field!(assert => expr ? self => None)),
+                message: assert.message().map(|expr| self.lower_expr(expr)),
+            },
+            span: assert.span(),
         })
     }
 
@@ -719,9 +770,12 @@ impl LoweringCtx<'_> {
         &mut self,
         warn_if: ast::WarnIfDeclaration,
     ) -> Option<Declaration> {
-        Some(Declaration::WarnIf {
-            condition: self.lower_expr(required_field!(warn_if => expr ? self => None)),
-            message: warn_if.message().map(|expr| self.lower_expr(expr)),
+        Some(Declaration {
+            kind: DeclarationKind::WarnIf {
+                condition: self.lower_expr(required_field!(warn_if => expr ? self => None)),
+                message: warn_if.message().map(|expr| self.lower_expr(expr)),
+            },
+            span: warn_if.span(),
         })
     }
 
@@ -730,8 +784,11 @@ impl LoweringCtx<'_> {
         &mut self,
         recovery: ast::RecoveryDeclaration,
     ) -> Option<Declaration> {
-        Some(Declaration::Recover {
-            at: self.lower_expr(required_field!(recovery => expr ? self => None)),
+        Some(Declaration {
+            kind: DeclarationKind::Recover {
+                at: self.lower_expr(required_field!(recovery => expr ? self => None)),
+            },
+            span: recovery.span(),
         })
     }
 

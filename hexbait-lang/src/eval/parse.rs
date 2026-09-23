@@ -3,7 +3,9 @@
 use std::fmt;
 
 use crate::{
-    compile::ir::{ElsePart, Expr, File, IfChain, LetStatement, StructContent, StructField},
+    compile::ir::{
+        Block, Expr, File, IfChain, LetStatement, StructContent, StructContentKind, StructField,
+    },
     eval::{
         ValueKind,
         parse::{
@@ -99,24 +101,17 @@ impl ParseContext {
         cursor: &mut Cursor,
         struct_ctx: &mut StructContext,
     ) -> Result<()> {
-        let condition =
-            self.eval_expr(&if_chain.condition, cursor, struct_ctx, Default::default())?;
+        for if_block in &if_chain.if_blocks {
+            let condition =
+                self.eval_expr(&if_block.condition, cursor, struct_ctx, Default::default())?;
 
-        if condition.kind.expect_bool() {
-            for single_content in &if_chain.then_block {
-                self.eval_single_struct_content(single_content, cursor, struct_ctx)?;
+            if condition.kind.expect_bool() {
+                return self.eval_block(&if_block.block, cursor, struct_ctx);
             }
-        } else if let Some(else_part) = &if_chain.else_part {
-            match else_part {
-                ElsePart::IfChain(if_chain) => {
-                    self.eval_if_chain(if_chain, cursor, struct_ctx)?;
-                }
-                ElsePart::ElseBlock(else_block) => {
-                    for single_content in else_block {
-                        self.eval_single_struct_content(single_content, cursor, struct_ctx)?;
-                    }
-                }
-            }
+        }
+
+        if let Some(else_block) = &if_chain.else_block {
+            return self.eval_block(else_block, cursor, struct_ctx);
         }
 
         Ok(())
@@ -168,6 +163,20 @@ impl ParseContext {
         Ok(())
     }
 
+    /// Evaluates the given block.
+    fn eval_block(
+        &mut self,
+        block: &Block,
+        cursor: &mut Cursor,
+        struct_ctx: &mut StructContext,
+    ) -> Result<()> {
+        for single_content in &block.content {
+            self.eval_single_struct_content(single_content, cursor, struct_ctx)?;
+        }
+
+        Ok(())
+    }
+
     /// Evaluates the given single `struct` content.
     fn eval_single_struct_content(
         &mut self,
@@ -175,8 +184,8 @@ impl ParseContext {
         cursor: &mut Cursor,
         struct_ctx: &mut StructContext,
     ) -> Result<()> {
-        match content {
-            StructContent::Field(field) => {
+        match &content.kind {
+            StructContentKind::Field(field) => {
                 match self.eval_struct_field(field, cursor, struct_ctx) {
                     Ok(()) => Ok(()),
                     Err(mut err) => {
@@ -187,13 +196,13 @@ impl ParseContext {
                     }
                 }
             }
-            StructContent::Declaration(declaration) => {
+            StructContentKind::Declaration(declaration) => {
                 Ok(self.eval_declaration(declaration, cursor, struct_ctx)?)
             }
-            StructContent::LetStatement(let_statement) => {
+            StructContentKind::LetStatement(let_statement) => {
                 Ok(self.eval_let_statement(let_statement, cursor, struct_ctx)?)
             }
-            StructContent::Error => static_analysis_impossible(),
+            StructContentKind::Error => static_analysis_impossible(),
         }
     }
 

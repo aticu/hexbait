@@ -1,6 +1,6 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: result
+expression: "!endian le;\n\nlet;\nlet a;\nlet b =;\nc {\n\tlet d = \n};\ne u8;\n"
 input_file: hexbait-lang/tests/parser-cases/basic_recovery.hbl
 ---
 File@0..57
@@ -19,21 +19,21 @@ File@0..57
   LetStatement@18..24
     LetKw@18..21 "let"
     Whitespace@21..22 " "
-    Identifier@22..23 "x"
+    Identifier@22..23 "a"
     Atom@23..23
     Semicolon@23..24 ";"
   Whitespace@24..25 "\n"
   LetStatement@25..33
     LetKw@25..28 "let"
     Whitespace@28..29 " "
-    Identifier@29..30 "x"
+    Identifier@29..30 "b"
     Whitespace@30..31 " "
     Equals@31..32 "="
     Atom@32..32
     Semicolon@32..33 ";"
   Whitespace@33..34 "\n"
   StructField@34..50
-    Identifier@34..35 "x"
+    Identifier@34..35 "c"
     Whitespace@35..36 " "
     AnonymousStructParseType@36..49
       StructBlock@36..49
@@ -42,7 +42,7 @@ File@0..57
         LetStatement@39..48
           LetKw@39..42 "let"
           Whitespace@42..43 " "
-          Identifier@43..44 "x"
+          Identifier@43..44 "d"
           Whitespace@44..45 " "
           Equals@45..46 "="
           Whitespace@46..48 " \n"
@@ -51,7 +51,7 @@ File@0..57
     Semicolon@49..50 ";"
   Whitespace@50..51 "\n"
   StructField@51..56
-    Identifier@51..52 "y"
+    Identifier@51..52 "e"
     Whitespace@52..53 " "
     NamedParseType@53..55
       Identifier@53..55 "u8"
@@ -65,31 +65,31 @@ error: expected identifier
 2 │ 
 3 │ let;
   │    ^ found unexpected token `;`
-4 │ let x;
+4 │ let a;
 
 
 error: expected `=`
   ┌─ basic_recovery.hbl:4:6
   │
 3 │ let;
-4 │ let x;
+4 │ let a;
   │      ^ found unexpected token `;`
-5 │ let x =;
+5 │ let b =;
 
 
 error: expected identifier, literal, `peek`, `concat`, `$`, `<` or `(`
   ┌─ basic_recovery.hbl:5:8
   │
-4 │ let x;
-5 │ let x =;
+4 │ let a;
+5 │ let b =;
   │        ^ found unexpected token `;`
-6 │ x {
+6 │ c {
 
 
 error: expected identifier, literal, `peek`, `concat`, `$`, `<` or `(`
   ┌─ basic_recovery.hbl:8:1
   │
-7 │     let x = 
+7 │     let d = 
 8 │ };
   │ ^ found unexpected token `}`
-9 │ y u8;
+9 │ e u8;

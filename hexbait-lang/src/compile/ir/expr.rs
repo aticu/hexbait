@@ -1,6 +1,6 @@
 //! Implements expressions in the IR.
 
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 use crate::{Int, compile::Span};
 
@@ -31,7 +31,7 @@ pub enum UnOp {
 }
 
 /// A binary operator.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum BinOp {
     /// The addition operator: `+`.
     Add,
@@ -71,6 +71,32 @@ pub enum BinOp {
     ShiftRight,
 }
 
+impl fmt::Display for BinOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let text = match self {
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
+            BinOp::Mod => "%",
+            BinOp::Eq => "==",
+            BinOp::Neq => "!=",
+            BinOp::Gt => ">",
+            BinOp::Geq => ">=",
+            BinOp::Lt => "<",
+            BinOp::Leq => "<=",
+            BinOp::LogicalAnd => "&&",
+            BinOp::LogicalOr => "||",
+            BinOp::BitAnd => "&",
+            BinOp::BitOr => "|",
+            BinOp::BitXor => "^",
+            BinOp::ShiftLeft => "<<",
+            BinOp::ShiftRight => ">>",
+        };
+        write!(f, "{text}")
+    }
+}
+
 /// An expression.
 #[derive(Debug)]
 pub struct Expr {
@@ -89,8 +115,6 @@ pub enum ExprKind {
     VarUse(Spanned<Symbol>),
     /// The current parsing offset.
     Offset,
-    /// Accesses the partially parsed parent node.
-    Parent,
     /// The last parsed element in a repeating expression.
     Last,
     /// The current length of the element in a repeating expression.
@@ -151,19 +175,12 @@ pub enum StructRefPart {
     /// Refers to the parsed last element of an array.
     Last,
     /// A reference to a named sibling `struct`.
-    Named(Spanned<Symbol>),
+    Named(Symbol),
 }
 
 /// A reference to a parsed or semi-parsed `struct`.
 #[derive(Debug)]
-pub enum StructRef {
-    /// The `struct` reference is just a single reference.
-    Root(StructRefPart),
-    /// The `struct` reference is part of a chain.
-    Chained {
-        /// The parent of this `struct` ref.
-        parent: Box<StructRef>,
-        /// The referenced field of this `struct` ref.
-        field: StructRefPart,
-    },
+pub struct StructRef {
+    /// The parts of this struct reference.
+    pub parts: Vec<Spanned<StructRefPart>>,
 }

@@ -1,13 +1,13 @@
 ---
 source: hexbait-parse/tests/cases.rs
-expression: "\n=== Spec ===\nw u8;\nx u(w);\n\n\n=== Hex ===\nf8\nff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff\nff ff ff ff ff ff ff ff ff ff ff ff ff ff ff\n"
+expression: "\n=== Spec ===\n!endian le;\n\nw u8;\nx u(w * 8);\n\n\n=== Hex ===\n1f\nff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff\nff ff ff ff ff ff ff ff ff ff ff ff ff ff ff\n"
 input_file: hexbait-parse/tests/cases/dyn_width/spec.hbl
 ---
 {
   "value": {
     "value": {
       "w": {
-        "value": 248,
+        "value": 31,
         "provenance": "0..=0"
       },
       "x": {

@@ -1,2 +1,4 @@
+!endian le;
+
 w u8;
-x u(w);
+x u(w * 8);

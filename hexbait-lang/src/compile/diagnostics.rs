@@ -21,27 +21,30 @@ pub struct Diagnostic {
     main_label: Label,
     /// The additional labels of this diagnostic.
     additional_labels: Vec<Label>,
+    /// An optional help message.
+    help: Option<String>,
 }
 
 impl Diagnostic {
     /// Creates a new diagnostic.
-    pub fn new(level: DiagnosticLevel, message: impl ToString, main_label: Label) -> Diagnostic {
+    fn new(level: DiagnosticLevel, message: impl ToString, main_label: Label) -> Diagnostic {
         Diagnostic {
             level,
             message: message.to_string(),
             main_label,
             additional_labels: Vec::new(),
+            help: None,
         }
     }
 
     /// Creates a new error.
     pub fn error(message: impl ToString, main_label: Label) -> Diagnostic {
-        Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: message.to_string(),
-            main_label,
-            additional_labels: Vec::new(),
-        }
+        Diagnostic::new(DiagnosticLevel::Error, message, main_label)
+    }
+
+    /// Creates a new warning.
+    pub fn warning(message: impl ToString, main_label: Label) -> Diagnostic {
+        Diagnostic::new(DiagnosticLevel::Warning, message, main_label)
     }
 
     /// Returns the diagnostic with the added label.
@@ -50,9 +53,28 @@ impl Diagnostic {
         self
     }
 
+    /// Returns the diagnostic with the added labels.
+    pub fn with_labels(mut self, labels: impl IntoIterator<Item = Label>) -> Self {
+        for label in labels {
+            self.add_label(label);
+        }
+        self
+    }
+
     /// Adds a label to the diagnostic.
     pub fn add_label(&mut self, label: Label) {
         self.additional_labels.push(label);
+    }
+
+    /// Returns the diagnostic with the added help text.
+    pub fn with_help(mut self, help: impl ToString) -> Self {
+        self.add_help(help);
+        self
+    }
+
+    /// Adds a help text to the diagnostic.
+    pub fn add_help(&mut self, help: impl ToString) {
+        self.help = Some(help.to_string());
     }
 
     /// The level of this diagnostic.
@@ -106,6 +128,7 @@ impl Diagnostic {
                 codespan_reporting::diagnostic::Label::secondary((), label.span().range())
                     .with_message(label.message())
             }))
+            .with_notes_iter(self.help.iter().cloned())
     }
 
     /// Emits the diagnostic to the given writer.

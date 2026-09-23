@@ -1,6 +1,7 @@
 //! Implements evaluation of a parse type.
 
 use hexbait_common::{Endianness, Len};
+use num_traits::Signed as _;
 
 use crate::{
     Int,
@@ -81,11 +82,14 @@ impl ParseContext {
         let count_val = self.eval_expr(expr, cursor, struct_ctx, Default::default())?;
 
         u64::try_from(count_val.kind.expect_int()).map_err(|_| {
-            self.diagnostics.new_err(
-                "count too large".into(),
-                count_val.provenance.clone(),
-                expr.span,
-            )
+            let message = if count_val.kind.expect_int().is_negative() {
+                "count is negative"
+            } else {
+                "count too large"
+            };
+
+            self.diagnostics
+                .new_err(message.into(), count_val.provenance.clone(), expr.span)
         })
     }
 
@@ -124,7 +128,7 @@ impl ParseContext {
             ParseTypeKind::Named { name } => {
                 todo!("trying to parse named `{name:?}` unimplemented")
             }
-            ParseTypeKind::Bytes { repetition_kind } => match repetition_kind {
+            ParseTypeKind::Bytes { repetition } => match &repetition.kind {
                 RepeatKind::Len { count: count_expr } => {
                     let count = self.eval_count(count_expr, cursor, struct_ctx)?;
                     self.read_bytes_value(count, parse_type.span, cursor)?
@@ -185,8 +189,8 @@ impl ParseContext {
             }
             ParseTypeKind::Repeating {
                 parse_type,
-                repetition_kind,
-            } => match repetition_kind {
+                repetition,
+            } => match &repetition.kind {
                 RepeatKind::Len { count } => {
                     let count = self.eval_count(count, cursor, struct_ctx)?;
 
@@ -213,10 +217,10 @@ impl ParseContext {
                 }
                 RepeatKind::Error => static_analysis_impossible(),
             },
-            ParseTypeKind::Struct { content } => {
+            ParseTypeKind::Struct { block } => {
                 let mut ctx = struct_ctx.child();
 
-                match self.eval_struct_content(content, cursor, &mut ctx) {
+                match self.eval_struct_content(&block.content, cursor, &mut ctx) {
                     Ok(()) => ctx.into_value(),
                     Err(err) => Err(err.with_partial_result(ctx.into_value()))?,
                 }
@@ -230,7 +234,7 @@ impl ParseContext {
                     self.eval_expr(scrutinee, cursor, struct_ctx, Default::default())?;
 
                 'result: {
-                    for (lit, parse_type) in branches {
+                    for (lit, _, parse_type) in branches {
                         if scrutinee_val.kind == *lit {
                             break 'result self.eval_parse_type(parse_type, cursor, struct_ctx)?;
                         }

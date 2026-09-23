@@ -1,9 +1,9 @@
 !endian le;
 
 let;
-let x;
-let x =;
-x {
-	let x = 
+let a;
+let b =;
+c {
+	let d = 
 };
-y u8;
+e u8;

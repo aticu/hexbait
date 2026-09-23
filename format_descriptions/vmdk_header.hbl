@@ -1,3 +1,5 @@
+!endian le;
+
 signature bytes = "KDMV";
 version u32;
 flags u32;

@@ -105,16 +105,6 @@ impl<'parent> StructContext<'parent> {
         provenance
     }
 
-    /// Returns the `struct` context as a partially parsed `struct` value.
-    pub fn as_value(&self) -> Value {
-        Value {
-            kind: ValueKind::Struct {
-                content: self.content.clone(),
-            },
-            provenance: self.provenance(),
-        }
-    }
-
     /// Turns the `struct` context into a fully parsed `struct`.
     pub fn into_value(self) -> Value {
         let provenance = self.provenance();
@@ -139,38 +129,26 @@ impl<'parent> StructContext<'parent> {
         struct_ref: &ir::StructRef,
         last: Option<&'ctx Value>,
     ) -> StructRef<'ctx> {
-        match struct_ref {
-            ir::StructRef::Root(struct_ref_part) => match struct_ref_part {
-                ir::StructRefPart::Parent => {
-                    StructRef::Unfinished(self.parent().static_analysis_expect())
-                }
+        let mut current = StructRef::Unfinished(self);
+
+        for part in &struct_ref.parts {
+            current = match &part.inner {
+                ir::StructRefPart::Parent => match current {
+                    StructRef::Finished(_) => static_analysis_impossible(),
+                    StructRef::Unfinished(struct_context) => {
+                        StructRef::Unfinished(struct_context.parent().static_analysis_expect())
+                    }
+                },
                 ir::StructRefPart::Last => {
                     StructRef::Finished(last.static_analysis_expect().kind.expect_struct())
                 }
-                ir::StructRefPart::Named(name) => StructRef::Finished(
-                    self.field(&name.inner)
-                        .static_analysis_expect()
-                        .kind
-                        .expect_struct(),
-                ),
-            },
-            ir::StructRef::Chained { parent, field } => {
-                let parent = self.eval_struct_ref(parent, last);
-
-                match field {
-                    ir::StructRefPart::Parent => match parent {
-                        StructRef::Unfinished(struct_context) => {
-                            StructRef::Unfinished(struct_context.parent().static_analysis_expect())
-                        }
-                        StructRef::Finished(_) => static_analysis_impossible(),
-                    },
-                    ir::StructRefPart::Last => static_analysis_impossible(),
-                    ir::StructRefPart::Named(name) => {
-                        StructRef::Finished(parent.field(&name.inner).kind.expect_struct())
-                    }
+                ir::StructRefPart::Named(name) => {
+                    StructRef::Finished(current.field(name).kind.expect_struct())
                 }
             }
         }
+
+        current
     }
 }
 

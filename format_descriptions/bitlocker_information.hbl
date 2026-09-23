@@ -1,3 +1,5 @@
+!endian le;
+
 signature bytes = "-FVE-FS-";
 size u16;
 version u16;

@@ -1,5 +1,0 @@
-!endian le;
-
-!scope at -1 {
-	a u8;
-}

@@ -1,3 +1,5 @@
+!endian le;
+
 signature bytes = "regi";
 checksum u32;
 number_of_entries u32;
