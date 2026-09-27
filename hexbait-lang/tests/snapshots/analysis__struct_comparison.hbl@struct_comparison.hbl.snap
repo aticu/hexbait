@@ -1,0 +1,16 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "a {\n\tx u8;\n};\nb {\n\tx u8;\n};\n!assert a == b;\n"
+input_file: hexbait-lang/tests/analysis-cases/struct_comparison.hbl
+---
+error: binary operator `==` cannot be applied to `{ .. }` and `{ .. }`
+  ┌─ struct_comparison.hbl:7:9
+  │
+6 │ };
+7 │ !assert a == b;
+  │         ^^^^^^
+  │         │    │
+  │         │    right type
+  │         unsupported comparison
+  │         left type
+8 │

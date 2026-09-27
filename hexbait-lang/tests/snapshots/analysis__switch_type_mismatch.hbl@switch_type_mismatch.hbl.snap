@@ -1,0 +1,12 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "a u8;\nb switch a {\n\t\"a\" => u8,\n\t\"b\" => u8,\n\t_ => u8,\n};\n"
+input_file: hexbait-lang/tests/analysis-cases/switch_type_mismatch.hbl
+---
+error: expected branch literal to be of the same type as the scrutinee
+  ┌─ switch_type_mismatch.hbl:3:2
+  │
+2 │ b switch a {
+3 │     "a" => u8,
+  │     ^^^ unexpected type `bytes`
+4 │     "b" => u8,

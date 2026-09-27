@@ -1,0 +1,4 @@
+a u8;
+!scope in a {
+	b u8;
+}

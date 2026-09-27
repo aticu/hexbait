@@ -1,0 +1,5 @@
+a u8;
+!if a == 0 {
+	let b = 1 + true;
+}
+let c = a;

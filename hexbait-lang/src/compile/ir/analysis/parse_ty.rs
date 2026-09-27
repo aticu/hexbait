@@ -54,7 +54,10 @@ impl Env<'_> {
                         if !scrutinee_ty.kind.unifies(&lit_ty) {
                             break 'ty ctx.ty_err(
                                 "expected branch literal to be of the same type as the scrutinee",
-                                &scrutinee_ty,
+                                &Ty {
+                                    kind: lit_ty,
+                                    span: *lit_span,
+                                },
                                 *lit_span,
                             );
                         }
