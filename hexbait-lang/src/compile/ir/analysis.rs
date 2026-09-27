@@ -20,23 +20,11 @@ mod parse_ty;
 mod struct_content;
 mod ty;
 
-// TODO: check types
-// TODO: ensure that endianness is properly specified before parsing fields
-// TODO: ensure no errors are contained
-// TODO: ensure alignment is a power of two
-// TODO: ensure that alignment fits into u64
-// TODO: ensure that integers are non-zero length
-// TODO: ensure that non-byte-aligned integers are only allowed in bitfields
-// TODO: ensure that all field accesses are valid (both field access and in current struct)
-// TODO: ensure comparison operations are well types (== and != for all, but others only for ints)
-// TODO: ensure assertion and warning messages are utf8
 // TODO: ensure that $last is only used if $len > 0
-// TODO: ensure that $parent, $last and $len are only used in correct contexts
-// TODO: ensure sensible behavior about struct nested in scopes and if declarations
-// TODO: ensure u(_) and i(_) parse types contain int expressions
 // TODO: ensure that loops must make progress
 // TODO: ensure that there is no scope between a `recover` and the struct it references
-// TODO: ensure that `$parent` only appears in field access references and only at the root of them
+// TODO: properly check that `_`-prefixed fields don't escape
+// TODO: ensure that scopes, nested structs and endianness interact correctly with each other
 
 /// Checks if the file is well formed.
 pub fn check_file(file: &File, diagnostics: &mut Diagnostics) {
@@ -85,7 +73,7 @@ impl AnalysisCtx<'_> {
     /// Adds a type error to the context.
     #[track_caller]
     fn ty_err(&mut self, message: impl ToString, ty: &Ty, span: Span) -> TyKind {
-        if matches!(&ty.kind, TyKind::Error) {
+        if ty.contains_err() {
             assert!(self.diagnostics.contains_errors());
             return TyKind::Error;
         }

@@ -66,7 +66,13 @@ impl ParseContext {
             DeclarationKind::Align(expr) => {
                 let value = self.eval_expr(expr, cursor, struct_ctx, Default::default())?;
                 let align = value.kind.expect_int();
-                let align = u64::try_from(align).static_analysis_expect();
+                let Ok(align) = u64::try_from(align) else {
+                    return Err(self.diagnostics.new_err(
+                        "alignment too large or negative".to_string(),
+                        value.provenance.clone(),
+                        expr.span,
+                    ));
+                };
 
                 if !align.is_power_of_two() {
                     return Err(self.diagnostics.new_err(

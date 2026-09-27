@@ -1,9 +1,6 @@
 //! Implements the types of the hexbait language.
 
-use std::{
-    collections::{HashMap, HashSet},
-    fmt,
-};
+use std::fmt;
 
 use crate::compile::{Span, ir::Symbol};
 
@@ -124,55 +121,57 @@ impl Ty {
 
     /// Joins multiple branches into a struct type.
     fn join_struct(branches: &[Ty], span: Span) -> TyKind {
-        let mut fields = HashMap::<Symbol, FieldInfo>::new();
+        let mut fields = Vec::<FieldInfo>::new();
 
         struct FieldInfo {
+            name: Symbol,
             first_seen: Span,
             first_missing: Option<Span>,
+            inherited_conditional: Option<Availability>,
             tys: Vec<Ty>,
         }
 
         let mut is_first = true;
         match Ty::join_generic(branches, |ty| {
             let TyKind::Struct { struct_ty } = &ty.kind else {
-                is_first = false;
                 return false;
             };
 
             for field in &struct_ty.fields {
-                match fields.contains_key(&field.name) {
-                    true => {
-                        fields
-                            .get_mut(&field.name)
-                            .unwrap()
-                            .tys
-                            .push(field.ty.clone());
+                let incoming_availability =
+                    (!field.availability.is_guaranteed()).then(|| field.availability.clone());
+
+                match fields.iter_mut().find(|f| f.name == field.name) {
+                    Some(field_info) => {
+                        if field_info.inherited_conditional.is_none() {
+                            field_info.inherited_conditional = incoming_availability;
+                        }
+                        field_info.tys.push(field.ty.clone());
                     }
-                    false => {
-                        fields.insert(
-                            field.name.clone(),
-                            FieldInfo {
-                                first_seen: ty.span,
-                                first_missing: if is_first {
-                                    None
-                                } else {
-                                    Some(branches[0].span)
-                                },
-                                tys: vec![field.ty.clone()],
+                    None => {
+                        fields.push(FieldInfo {
+                            name: field.name.clone(),
+                            first_seen: ty.span,
+                            first_missing: if is_first {
+                                None
+                            } else {
+                                Some(branches[0].span)
                             },
-                        );
+                            inherited_conditional: incoming_availability,
+                            tys: vec![field.ty.clone()],
+                        });
                     }
                 }
             }
 
-            let mut missing = HashSet::new();
-            for name in fields.keys() {
-                if struct_ty.field(name).is_none() {
-                    missing.insert(name.clone());
+            let mut missing = Vec::new();
+            for (i, field_info) in fields.iter().enumerate() {
+                if struct_ty.field(&field_info.name).is_none() {
+                    missing.push(i);
                 }
             }
-            for name in missing {
-                fields.get_mut(&name).unwrap().first_missing = Some(ty.span);
+            for idx in missing {
+                fields[idx].first_missing.get_or_insert(ty.span);
             }
 
             is_first = false;
@@ -181,13 +180,17 @@ impl Ty {
             Ok(()) => {
                 let mut out_fields = Vec::new();
 
-                for (name, field) in fields.into_iter() {
+                for field_info in fields.into_iter() {
                     out_fields.push(FieldTy {
-                        name,
-                        ty: Ty::join(&field.tys, span),
-                        availability: if let Some(first_missing) = field.first_missing {
+                        name: field_info.name,
+                        ty: Ty::join(&field_info.tys, span),
+                        availability: if let Some(first_conditional) =
+                            field_info.inherited_conditional
+                        {
+                            first_conditional
+                        } else if let Some(first_missing) = field_info.first_missing {
                             Availability::Conditional {
-                                defined_at: field.first_seen,
+                                defined_at: field_info.first_seen,
                                 undefined_at: first_missing,
                             }
                         } else {
@@ -336,7 +339,7 @@ impl StructTy {
 
     /// Whether the structs are logically equivalent.
     fn unifies(&self, other: &StructTy) -> bool {
-        if self.fields.len() == other.fields.len() {
+        if self.fields.len() != other.fields.len() {
             return false;
         }
 

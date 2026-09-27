@@ -201,8 +201,14 @@ impl Env<'_> {
             });
         }
 
-        let TyKind::Struct { struct_ty } = Ty::join(&branches, span).kind else {
-            unreachable!()
+        let struct_ty = match Ty::join(&branches, span).kind {
+            TyKind::Error => return,
+            TyKind::Struct { struct_ty } => struct_ty,
+            TyKind::Indeterminate { .. }
+            | TyKind::Bool
+            | TyKind::Int { .. }
+            | TyKind::Bytes
+            | TyKind::Array { .. } => unreachable!(),
         };
 
         self.values = struct_ty;
@@ -235,13 +241,16 @@ impl Env<'_> {
             );
         }
 
-        if let Some(message) = message
-            && !matches!(&message.kind, ExprKind::Lit(Lit::Bytes(_)))
-        {
-            ctx.add_diagnostic(Diagnostic::error(
-                "expected `{ty}` message to be a string literal",
-                Label::new("not a string literal", message.span),
-            ));
+        if let Some(message) = message {
+            match &message.kind {
+                ExprKind::Lit(Lit::Bytes(val)) if std::str::from_utf8(val).is_ok() => (),
+                _ => {
+                    ctx.add_diagnostic(Diagnostic::error(
+                        format!("expected `{ty}` message to be a valid UTF-8 string literal"),
+                        Label::new("not a string literal", message.span),
+                    ));
+                }
+            }
         }
     }
 
