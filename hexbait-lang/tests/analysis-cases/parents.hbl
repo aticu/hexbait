@@ -1,0 +1,5 @@
+a u8;
+b {
+	let c = $parent.a;
+};
+let d = $parent.a;

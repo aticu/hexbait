@@ -1,0 +1,20 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "!assert 0 == 0: 25;\n!assert 0 == 0: <ff>;\n"
+input_file: hexbait-lang/tests/analysis-cases/invalid_assert_messages.hbl
+---
+error: expected `assert` message to be a valid UTF-8 string literal
+  ┌─ invalid_assert_messages.hbl:1:17
+  │
+1 │ !assert 0 == 0: 25;
+  │                 ^^ not a valid string literal
+2 │ !assert 0 == 0: <ff>;
+
+
+error: expected `assert` message to be a valid UTF-8 string literal
+  ┌─ invalid_assert_messages.hbl:2:17
+  │
+1 │ !assert 0 == 0: 25;
+2 │ !assert 0 == 0: <ff>;
+  │                 ^^^^ not a valid string literal
+3 │

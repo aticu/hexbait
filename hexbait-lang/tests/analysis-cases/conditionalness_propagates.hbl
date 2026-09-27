@@ -1,0 +1,14 @@
+a u8;
+b switch a {
+	0 => {
+		c u8;
+		!if c == 0 {
+			d u8;
+		}
+	},
+	_ => {
+		d u8;
+	},
+};
+
+!seek by b.d;

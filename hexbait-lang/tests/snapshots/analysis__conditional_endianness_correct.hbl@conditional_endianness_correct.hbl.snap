@@ -1,0 +1,6 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "x u8;\n!if x == 0 {\n\t!endian le;\n} else {\n\t!endian be;\n}\ny u16;\n"
+input_file: hexbait-lang/tests/analysis-cases/conditional_endianness_correct.hbl
+---
+no diagnostics

@@ -10,7 +10,7 @@ use crate::compile::{
         analysis::{
             AnalysisCtx, EndiannessState, Env,
             expr::ExtraExprCtx,
-            ty::{StructTy, Ty, TyKind},
+            ty::{Ty, TyKind},
         },
     },
 };
@@ -199,7 +199,7 @@ impl Env<'_> {
             let span = if_chain.if_blocks.last().unwrap().condition.span;
             branches.push(Ty {
                 kind: TyKind::Struct {
-                    struct_ty: std::mem::replace(&mut self.values, StructTy::empty()),
+                    struct_ty: self.values.clone(),
                 },
                 span,
             });
@@ -272,7 +272,7 @@ impl Env<'_> {
                 _ => {
                     ctx.add_diagnostic(Diagnostic::error(
                         format!("expected `{ty}` message to be a valid UTF-8 string literal"),
-                        Label::new("not a string literal", message.span),
+                        Label::new("not a valid string literal", message.span),
                     ));
                 }
             }

@@ -1,0 +1,12 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "a u8;\nb {\n\tlet c = $parent.a;\n};\nlet d = $parent.a;\n"
+input_file: hexbait-lang/tests/analysis-cases/parents.hbl
+---
+error: `$parent` used when there is no more parent
+  ┌─ parents.hbl:5:9
+  │
+4 │ };
+5 │ let d = $parent.a;
+  │         ^^^^^^^ no parent here
+6 │

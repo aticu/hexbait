@@ -1,0 +1,21 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "x u8;\n!if x == 0 {\n\ty u8;\n}\n!if x == 1 {\n\tz u8;\n}\nlet a = y;\n"
+input_file: hexbait-lang/tests/analysis-cases/conditional_field_stays_conditional.hbl
+---
+error: field `y` is not guaranteed to be available
+  ┌─ conditional_field_stays_conditional.hbl:8:9
+  │  
+1 │   x u8;
+2 │   !if x == 0 {
+  │       ------ not defined if this is `false`
+  │ ╭────────────'
+3 │ │     y u8;
+4 │ │ }
+  │ ╰─' defined here
+5 │   !if x == 1 {
+6 │       z u8;
+7 │   }
+8 │   let a = y;
+  │           ^ not guaranteed to be available
+9 │

@@ -1,0 +1,11 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "!align 5;\n"
+input_file: hexbait-lang/tests/analysis-cases/non_power_of_two_align.hbl
+---
+warning: this expression will error during execution
+  ┌─ non_power_of_two_align.hbl:1:8
+  │
+1 │ !align 5;
+  │        ^ alignment must be a power of two
+2 │

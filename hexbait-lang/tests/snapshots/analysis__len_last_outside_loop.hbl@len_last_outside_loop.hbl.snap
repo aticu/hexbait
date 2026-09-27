@@ -1,0 +1,20 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "let a = $last;\nlet b = $len;\n"
+input_file: hexbait-lang/tests/analysis-cases/len_last_outside_loop.hbl
+---
+error: `$last` cannot be used outside of a `while` repetition condition
+  ┌─ len_last_outside_loop.hbl:1:9
+  │
+1 │ let a = $last;
+  │         ^^^^^ invalid use of `$last`
+2 │ let b = $len;
+
+
+error: `$len` cannot be used outside of a `while` repetition condition
+  ┌─ len_last_outside_loop.hbl:2:9
+  │
+1 │ let a = $last;
+2 │ let b = $len;
+  │         ^^^^ invalid use of `$len`
+3 │
