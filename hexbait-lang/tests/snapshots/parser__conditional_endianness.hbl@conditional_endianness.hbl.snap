@@ -1,0 +1,64 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "x u8;\n\n!if x == 0 {\n\t!endian le;\n}\n\ny u16;\n"
+input_file: hexbait-lang/tests/parser-cases/conditional_endianness.hbl
+---
+File@0..43
+  StructField@0..5
+    Identifier@0..1 "x"
+    Whitespace@1..2 " "
+    NamedParseType@2..4
+      Identifier@2..4 "u8"
+    Semicolon@4..5 ";"
+  Whitespace@5..7 "\n\n"
+  IfDeclaration@7..34
+    ExclamationMark@7..8 "!"
+    IfChain@8..34
+      Identifier@8..10 "if"
+      Whitespace@10..11 " "
+      InfixExpr@11..17
+        Atom@11..12
+          Identifier@11..12 "x"
+        Whitespace@12..13 " "
+        Op@13..15
+          Equals@13..14 "="
+          Equals@14..15 "="
+        Whitespace@15..16 " "
+        Atom@16..17
+          DecimalIntegerLiteral@16..17 "0"
+      Whitespace@17..18 " "
+      StructBlock@18..34
+        LBrace@18..19 "{"
+        Whitespace@19..21 "\n\t"
+        EndiannessDeclaration@21..32
+          ExclamationMark@21..22 "!"
+          Identifier@22..28 "endian"
+          Whitespace@28..29 " "
+          Identifier@29..31 "le"
+          Semicolon@31..32 ";"
+        Whitespace@32..33 "\n"
+        RBrace@33..34 "}"
+  Whitespace@34..36 "\n\n"
+  StructField@36..42
+    Identifier@36..37 "y"
+    Whitespace@37..38 " "
+    NamedParseType@38..41
+      Identifier@38..41 "u16"
+    Semicolon@41..42 ";"
+  Whitespace@42..43 "\n"
+
+--- diagnostics ---
+error: attempt to parse a multi-byte integer before endianness is set
+  ┌─ conditional_endianness.hbl:7:3
+  │  
+2 │   
+3 │   !if x == 0 {
+  │       ------ endianness is not set if this is `false`
+  │ ╭────────────'
+4 │ │     !endian le;
+5 │ │ }
+  │ ╰─' endianness is set in this branch
+6 │   
+7 │   y u16;
+  │     ^^^ endianness unknown here
+8 │

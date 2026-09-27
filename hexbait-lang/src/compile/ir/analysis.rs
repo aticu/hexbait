@@ -147,6 +147,8 @@ enum EndiannessState {
         set_branch_span: Span,
         /// The span of the first branch where the endianness was not set.
         unset_branch_span: Span,
+        /// Whether the unset branch is a missing else branch.
+        unset_is_missing_else: bool,
     },
 }
 
@@ -166,9 +168,15 @@ impl EndiannessState {
         match self {
             EndiannessState::Undefined | EndiannessState::Set => None,
             EndiannessState::PartiallySet {
-                unset_branch_span, ..
+                unset_branch_span,
+                unset_is_missing_else,
+                ..
             } => Some(Label::new(
-                "endianness is not set in this branch",
+                if *unset_is_missing_else {
+                    "endianness is not set if this is `false`"
+                } else {
+                    "endianness is not set in this branch"
+                },
                 *unset_branch_span,
             )),
         }

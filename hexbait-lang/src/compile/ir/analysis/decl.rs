@@ -144,6 +144,7 @@ impl Env<'_> {
         let mut branches = Vec::new();
         let mut undefined_endianness_branch = None;
         let mut defined_endianness_branch = None;
+        let mut unset_is_missing_else = false;
 
         let mut check_block = |ctx: &mut AnalysisCtx, block: &Block| {
             let mut env_clone = self.create_branch_clone();
@@ -169,9 +170,11 @@ impl Env<'_> {
                 EndiannessState::PartiallySet {
                     set_branch_span,
                     unset_branch_span,
+                    unset_is_missing_else: missing_else,
                 } => {
                     defined_endianness_branch.get_or_insert(set_branch_span);
                     undefined_endianness_branch.get_or_insert(unset_branch_span);
+                    unset_is_missing_else |= missing_else;
                 }
             }
         };
@@ -193,15 +196,36 @@ impl Env<'_> {
         if let Some(else_block) = &if_chain.else_block {
             check_block(ctx, else_block);
         } else {
+            let span = if_chain.if_blocks.last().unwrap().condition.span;
             branches.push(Ty {
                 kind: TyKind::Struct {
                     struct_ty: std::mem::replace(&mut self.values, StructTy::empty()),
                 },
-                span: if_chain.if_blocks.last().unwrap().condition.span,
+                span,
             });
+            match self.endianness_state {
+                EndiannessState::Undefined => {
+                    if undefined_endianness_branch.is_none() {
+                        unset_is_missing_else = true;
+                    }
+                    undefined_endianness_branch.get_or_insert(span);
+                }
+                EndiannessState::Set => {
+                    defined_endianness_branch.get_or_insert(span);
+                }
+                EndiannessState::PartiallySet {
+                    set_branch_span,
+                    unset_branch_span,
+                    unset_is_missing_else: missing_else,
+                } => {
+                    defined_endianness_branch.get_or_insert(set_branch_span);
+                    undefined_endianness_branch.get_or_insert(unset_branch_span);
+                    unset_is_missing_else |= missing_else;
+                }
+            }
         }
 
-        let struct_ty = match Ty::join(&branches, span).kind {
+        let struct_ty = match Ty::join(&branches, span, if_chain.else_block.is_none()).kind {
             TyKind::Error => return,
             TyKind::Struct { struct_ty } => struct_ty,
             TyKind::Indeterminate { .. }
@@ -219,6 +243,7 @@ impl Env<'_> {
             (Some(set_branch), Some(unset_branch)) => EndiannessState::PartiallySet {
                 set_branch_span: set_branch,
                 unset_branch_span: unset_branch,
+                unset_is_missing_else,
             },
         };
     }

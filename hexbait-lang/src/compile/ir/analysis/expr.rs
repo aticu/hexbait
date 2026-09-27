@@ -87,6 +87,7 @@ impl Env<'_> {
                 Availability::Conditional {
                     defined_at,
                     undefined_at,
+                    undefined_is_missing_else,
                 } => {
                     ctx.add_diagnostic(
                         Diagnostic::error(
@@ -97,7 +98,14 @@ impl Env<'_> {
                             Label::new("not guaranteed to be available", var.span),
                         )
                         .with_label(Label::new("defined here", defined_at))
-                        .with_label(Label::new("not defined in this branch", undefined_at)),
+                        .with_label(Label::new(
+                            if undefined_is_missing_else {
+                                "not defined if this is `false`"
+                            } else {
+                                "not defined in this branch"
+                            },
+                            undefined_at,
+                        )),
                     );
                     TyKind::Error
                 }
@@ -242,6 +250,7 @@ impl Env<'_> {
                         Availability::Conditional {
                             defined_at,
                             undefined_at,
+                            undefined_is_missing_else,
                         } => {
                             ctx.add_diagnostic(
                                 Diagnostic::error(
@@ -252,7 +261,14 @@ impl Env<'_> {
                                     Label::new("not guaranteed to be available", part.span),
                                 )
                                 .with_label(Label::new("defined here", defined_at))
-                                .with_label(Label::new("not defined in this branch", undefined_at)),
+                                .with_label(Label::new(
+                                    if undefined_is_missing_else {
+                                        "not defined if this is `false`"
+                                    } else {
+                                        "not defined in this branch"
+                                    },
+                                    undefined_at,
+                                )),
                             );
                         }
                     }
@@ -288,6 +304,7 @@ impl Env<'_> {
             Availability::Conditional {
                 defined_at,
                 undefined_at,
+                undefined_is_missing_else,
             } => {
                 ctx.add_diagnostic(
                     Diagnostic::error(
@@ -298,7 +315,14 @@ impl Env<'_> {
                         Label::new("not guaranteed to be available", field.span),
                     )
                     .with_label(Label::new("defined here", defined_at))
-                    .with_label(Label::new("not defined in this branch", undefined_at)),
+                    .with_label(Label::new(
+                        if undefined_is_missing_else {
+                            "not defined if this is `false`"
+                        } else {
+                            "not defined in this branch"
+                        },
+                        undefined_at,
+                    )),
                 );
             }
         }

@@ -1,0 +1,13 @@
+!endian le;
+
+condition u8;
+x switch condition {
+	0 => {
+		x u8;
+	},
+	_ => {
+		x bytes len 1;
+	},
+};
+
+!seek by x.x;

@@ -1,0 +1,36 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "x u8;\nx bytes len 1;\n"
+input_file: hexbait-lang/tests/parser-cases/duplicate_field.hbl
+---
+File@0..21
+  StructField@0..5
+    Identifier@0..1 "x"
+    Whitespace@1..2 " "
+    NamedParseType@2..4
+      Identifier@2..4 "u8"
+    Semicolon@4..5 ";"
+  Whitespace@5..6 "\n"
+  StructField@6..20
+    Identifier@6..7 "x"
+    Whitespace@7..8 " "
+    BytesParseType@8..19
+      BytesKw@8..13 "bytes"
+      Whitespace@13..14 " "
+      RepeatLenDecl@14..19
+        Identifier@14..17 "len"
+        Whitespace@17..18 " "
+        Atom@18..19
+          DecimalIntegerLiteral@18..19 "1"
+    Semicolon@19..20 ";"
+  Whitespace@20..21 "\n"
+
+--- diagnostics ---
+error: field should not be duplicated
+  ┌─ duplicate_field.hbl:2:1
+  │
+1 │ x u8;
+  │   -- original field defined here
+2 │ x bytes len 1;
+  │ ^ duplicated field name
+3 │

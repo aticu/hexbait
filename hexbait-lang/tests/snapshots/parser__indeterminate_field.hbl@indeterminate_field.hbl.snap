@@ -1,0 +1,111 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "!endian le;\n\ncondition u8;\nx switch condition {\n\t0 => {\n\t\tx u8;\n\t},\n\t_ => {\n\t\tx bytes len 1;\n\t},\n};\n\n!seek by x.x;\n"
+input_file: hexbait-lang/tests/parser-cases/indeterminate_field.hbl
+---
+File@0..115
+  EndiannessDeclaration@0..11
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    Whitespace@7..8 " "
+    Identifier@8..10 "le"
+    Semicolon@10..11 ";"
+  Whitespace@11..13 "\n\n"
+  StructField@13..26
+    Identifier@13..22 "condition"
+    Whitespace@22..23 " "
+    NamedParseType@23..25
+      Identifier@23..25 "u8"
+    Semicolon@25..26 ";"
+  Whitespace@26..27 "\n"
+  StructField@27..99
+    Identifier@27..28 "x"
+    Whitespace@28..29 " "
+    SwitchParseType@29..98
+      SwitchKw@29..35 "switch"
+      Whitespace@35..36 " "
+      Atom@36..45
+        Identifier@36..45 "condition"
+      Whitespace@45..46 " "
+      LBrace@46..47 "{"
+      Whitespace@47..49 "\n\t"
+      SwitchParseTypeArm@49..67
+        Atom@49..50
+          DecimalIntegerLiteral@49..50 "0"
+        Whitespace@50..51 " "
+        Equals@51..52 "="
+        RAngle@52..53 ">"
+        Whitespace@53..54 " "
+        AnonymousStructParseType@54..66
+          StructBlock@54..66
+            LBrace@54..55 "{"
+            Whitespace@55..58 "\n\t\t"
+            StructField@58..63
+              Identifier@58..59 "x"
+              Whitespace@59..60 " "
+              NamedParseType@60..62
+                Identifier@60..62 "u8"
+              Semicolon@62..63 ";"
+            Whitespace@63..65 "\n\t"
+            RBrace@65..66 "}"
+        Comma@66..67 ","
+      Whitespace@67..69 "\n\t"
+      Underscore@69..70 "_"
+      Whitespace@70..71 " "
+      Equals@71..72 "="
+      RAngle@72..73 ">"
+      Whitespace@73..74 " "
+      AnonymousStructParseType@74..95
+        StructBlock@74..95
+          LBrace@74..75 "{"
+          Whitespace@75..78 "\n\t\t"
+          StructField@78..92
+            Identifier@78..79 "x"
+            Whitespace@79..80 " "
+            BytesParseType@80..91
+              BytesKw@80..85 "bytes"
+              Whitespace@85..86 " "
+              RepeatLenDecl@86..91
+                Identifier@86..89 "len"
+                Whitespace@89..90 " "
+                Atom@90..91
+                  DecimalIntegerLiteral@90..91 "1"
+            Semicolon@91..92 ";"
+          Whitespace@92..94 "\n\t"
+          RBrace@94..95 "}"
+      Comma@95..96 ","
+      Whitespace@96..97 "\n"
+      RBrace@97..98 "}"
+    Semicolon@98..99 ";"
+  Whitespace@99..101 "\n\n"
+  SeekByDeclaration@101..114
+    ExclamationMark@101..102 "!"
+    Identifier@102..106 "seek"
+    Whitespace@106..107 " "
+    Identifier@107..109 "by"
+    Whitespace@109..110 " "
+    FieldAccess@110..113
+      Atom@110..111
+        Identifier@110..111 "x"
+      Dot@111..112 "."
+      Identifier@112..113 "x"
+    Semicolon@113..114 ";"
+  Whitespace@114..115 "\n"
+
+--- diagnostics ---
+error: type differs between braches
+   ┌─ indeterminate_field.hbl:13:10
+   │
+ 5 │     0 => {
+ 6 │         x u8;
+   │           -- first branch here
+ 7 │     },
+ 8 │     _ => {
+ 9 │         x bytes len 1;
+   │           ----------- second branch here
+10 │     },
+11 │ };
+12 │ 
+13 │ !seek by x.x;
+   │          ^^^ undetermined type
+14 │

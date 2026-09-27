@@ -47,13 +47,13 @@ impl Ty {
     }
 
     /// Joins the type of multiple branches into one type.
-    pub fn join(branches: &[Ty], span: Span) -> Ty {
+    pub fn join(branches: &[Ty], span: Span, last_branch_is_missing_else: bool) -> Ty {
         let kind = match &branches[0].kind {
             TyKind::Error | TyKind::Indeterminate { .. } => branches[0].kind.clone(),
             TyKind::Bool | TyKind::Bytes => Ty::join_primitive(branches, &branches[0].kind),
             TyKind::Int { .. } => Ty::join_int(branches),
-            TyKind::Struct { .. } => Ty::join_struct(branches, span),
-            TyKind::Array { .. } => Ty::join_array(branches, span),
+            TyKind::Struct { .. } => Ty::join_struct(branches, span, last_branch_is_missing_else),
+            TyKind::Array { .. } => Ty::join_array(branches, span, last_branch_is_missing_else),
         };
 
         Ty { kind, span }
@@ -120,7 +120,7 @@ impl Ty {
     }
 
     /// Joins multiple branches into a struct type.
-    fn join_struct(branches: &[Ty], span: Span) -> TyKind {
+    fn join_struct(branches: &[Ty], span: Span, last_branch_is_missing_else: bool) -> TyKind {
         let mut fields = Vec::<FieldInfo>::new();
 
         struct FieldInfo {
@@ -183,7 +183,7 @@ impl Ty {
                 for field_info in fields.into_iter() {
                     out_fields.push(FieldTy {
                         name: field_info.name,
-                        ty: Ty::join(&field_info.tys, span),
+                        ty: Ty::join(&field_info.tys, span, last_branch_is_missing_else),
                         availability: if let Some(first_conditional) =
                             field_info.inherited_conditional
                         {
@@ -192,6 +192,8 @@ impl Ty {
                             Availability::Conditional {
                                 defined_at: field_info.first_seen,
                                 undefined_at: first_missing,
+                                undefined_is_missing_else: last_branch_is_missing_else
+                                    && first_missing == branches.last().unwrap().span,
                             }
                         } else {
                             Availability::Guaranteed
@@ -208,7 +210,7 @@ impl Ty {
     }
 
     /// Joins multiple branches into an array type.
-    fn join_array(branches: &[Ty], span: Span) -> TyKind {
+    fn join_array(branches: &[Ty], span: Span, last_branch_is_missing_else: bool) -> TyKind {
         let mut item_tys = Vec::new();
 
         match Ty::join_generic(branches, |ty| {
@@ -220,7 +222,7 @@ impl Ty {
             }
         }) {
             Ok(()) => TyKind::Array {
-                item_ty: Box::new(Ty::join(&item_tys, span)),
+                item_ty: Box::new(Ty::join(&item_tys, span, last_branch_is_missing_else)),
             },
             Err(kind) => kind,
         }
@@ -380,6 +382,8 @@ pub enum Availability {
         defined_at: Span,
         /// The span that describes why this field is unavailable.
         undefined_at: Span,
+        /// Whether the undefined branch is a missing `else` branch.
+        undefined_is_missing_else: bool,
     },
 }
 

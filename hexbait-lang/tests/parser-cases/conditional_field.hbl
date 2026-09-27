@@ -1,0 +1,7 @@
+cond u8;
+
+!if cond == 0 {
+	x u8;
+}
+
+let y = x;

@@ -64,7 +64,7 @@ impl Env<'_> {
 
                     branch_tys.push(self.check_parse_type(ctx, default));
 
-                    Ty::join(&branch_tys, parse_ty.span).kind
+                    Ty::join(&branch_tys, parse_ty.span, false).kind
                 }
                 ParseTypeKind::Error => {
                     assert!(ctx.diagnostics.contains_errors());
