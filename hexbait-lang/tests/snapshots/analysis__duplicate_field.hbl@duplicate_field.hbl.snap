@@ -1,0 +1,13 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "x u8;\nx bytes len 1;\n"
+input_file: hexbait-lang/tests/analysis-cases/duplicate_field.hbl
+---
+error: field should not be duplicated
+  ┌─ duplicate_field.hbl:2:1
+  │
+1 │ x u8;
+  │   -- original field defined here
+2 │ x bytes len 1;
+  │ ^ duplicated field name
+3 │
