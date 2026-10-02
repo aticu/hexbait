@@ -7,3 +7,8 @@ c {
 	let d = 
 };
 e u8;
+let f = .;
+let g = .a.;
+let h = .a.$;
+let i = concat(. .a);
+let j = .

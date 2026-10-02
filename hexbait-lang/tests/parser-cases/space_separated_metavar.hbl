@@ -1,0 +1,6 @@
+a u8;
+b {
+	let c = $ parent.a;
+	d bytes while $ last != 0;
+	let e = $ ;
+};

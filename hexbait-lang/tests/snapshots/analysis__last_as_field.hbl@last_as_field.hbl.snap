@@ -1,0 +1,12 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "a {};\nlet b = .a.$last;\n"
+input_file: hexbait-lang/tests/analysis-cases/last_as_field.hbl
+---
+error: `$last` cannot be used as as a field
+  ┌─ last_as_field.hbl:2:12
+  │
+1 │ a {};
+2 │ let b = .a.$last;
+  │            ^^^^^ invalid field
+3 │

@@ -1,0 +1,2 @@
+a {};
+let b = .a.$last;

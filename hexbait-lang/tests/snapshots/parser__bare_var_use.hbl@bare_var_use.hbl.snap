@@ -1,0 +1,71 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "a {\n\tb u8;\n\tlet c = b;\n};\nlet d = a.c;\n"
+input_file: hexbait-lang/tests/parser-cases/bare_var_use.hbl
+---
+File@0..39
+  StructField@0..25
+    Identifier@0..1 "a"
+    Whitespace@1..2 " "
+    AnonymousStructParseType@2..24
+      StructBlock@2..24
+        LBrace@2..3 "{"
+        Whitespace@3..5 "\n\t"
+        StructField@5..10
+          Identifier@5..6 "b"
+          Whitespace@6..7 " "
+          NamedParseType@7..9
+            Identifier@7..9 "u8"
+          Semicolon@9..10 ";"
+        Whitespace@10..12 "\n\t"
+        LetStatement@12..22
+          LetKw@12..15 "let"
+          Whitespace@15..16 " "
+          Identifier@16..17 "c"
+          Whitespace@17..18 " "
+          Equals@18..19 "="
+          Whitespace@19..20 " "
+          Atom@20..21
+            Identifier@20..21 "b"
+          Semicolon@21..22 ";"
+        Whitespace@22..23 "\n"
+        RBrace@23..24 "}"
+    Semicolon@24..25 ";"
+  Whitespace@25..26 "\n"
+  LetStatement@26..38
+    LetKw@26..29 "let"
+    Whitespace@29..30 " "
+    Identifier@30..31 "d"
+    Whitespace@31..32 " "
+    Equals@32..33 "="
+    Whitespace@33..34 " "
+    FieldAccess@34..37
+      Atom@34..35
+        Identifier@34..35 "a"
+      Dot@35..36 "."
+      BareField@36..37
+        Identifier@36..37 "c"
+    Semicolon@37..38 ";"
+  Whitespace@38..39 "\n"
+
+--- diagnostics ---
+error: bare variables are reserved syntax
+  ┌─ bare_var_use.hbl:3:10
+  │
+2 │     b u8;
+3 │     let c = b;
+  │             ^ bare variables are unsupported
+4 │ };
+  │
+  = try adding a leading `.`
+
+
+error: bare variables are reserved syntax
+  ┌─ bare_var_use.hbl:5:9
+  │
+4 │ };
+5 │ let d = a.c;
+  │         ^ bare variables are unsupported
+6 │ 
+  │
+  = try adding a leading `.`

@@ -14,10 +14,11 @@ use super::nested_parse_type;
 fn metavar_raw(p: &mut Parser) {
     p.expect(TokenKind::Dollar);
     if let Some(t) = p.peek().next()
+        && t.kind == TokenKind::Identifier
         && t.preceeded_by_trivia
     {
         p.raw_diagnostic(Diagnostic::error(
-            "unexpected separation between `$` and `ident`",
+            "unexpected whitespace or comment between `$` and the name",
             Label::new("unexpected separator before this", t.span),
         ));
     }

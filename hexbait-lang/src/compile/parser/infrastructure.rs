@@ -305,7 +305,6 @@ impl<'src> Parser<'src> {
             ),
         };
 
-        self.last_err_pos = Some(self.pos);
         self.raw_diagnostic(Diagnostic::error(
             message,
             Label::new(
@@ -323,6 +322,7 @@ impl<'src> Parser<'src> {
 
     /// Adds a raw error to the diagnostics.
     pub(crate) fn raw_diagnostic(&mut self, diagnostic: Diagnostic) {
+        self.last_err_pos = Some(self.pos);
         self.events.push(Event::Error(diagnostic));
     }
 

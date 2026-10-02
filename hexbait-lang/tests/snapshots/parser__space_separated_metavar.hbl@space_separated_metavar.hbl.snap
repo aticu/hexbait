@@ -1,0 +1,102 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "a u8;\nb {\n\tlet c = $ parent.a;\n\td bytes while $ last != 0;\n\tlet e = $ ;\n};\n"
+input_file: hexbait-lang/tests/parser-cases/space_separated_metavar.hbl
+---
+File@0..75
+  StructField@0..5
+    Identifier@0..1 "a"
+    Whitespace@1..2 " "
+    NamedParseType@2..4
+      Identifier@2..4 "u8"
+    Semicolon@4..5 ";"
+  Whitespace@5..6 "\n"
+  StructField@6..74
+    Identifier@6..7 "b"
+    Whitespace@7..8 " "
+    AnonymousStructParseType@8..73
+      StructBlock@8..73
+        LBrace@8..9 "{"
+        Whitespace@9..11 "\n\t"
+        LetStatement@11..30
+          LetKw@11..14 "let"
+          Whitespace@14..15 " "
+          Identifier@15..16 "c"
+          Whitespace@16..17 " "
+          Equals@17..18 "="
+          Whitespace@18..19 " "
+          FieldAccess@19..29
+            Metavar@19..27
+              Dollar@19..20 "$"
+              Whitespace@20..21 " "
+              Identifier@21..27 "parent"
+            Dot@27..28 "."
+            BareField@28..29
+              Identifier@28..29 "a"
+          Semicolon@29..30 ";"
+        Whitespace@30..32 "\n\t"
+        StructField@32..58
+          Identifier@32..33 "d"
+          Whitespace@33..34 " "
+          BytesParseType@34..57
+            BytesKw@34..39 "bytes"
+            Whitespace@39..40 " "
+            RepeatWhileDecl@40..57
+              Identifier@40..45 "while"
+              Whitespace@45..46 " "
+              InfixExpr@46..57
+                Metavar@46..52
+                  Dollar@46..47 "$"
+                  Whitespace@47..48 " "
+                  Identifier@48..52 "last"
+                Whitespace@52..53 " "
+                Op@53..55
+                  ExclamationMark@53..54 "!"
+                  Equals@54..55 "="
+                Whitespace@55..56 " "
+                Atom@56..57
+                  DecimalIntegerLiteral@56..57 "0"
+          Semicolon@57..58 ";"
+        Whitespace@58..60 "\n\t"
+        LetStatement@60..71
+          LetKw@60..63 "let"
+          Whitespace@63..64 " "
+          Identifier@64..65 "e"
+          Whitespace@65..66 " "
+          Equals@66..67 "="
+          Whitespace@67..68 " "
+          Metavar@68..69
+            Dollar@68..69 "$"
+          Whitespace@69..70 " "
+          Semicolon@70..71 ";"
+        Whitespace@71..72 "\n"
+        RBrace@72..73 "}"
+    Semicolon@73..74 ";"
+  Whitespace@74..75 "\n"
+
+--- diagnostics ---
+error: unexpected whitespace or comment between `$` and the name
+  ┌─ space_separated_metavar.hbl:3:12
+  │
+2 │ b {
+3 │     let c = $ parent.a;
+  │               ^^^^^^ unexpected separator before this
+4 │     d bytes while $ last != 0;
+
+
+error: unexpected whitespace or comment between `$` and the name
+  ┌─ space_separated_metavar.hbl:4:18
+  │
+3 │     let c = $ parent.a;
+4 │     d bytes while $ last != 0;
+  │                     ^^^^ unexpected separator before this
+5 │     let e = $ ;
+
+
+error: expected identifier
+  ┌─ space_separated_metavar.hbl:5:12
+  │
+4 │     d bytes while $ last != 0;
+5 │     let e = $ ;
+  │               ^ found unexpected token `;`
+6 │ };

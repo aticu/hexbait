@@ -1,9 +1,9 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\nlet;\nlet a;\nlet b =;\nc {\n\tlet d = \n};\ne u8;\n"
+expression: "!endian le;\n\nlet;\nlet a;\nlet b =;\nc {\n\tlet d = \n};\ne u8;\nlet f = .;\nlet g = .a.;\nlet h = .a.$;\nlet i = concat(. .a);\nlet j = .\n"
 input_file: hexbait-lang/tests/parser-cases/basic_recovery.hbl
 ---
-File@0..57
+File@0..127
   EndiannessDeclaration@0..11
     ExclamationMark@0..1 "!"
     Identifier@1..7 "endian"
@@ -57,6 +57,84 @@ File@0..57
       Identifier@53..55 "u8"
     Semicolon@55..56 ";"
   Whitespace@56..57 "\n"
+  LetStatement@57..67
+    LetKw@57..60 "let"
+    Whitespace@60..61 " "
+    Identifier@61..62 "f"
+    Whitespace@62..63 " "
+    Equals@63..64 "="
+    Whitespace@64..65 " "
+    FieldAccess@65..66
+      Dot@65..66 "."
+      BareField@66..66
+    Semicolon@66..67 ";"
+  Whitespace@67..68 "\n"
+  LetStatement@68..80
+    LetKw@68..71 "let"
+    Whitespace@71..72 " "
+    Identifier@72..73 "g"
+    Whitespace@73..74 " "
+    Equals@74..75 "="
+    Whitespace@75..76 " "
+    FieldAccess@76..79
+      FieldAccess@76..78
+        Dot@76..77 "."
+        BareField@77..78
+          Identifier@77..78 "a"
+      Dot@78..79 "."
+      BareField@79..79
+    Semicolon@79..80 ";"
+  Whitespace@80..81 "\n"
+  LetStatement@81..94
+    LetKw@81..84 "let"
+    Whitespace@84..85 " "
+    Identifier@85..86 "h"
+    Whitespace@86..87 " "
+    Equals@87..88 "="
+    Whitespace@88..89 " "
+    FieldAccess@89..93
+      FieldAccess@89..91
+        Dot@89..90 "."
+        BareField@90..91
+          Identifier@90..91 "a"
+      Dot@91..92 "."
+      MetaField@92..93
+        Dollar@92..93 "$"
+    Semicolon@93..94 ";"
+  Whitespace@94..95 "\n"
+  LetStatement@95..116
+    LetKw@95..98 "let"
+    Whitespace@98..99 " "
+    Identifier@99..100 "i"
+    Whitespace@100..101 " "
+    Equals@101..102 "="
+    Whitespace@102..103 " "
+    ConcatExpr@103..115
+      ConcatKw@103..109 "concat"
+      LParen@109..110 "("
+      ConcatArgDirect@110..114
+        FieldAccess@110..114
+          FieldAccess@110..112
+            Dot@110..111 "."
+            Whitespace@111..112 " "
+            BareField@112..112
+          Dot@112..113 "."
+          BareField@113..114
+            Identifier@113..114 "a"
+      RParen@114..115 ")"
+    Semicolon@115..116 ";"
+  Whitespace@116..117 "\n"
+  LetStatement@117..127
+    LetKw@117..120 "let"
+    Whitespace@120..121 " "
+    Identifier@121..122 "j"
+    Whitespace@122..123 " "
+    Equals@123..124 "="
+    Whitespace@124..125 " "
+    FieldAccess@125..127
+      Dot@125..126 "."
+      Whitespace@126..127 "\n"
+      BareField@127..127
 
 --- diagnostics ---
 error: expected identifier
@@ -93,3 +171,47 @@ error: expected identifier, literal, `.`, `peek`, `concat`, `$`, `<` or `(`
 8 │ };
   │ ^ found unexpected token `}`
 9 │ e u8;
+
+
+error: expected identifier
+   ┌─ basic_recovery.hbl:10:10
+   │
+ 9 │ e u8;
+10 │ let f = .;
+   │          ^ found unexpected token `;`
+11 │ let g = .a.;
+
+
+error: expected identifier
+   ┌─ basic_recovery.hbl:11:12
+   │
+10 │ let f = .;
+11 │ let g = .a.;
+   │            ^ found unexpected token `;`
+12 │ let h = .a.$;
+
+
+error: expected identifier
+   ┌─ basic_recovery.hbl:12:13
+   │
+11 │ let g = .a.;
+12 │ let h = .a.$;
+   │             ^ found unexpected token `;`
+13 │ let i = concat(. .a);
+
+
+error: expected identifier
+   ┌─ basic_recovery.hbl:13:18
+   │
+12 │ let h = .a.$;
+13 │ let i = concat(. .a);
+   │                  ^ found unexpected token `.`
+14 │ let j = .
+
+
+error: expected identifier
+   ┌─ basic_recovery.hbl:15:1
+   │
+14 │ let j = .
+15 │ 
+   │ ^ found unexpected token end of file

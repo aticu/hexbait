@@ -12,6 +12,7 @@ use crate::{
         },
         lexer::TokenKind,
         span::Span,
+        syntax::{SyntaxKind, SyntaxNode},
     },
     int_from_str,
 };
@@ -63,13 +64,36 @@ macro_rules! required_field {
             Some(val) => val,
             None => {
                 assert!(
-                    $this.diagnostics.contains_error_in($value.span()),
+                    $this
+                        .diagnostics
+                        .contains_error_in(missing_part_error_span($value.syntax())),
                     "required field not present, but there are no errors"
                 );
                 return $err_ty;
             }
         }
     };
+}
+
+/// Returns the span in which parse errors for missing parts of `node` are reported.
+///
+/// The parser attaches errors about missing tokens to the next token, which lies outside of
+/// `node` (especially if `node` is empty), so the span is extended up to the end of the next
+/// non-trivia token.
+fn missing_part_error_span(node: &SyntaxNode) -> Span {
+    let range = node.text_range();
+    let root = node.ancestors().last().unwrap_or_else(|| node.clone());
+    let mut next = root.token_at_offset(range.end()).right_biased();
+    while let Some(token) = &next
+        && matches!(token.kind(), SyntaxKind::Token { kind } if kind.is_trivia())
+    {
+        next = token.next_token();
+    }
+    let end = next
+        .map(|token| token.text_range().end())
+        .unwrap_or(root.text_range().end());
+
+    Span::from(rowan::TextRange::new(range.start(), end))
 }
 
 impl LoweringCtx<'_> {
@@ -418,10 +442,13 @@ impl LoweringCtx<'_> {
             TokenKind::TrueKw => ExprKind::Lit(Lit::Bool(true)),
             TokenKind::FalseKw => ExprKind::Lit(Lit::Bool(false)),
             TokenKind::Identifier => {
-                self.add_diagnostic(Diagnostic::error(
-                    "bare variables are reserved syntax",
-                    Label::new("bare variable are unsupported", atom.span()),
-                ));
+                self.add_diagnostic(
+                    Diagnostic::error(
+                        "bare variables are reserved syntax",
+                        Label::new("bare variables are unsupported", atom.span()),
+                    )
+                    .with_help("try adding a leading `.`"),
+                );
                 ExprKind::Error
             }
             _ => parser_unreachable!(),
@@ -483,19 +510,6 @@ impl LoweringCtx<'_> {
 
     /// Lowers the given AST field access expression to IR.
     fn lower_field_access(&mut self, field_access: ast::FieldAccess) -> ExprKind {
-        let field_raw = required_field!(field_access => field_name ? self => ExprKind::Error);
-        let field_span = field_raw.span();
-        let Some(field) = self.lower_field_name(field_raw) else {
-            return ExprKind::Error;
-        };
-        let StructRefPart::Named(field) = field else {
-            self.add_diagnostic(Diagnostic::error(
-                "expected final field to be a bare field",
-                Label::new("must be a bare field", field_span),
-            ));
-            return ExprKind::Error;
-        };
-
         fn lower_struct_ref(
             lowering_ctx: &mut LoweringCtx,
             parts: &mut Vec<Spanned<StructRefPart>>,
@@ -515,13 +529,18 @@ impl LoweringCtx<'_> {
             };
 
             match expr {
+                ast::Expr::Atom(atom) if atom.child_kind() == Some(TokenKind::Identifier) => {
+                    lowering_ctx.lower_atom(atom);
+                    return None;
+                }
                 ast::Expr::Metavar(metavar) => {
-                    if metavar.text() == "$parent" {
+                    let name = required_field!(metavar => name ? lowering_ctx => None);
+                    if name.text() == "parent" {
                         parts.push(Spanned {
                             inner: StructRefPart::Parent,
                             span,
                         });
-                    } else if metavar.text() == "$last" {
+                    } else if name.text() == "last" {
                         parts.push(Spanned {
                             inner: StructRefPart::Last,
                             span,
@@ -563,6 +582,19 @@ impl LoweringCtx<'_> {
             return ExprKind::Error;
         };
 
+        let field_raw = required_field!(field_access => field_name ? self => ExprKind::Error);
+        let field_span = field_raw.span();
+        let Some(field) = self.lower_field_name(field_raw) else {
+            return ExprKind::Error;
+        };
+        let StructRefPart::Named(field) = field else {
+            self.add_diagnostic(Diagnostic::error(
+                "expected final field to be a bare field",
+                Label::new("must be a bare field", field_span),
+            ));
+            return ExprKind::Error;
+        };
+
         ExprKind::FieldAccess {
             struct_ref: StructRef { parts },
             field: Spanned {
@@ -584,8 +616,8 @@ impl LoweringCtx<'_> {
                     Some(StructRefPart::Parent)
                 } else {
                     self.add_diagnostic(Diagnostic::error(
-                        "unknown meta field name",
-                        Label::new("expected `parent`", meta_field.span()),
+                        format!("`${}` cannot be used as as a field", name.text()),
+                        Label::new("invalid field", meta_field.span()),
                     ));
                     None
                 }
