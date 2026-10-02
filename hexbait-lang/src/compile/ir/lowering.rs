@@ -322,6 +322,13 @@ impl LoweringCtx<'_> {
                     "offset" => ExprKind::Offset,
                     "last" => ExprKind::Last,
                     "len" => ExprKind::Len,
+                    "parent" => {
+                        self.add_diagnostic(Diagnostic::error(
+                            "metavariable `$parent` cannot only be used in a field access",
+                            Label::new("invalid use of `$parent`", metavar.span()),
+                        ));
+                        ExprKind::Error
+                    }
                     var => {
                         self.add_diagnostic(Diagnostic::error(
                             format!("metavariable `${var}` is unknown"),
@@ -541,8 +548,8 @@ impl LoweringCtx<'_> {
             let span = expr.span();
             let mut err = || {
                 lowering_ctx.add_diagnostic(Diagnostic::error(
-                    "expected `$parent`, `$last` or another field access",
-                    Label::new("unexpected field access", span),
+                    "expected `$parent`, `$last` or another field access expression here",
+                    Label::new("cannot access fields of this", span),
                 ));
             };
 
@@ -634,7 +641,7 @@ impl LoweringCtx<'_> {
                     Some(StructRefPart::Parent)
                 } else {
                     self.add_diagnostic(Diagnostic::error(
-                        format!("`${}` cannot be used as as a field", name.text()),
+                        format!("`${}` cannot be used as a field", name.text()),
                         Label::new("invalid field", meta_field.span()),
                     ));
                     None

@@ -1,0 +1,11 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "let x = $offset.x;\n"
+input_file: hexbait-lang/tests/analysis-cases/invalid_field_access.hbl
+---
+error: expected `$parent`, `$last` or another field access expression here
+  ┌─ invalid_field_access.hbl:1:9
+  │
+1 │ let x = $offset.x;
+  │         ^^^^^^^ cannot access fields of this
+2 │

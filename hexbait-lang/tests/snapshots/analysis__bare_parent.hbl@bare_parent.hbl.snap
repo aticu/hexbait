@@ -1,0 +1,11 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "let a = $parent;\n"
+input_file: hexbait-lang/tests/analysis-cases/bare_parent.hbl
+---
+error: metavariable `$parent` cannot only be used in a field access
+  ┌─ bare_parent.hbl:1:9
+  │
+1 │ let a = $parent;
+  │         ^^^^^^^ invalid use of `$parent`
+2 │
