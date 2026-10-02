@@ -38,10 +38,6 @@ impl ParseContext {
                 },
                 provenance: Provenance::empty(),
             }),
-            ExprKind::VarUse(var) => Ok(struct_ctx
-                .field(&var.inner)
-                .static_analysis_expect()
-                .clone()),
             ExprKind::Offset => Ok(Value {
                 kind: ValueKind::Integer(Int::from(cursor.offset().as_u64())),
                 provenance: Provenance::empty(),

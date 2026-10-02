@@ -12,7 +12,7 @@
 	number_of_items u32;
 	level u8;
 
-	nodes switch level {
+	nodes switch .level {
 		0 => [{
 			object_id u64;
 			item_ty u8;
@@ -20,8 +20,8 @@
 			data_offset u32;
 			data_size u32;
 
-			!scope at 0x65 + data_offset until 0x65 + data_offset + data_size {
-				data switch item_ty {
+			!scope at 0x65 + .data_offset until 0x65 + .data_offset + .data_size {
+				data switch .item_ty {
 					0x01 => {
 						generation u64;
 						transid u64;
@@ -44,7 +44,7 @@
 					0x0c => {
 						index_in_dir u64;
 						name_len u16;
-						name bytes len name_len;
+						name bytes len .name_len;
 					},
 					0x18 => {
 						key {
@@ -56,8 +56,8 @@
 						data_len u16;
 						name_len u16;
 						ty u8;
-						name bytes len name_len;
-						data bytes len data_len;
+						name bytes len .name_len;
+						data bytes len .data_len;
 					},
 					0x54 => {
 						key {
@@ -69,8 +69,8 @@
 						data_len u16;
 						name_len u16;
 						ty u8;
-						name bytes len name_len;
-						data bytes len data_len;
+						name bytes len .name_len;
+						data bytes len .data_len;
 					},
 					0x60 => {
 						key {
@@ -82,8 +82,8 @@
 						data_len u16;
 						name_len u16;
 						ty u8;
-						name bytes len name_len;
-						data bytes len data_len;
+						name bytes len .name_len;
+						data bytes len .data_len;
 					},
 					0x6c => {
 						generation u64;
@@ -92,7 +92,7 @@
 						encryption u8;
 						other_encoding u16;
 						ty u8;
-						content switch ty {
+						content switch .ty {
 							0 => bytes len $parent.data_size - 0x15,
 							_ => {
 								logical_address u64;
@@ -145,18 +145,18 @@
 							device_id u64;
 							offset u64;
 							device_uuid bytes len 16;
-						}] len number_of_stripes;
+						}] len .number_of_stripes;
 					},
-					_ => bytes len data_size,
+					_ => bytes len .data_size,
 				};
 			}
-		}] len number_of_items,
+		}] len .number_of_items,
 		_ => [{
 			object_id u64;
 			item_ty u8;
 			offset u64;
 			block_number u64;
 			generation u64;
-		}] len number_of_items,
+		}] len .number_of_items,
 	};
 }

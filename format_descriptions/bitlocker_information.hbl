@@ -28,7 +28,7 @@ datums [{
     entry_type u16;
     value_type u16;
     error_status u16;
-    content switch value_type {
-        _ => bytes len size - 8,
+    content switch .value_type {
+        _ => bytes len .size - 8,
     };
-}] while $offset < dataset.size + 64;
+}] while $offset < .dataset.size + 64;

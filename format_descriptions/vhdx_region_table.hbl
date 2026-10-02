@@ -10,4 +10,4 @@ entries [{
     region_data_offset u64;
     region_data_size u32;
     is_required_flag u32;
-}] len number_of_entries;
+}] len .number_of_entries;

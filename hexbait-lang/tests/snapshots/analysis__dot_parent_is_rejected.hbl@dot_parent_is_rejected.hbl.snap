@@ -1,0 +1,14 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "a u8;\nb {\n\tlet c = .$parent.a;\n};\n"
+input_file: hexbait-lang/tests/analysis-cases/dot_parent_is_rejected.hbl
+---
+error: only sibling field accesses are allowed after the initial `.`
+  ┌─ dot_parent_is_rejected.hbl:3:10
+  │
+2 │ b {
+3 │     let c = .$parent.a;
+  │             ^^^^^^^^ illegal field access
+4 │ };
+  │
+  = remove the leading `.`

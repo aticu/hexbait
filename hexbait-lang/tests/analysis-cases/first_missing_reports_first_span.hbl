@@ -1,5 +1,5 @@
 a u8;
-b switch a {
+b switch .a {
 	0 => {},
 	1 => {},
 	2 => {
@@ -10,4 +10,4 @@ b switch a {
 	}
 };
 
-!seek by b.c;
+!seek by .b.c;

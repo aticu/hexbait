@@ -1,12 +1,12 @@
 ---
 source: hexbait-lang/tests/analysis.rs
-expression: "a u8;\n!if a == 0 {\n\tlet b = 1 + true;\n}\nlet c = a;\n"
+expression: "a u8;\n!if .a == 0 {\n\tlet b = 1 + true;\n}\nlet c = .a;\n"
 input_file: hexbait-lang/tests/analysis-cases/fields_stay_valid_after_error.hbl
 ---
 error: binary operator `+` can only be applied to ints
   ┌─ fields_stay_valid_after_error.hbl:3:14
   │
-2 │ !if a == 0 {
+2 │ !if .a == 0 {
 3 │     let b = 1 + true;
   │                 ^^^^ unexpected type `bool`
 4 │ }

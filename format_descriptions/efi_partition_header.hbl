@@ -4,7 +4,7 @@ signature bytes = "EFI PART";
 revision u32 = 0x00010000;
 header_size u32;
 
-!assert header_size >= 92;
+!assert .header_size >= 92;
 
 header_crc32 u32;
 reserved u32 = 0;

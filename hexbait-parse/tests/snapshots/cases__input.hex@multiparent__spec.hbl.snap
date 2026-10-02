@@ -1,0 +1,36 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\na u8;\nb {\n\tc u8;\n\td {\n\t\tlet e = $parent.$parent.a;\n\t};\n};\n\n\n=== Hex ===\n00 01\n"
+input_file: hexbait-parse/tests/cases/multiparent/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "a": {
+        "value": 0,
+        "provenance": "0..=0"
+      },
+      "b": {
+        "value": {
+          "c": {
+            "value": 1,
+            "provenance": "1..=1"
+          },
+          "d": {
+            "value": {
+              "e": {
+                "value": 0,
+                "provenance": "0..=0"
+              }
+            },
+            "provenance": "0..=0"
+          }
+        },
+        "provenance": "0..=1"
+      }
+    },
+    "provenance": "0..=1"
+  },
+  "errors": [],
+  "warnings": []
+}

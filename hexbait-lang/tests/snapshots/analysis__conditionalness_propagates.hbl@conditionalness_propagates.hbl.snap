@@ -1,21 +1,21 @@
 ---
 source: hexbait-lang/tests/analysis.rs
-expression: "a u8;\nb switch a {\n\t0 => {\n\t\tc u8;\n\t\t!if c == 0 {\n\t\t\td u8;\n\t\t}\n\t},\n\t_ => {\n\t\td u8;\n\t},\n};\n\n!seek by b.d;\n"
+expression: "a u8;\nb switch .a {\n\t0 => {\n\t\tc u8;\n\t\t!if .c == 0 {\n\t\t\td u8;\n\t\t}\n\t},\n\t_ => {\n\t\td u8;\n\t},\n};\n\n!seek by .b.d;\n"
 input_file: hexbait-lang/tests/analysis-cases/conditionalness_propagates.hbl
 ---
 error: field `d` is not guaranteed to be available
-   ┌─ conditionalness_propagates.hbl:14:12
+   ┌─ conditionalness_propagates.hbl:14:13
    │  
  4 │           c u8;
- 5 │           !if c == 0 {
-   │               ------ not defined if this is `false`
-   │ ╭────────────────────'
+ 5 │           !if .c == 0 {
+   │               ------- not defined if this is `false`
+   │ ╭─────────────────────'
  6 │ │             d u8;
  7 │ │         }
    │ ╰─────────' defined here
  8 │       },
    ·  
 13 │   
-14 │   !seek by b.d;
-   │              ^ not guaranteed to be available
+14 │   !seek by .b.d;
+   │               ^ not guaranteed to be available
 15 │

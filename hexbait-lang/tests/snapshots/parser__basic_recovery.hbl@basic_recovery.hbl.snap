@@ -77,7 +77,7 @@ error: expected `=`
 5 │ let b =;
 
 
-error: expected identifier, literal, `peek`, `concat`, `$`, `<` or `(`
+error: expected identifier, literal, `.`, `peek`, `concat`, `$`, `<` or `(`
   ┌─ basic_recovery.hbl:5:8
   │
 4 │ let a;
@@ -86,7 +86,7 @@ error: expected identifier, literal, `peek`, `concat`, `$`, `<` or `(`
 6 │ c {
 
 
-error: expected identifier, literal, `peek`, `concat`, `$`, `<` or `(`
+error: expected identifier, literal, `.`, `peek`, `concat`, `$`, `<` or `(`
   ┌─ basic_recovery.hbl:8:1
   │
 7 │     let d = 

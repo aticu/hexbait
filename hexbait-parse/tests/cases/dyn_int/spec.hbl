@@ -3,7 +3,7 @@
 w u8;
 fixed u32;
 dynamic u(32);
-by_field u(w * 8);
+by_field u(.w * 8);
 signed i(16);
 width24 u24;
 iwidth24 i24;

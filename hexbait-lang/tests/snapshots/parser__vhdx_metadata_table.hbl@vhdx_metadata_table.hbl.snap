@@ -1,9 +1,9 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\nsignature bytes = \"metadata\";\nunknown u16;\nnumber_of_entries u16;\nunknown2 bytes len 20;\n\nentries [{\n    metadata_item_identifier bytes len 16;\n    metadata_item_offset u32;\n    metadata_item_size u32;\n    unknown u64;\n}] len number_of_entries;\n"
+expression: "!endian le;\n\nsignature bytes = \"metadata\";\nunknown u16;\nnumber_of_entries u16;\nunknown2 bytes len 20;\n\nentries [{\n    metadata_item_identifier bytes len 16;\n    metadata_item_offset u32;\n    metadata_item_size u32;\n    unknown u64;\n}] len .number_of_entries;\n"
 input_file: format_descriptions/vhdx_metadata_table.hbl
 ---
-File@0..258
+File@0..259
   EndiannessDeclaration@0..11
     ExclamationMark@0..1 "!"
     Identifier@1..7 "endian"
@@ -50,10 +50,10 @@ File@0..258
           DecimalIntegerLiteral@98..100 "20"
     Semicolon@100..101 ";"
   Whitespace@101..103 "\n\n"
-  StructField@103..257
+  StructField@103..258
     Identifier@103..110 "entries"
     Whitespace@110..111 " "
-    RepeatParseType@111..256
+    RepeatParseType@111..257
       LBracket@111..112 "["
       AnonymousStructParseType@112..233
         StructBlock@112..233
@@ -96,13 +96,15 @@ File@0..258
           RBrace@232..233 "}"
       RBracket@233..234 "]"
       Whitespace@234..235 " "
-      RepeatLenDecl@235..256
+      RepeatLenDecl@235..257
         Identifier@235..238 "len"
         Whitespace@238..239 " "
-        Atom@239..256
-          Identifier@239..256 "number_of_entries"
-    Semicolon@256..257 ";"
-  Whitespace@257..258 "\n"
+        FieldAccess@239..257
+          Dot@239..240 "."
+          BareField@240..257
+            Identifier@240..257 "number_of_entries"
+    Semicolon@257..258 ";"
+  Whitespace@258..259 "\n"
 
 --- diagnostics ---
 no diagnostics

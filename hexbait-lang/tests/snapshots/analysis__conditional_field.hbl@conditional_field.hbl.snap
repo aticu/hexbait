@@ -1,19 +1,19 @@
 ---
 source: hexbait-lang/tests/analysis.rs
-expression: "cond u8;\n\n!if cond == 0 {\n\tx u8;\n}\n\nlet y = x;\n"
+expression: "cond u8;\n\n!if .cond == 0 {\n\tx u8;\n}\n\nlet y = .x;\n"
 input_file: hexbait-lang/tests/analysis-cases/conditional_field.hbl
 ---
 error: field `x` is not guaranteed to be available
-  ┌─ conditional_field.hbl:7:9
+  ┌─ conditional_field.hbl:7:10
   │  
 2 │   
-3 │   !if cond == 0 {
-  │       --------- not defined if this is `false`
-  │ ╭───────────────'
+3 │   !if .cond == 0 {
+  │       ---------- not defined if this is `false`
+  │ ╭────────────────'
 4 │ │     x u8;
 5 │ │ }
   │ ╰─' defined here
 6 │   
-7 │   let y = x;
-  │           ^ not guaranteed to be available
+7 │   let y = .x;
+  │            ^ not guaranteed to be available
 8 │

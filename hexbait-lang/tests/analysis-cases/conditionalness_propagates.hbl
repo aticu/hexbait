@@ -1,8 +1,8 @@
 a u8;
-b switch a {
+b switch .a {
 	0 => {
 		c u8;
-		!if c == 0 {
+		!if .c == 0 {
 			d u8;
 		}
 	},
@@ -11,4 +11,4 @@ b switch a {
 	},
 };
 
-!seek by b.d;
+!seek by .b.d;

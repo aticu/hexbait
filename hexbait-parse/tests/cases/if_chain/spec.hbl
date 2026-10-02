@@ -1,9 +1,9 @@
 !endian le;
 
 k u8;
-!if k == 1 {
+!if .k == 1 {
   one u8;
-} else if k == 2 {
+} else if .k == 2 {
   two u16;
 } else {
   other bytes len 3;

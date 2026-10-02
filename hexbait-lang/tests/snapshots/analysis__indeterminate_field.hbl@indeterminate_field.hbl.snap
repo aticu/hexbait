@@ -1,6 +1,6 @@
 ---
 source: hexbait-lang/tests/analysis.rs
-expression: "!endian le;\n\ncondition u8;\nx switch condition {\n\t0 => {\n\t\tx u8;\n\t},\n\t_ => {\n\t\tx bytes len 1;\n\t},\n};\n\n!seek by x.x;\n"
+expression: "!endian le;\n\ncondition u8;\nx switch condition {\n\t0 => {\n\t\tx u8;\n\t},\n\t_ => {\n\t\tx bytes len 1;\n\t},\n};\n\n!seek by .x.x;\n"
 input_file: hexbait-lang/tests/analysis-cases/indeterminate_field.hbl
 ---
 error: type differs between braches
@@ -16,6 +16,6 @@ error: type differs between braches
 10 │     },
 11 │ };
 12 │ 
-13 │ !seek by x.x;
-   │          ^^^ undetermined type
+13 │ !seek by .x.x;
+   │          ^^^^ undetermined type
 14 │

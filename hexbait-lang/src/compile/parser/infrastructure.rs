@@ -74,6 +74,8 @@ pub(crate) struct PeekedToken<'src> {
     pub(crate) kind: TokenKind,
     /// The source text of the token.
     pub(crate) text: &'src str,
+    /// The span of the token.
+    pub(crate) span: Span,
     /// Whether this token was preceeded by trivia.
     pub(crate) preceeded_by_trivia: bool,
 }
@@ -131,6 +133,7 @@ impl<'src> Parser<'src> {
                 PeekedToken {
                     kind: token.kind,
                     text: &self.src[token.span.range()],
+                    span: token.span,
                     preceeded_by_trivia,
                 }
             })
@@ -303,7 +306,7 @@ impl<'src> Parser<'src> {
         };
 
         self.last_err_pos = Some(self.pos);
-        self.events.push(Event::Error(Diagnostic::error(
+        self.raw_diagnostic(Diagnostic::error(
             message,
             Label::new(
                 format!(
@@ -315,7 +318,12 @@ impl<'src> Parser<'src> {
                 ),
                 span,
             ),
-        )));
+        ));
+    }
+
+    /// Adds a raw error to the diagnostics.
+    pub(crate) fn raw_diagnostic(&mut self, diagnostic: Diagnostic) {
+        self.events.push(Event::Error(diagnostic));
     }
 
     /// Recovers from a previous error, by looking for a recovery token.

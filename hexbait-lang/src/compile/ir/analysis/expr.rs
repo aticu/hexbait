@@ -42,7 +42,6 @@ impl Env<'_> {
     pub fn check_expr(&self, ctx: &mut AnalysisCtx, expr: &Expr, extra_ctx: &ExtraExprCtx) -> Ty {
         let kind = match &expr.kind {
             ExprKind::Lit(lit) => self.check_lit(lit),
-            ExprKind::VarUse(var) => self.check_var_use(ctx, var),
             ExprKind::Offset => self.check_offset(),
             ExprKind::Last => self.check_last(ctx, expr.span, extra_ctx),
             ExprKind::Len => self.check_len(ctx, expr.span, extra_ctx),
@@ -76,47 +75,6 @@ impl Env<'_> {
             },
             Lit::Bytes(_) => TyKind::Bytes,
             Lit::Bool(_) => TyKind::Bool,
-        }
-    }
-
-    /// Checks the given variable use expression.
-    fn check_var_use(&self, ctx: &mut AnalysisCtx, var: &Spanned<Symbol>) -> TyKind {
-        match self.values.field(&var.inner) {
-            Some(field) => match field.availability {
-                Availability::Guaranteed => field.ty.kind.clone(),
-                Availability::Conditional {
-                    defined_at,
-                    undefined_at,
-                    undefined_is_missing_else,
-                } => {
-                    ctx.add_diagnostic(
-                        Diagnostic::error(
-                            format!(
-                                "field `{}` is not guaranteed to be available",
-                                var.inner.as_str()
-                            ),
-                            Label::new("not guaranteed to be available", var.span),
-                        )
-                        .with_label(Label::new("defined here", defined_at))
-                        .with_label(Label::new(
-                            if undefined_is_missing_else {
-                                "not defined if this is `false`"
-                            } else {
-                                "not defined in this branch"
-                            },
-                            undefined_at,
-                        )),
-                    );
-                    TyKind::Error
-                }
-            },
-            None => {
-                ctx.add_diagnostic(Diagnostic::error(
-                    format!("the variable `{}` is not defined", var.inner.as_str()),
-                    Label::new("undefined variable", var.span),
-                ));
-                TyKind::Error
-            }
         }
     }
 

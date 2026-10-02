@@ -1,4 +1,4 @@
 a u8;
-!scope in a {
+!scope in .a {
 	b u8;
 }

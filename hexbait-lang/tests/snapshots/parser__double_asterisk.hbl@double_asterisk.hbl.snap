@@ -1,6 +1,6 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: result
+expression: "!endian le;\n\nlet x = 1 ** 2;\n"
 input_file: hexbait-lang/tests/parser-cases/double_asterisk.hbl
 ---
 File@0..29
@@ -35,7 +35,7 @@ File@0..29
   Whitespace@28..29 "\n"
 
 --- diagnostics ---
-error: expected identifier, literal, `peek`, `concat`, `$`, `<` or `(`
+error: expected identifier, literal, `.`, `peek`, `concat`, `$`, `<` or `(`
   ┌─ double_asterisk.hbl:3:12
   │
 2 │ 

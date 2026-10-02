@@ -5,7 +5,7 @@ a u16;
 b u16;
 !align 8;
 c u8;
-let sum = a + b;
+let sum = .a + .b;
 let lit = 7;
 
 !seek to 8;

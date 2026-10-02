@@ -161,8 +161,12 @@ pub enum NodeKind {
     InfixExpr,
     /// An expression with a prefix operator.
     PrefixExpr,
-    /// A field access expression: `val.field`.
+    /// A field access expression: `.val.field`.
     FieldAccess,
+    /// A bare field consisting of an identifier.
+    BareField,
+    /// A meta field consisting of a metavariable.
+    MetaField,
     /// A `peek(type, at = offset)` expression.
     PeekExpr,
     /// A `concat(val1, val2, ..val3)` expression.

@@ -1,8 +1,8 @@
 x u8;
-!if x == 0 {
+!if .x == 0 {
 	y u8;
 }
-!if x == 1 {
+!if .x == 1 {
 	z u8;
 }
-let a = y;
+let a = .y;

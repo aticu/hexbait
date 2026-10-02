@@ -4,4 +4,4 @@ a {
 b {
 	x u8;
 };
-!assert a == b;
+!assert .a == .b;

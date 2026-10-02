@@ -46,13 +46,6 @@ impl<'parent> StructContext<'parent> {
         }
     }
 
-    /// Returns the field named `field_name`.
-    pub fn field(&self, field_name: &Symbol) -> Option<&Value> {
-        self.content
-            .iter()
-            .find_map(|content| content.val_if_name_eq(field_name))
-    }
-
     /// Inserts a field with the given name into the `struct`.
     pub fn insert(&mut self, field_name: Symbol, value: Value) {
         // TODO: use resolved names here later

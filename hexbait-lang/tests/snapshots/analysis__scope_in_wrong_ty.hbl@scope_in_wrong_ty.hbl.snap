@@ -1,12 +1,12 @@
 ---
 source: hexbait-lang/tests/analysis.rs
-expression: "a u8;\n!scope in a {\n\tb u8;\n}\n"
+expression: "a u8;\n!scope in .a {\n\tb u8;\n}\n"
 input_file: hexbait-lang/tests/analysis-cases/scope_in_wrong_ty.hbl
 ---
 error: expected bytes type as argument to `scope in`
   ┌─ scope_in_wrong_ty.hbl:2:11
   │
 1 │ a u8;
-2 │ !scope in a {
-  │           ^ unexpected type `int`
+2 │ !scope in .a {
+  │           ^^ unexpected type `int`
 3 │     b u8;

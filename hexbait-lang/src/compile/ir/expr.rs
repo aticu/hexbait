@@ -111,8 +111,6 @@ pub struct Expr {
 pub enum ExprKind {
     /// A literal expression.
     Lit(Lit),
-    /// A use of a variable.
-    VarUse(Spanned<Symbol>),
     /// The current parsing offset.
     Offset,
     /// The last parsed element in a repeating expression.

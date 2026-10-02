@@ -1,9 +1,9 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\nsignature bytes = \"-FVE-FS-\";\nsize u16;\nversion u16;\ncurrent_state u16;\nnext_state u16;\nencrypted_volume_size u64;\nconvert_size u32;\nnum_of_backup_sectors u32;\ninformation_offsets [u64] len 3;\nboot_sector_backup u64;\n\ndataset {\n    size u32;\n    unknown1 u32;\n    header_size u32;\n    copy_size u32;\n    guid bytes len 16;\n    next_counter u32;\n    algorithm u16;\n    trash u16;\n    timestamp u64;\n};\n\ndatums [{\n    size u16;\n    entry_type u16;\n    value_type u16;\n    error_status u16;\n    content switch value_type {\n        _ => bytes len size - 8,\n    };\n}] while $offset < dataset.size + 64;\n"
+expression: "!endian le;\n\nsignature bytes = \"-FVE-FS-\";\nsize u16;\nversion u16;\ncurrent_state u16;\nnext_state u16;\nencrypted_volume_size u64;\nconvert_size u32;\nnum_of_backup_sectors u32;\ninformation_offsets [u64] len 3;\nboot_sector_backup u64;\n\ndataset {\n    size u32;\n    unknown1 u32;\n    header_size u32;\n    copy_size u32;\n    guid bytes len 16;\n    next_counter u32;\n    algorithm u16;\n    trash u16;\n    timestamp u64;\n};\n\ndatums [{\n    size u16;\n    entry_type u16;\n    value_type u16;\n    error_status u16;\n    content switch .value_type {\n        _ => bytes len .size - 8,\n    };\n}] while $offset < .dataset.size + 64;\n"
 input_file: format_descriptions/bitlocker_information.hbl
 ---
-File@0..611
+File@0..614
   EndiannessDeclaration@0..11
     ExclamationMark@0..1 "!"
     Identifier@1..7 "endian"
@@ -174,13 +174,13 @@ File@0..611
         RBrace@411..412 "}"
     Semicolon@412..413 ";"
   Whitespace@413..415 "\n\n"
-  StructField@415..610
+  StructField@415..613
     Identifier@415..421 "datums"
     Whitespace@421..422 " "
-    RepeatParseType@422..609
+    RepeatParseType@422..612
       LBracket@422..423 "["
-      AnonymousStructParseType@423..574
-        StructBlock@423..574
+      AnonymousStructParseType@423..576
+        StructBlock@423..576
           LBrace@423..424 "{"
           Whitespace@424..429 "\n    "
           StructField@429..438
@@ -211,70 +211,77 @@ File@0..611
               Identifier@496..499 "u16"
             Semicolon@499..500 ";"
           Whitespace@500..505 "\n    "
-          StructField@505..572
+          StructField@505..574
             Identifier@505..512 "content"
             Whitespace@512..513 " "
-            SwitchParseType@513..571
+            SwitchParseType@513..573
               SwitchKw@513..519 "switch"
               Whitespace@519..520 " "
-              Atom@520..530
-                Identifier@520..530 "value_type"
-              Whitespace@530..531 " "
-              LBrace@531..532 "{"
-              Whitespace@532..541 "\n        "
-              Underscore@541..542 "_"
-              Whitespace@542..543 " "
-              Equals@543..544 "="
-              RAngle@544..545 ">"
-              Whitespace@545..546 " "
-              BytesParseType@546..564
-                BytesKw@546..551 "bytes"
-                Whitespace@551..552 " "
-                RepeatLenDecl@552..564
-                  Identifier@552..555 "len"
-                  Whitespace@555..556 " "
-                  InfixExpr@556..564
-                    Atom@556..560
-                      Identifier@556..560 "size"
-                    Whitespace@560..561 " "
-                    Op@561..562
-                      Minus@561..562 "-"
+              FieldAccess@520..531
+                Dot@520..521 "."
+                BareField@521..531
+                  Identifier@521..531 "value_type"
+              Whitespace@531..532 " "
+              LBrace@532..533 "{"
+              Whitespace@533..542 "\n        "
+              Underscore@542..543 "_"
+              Whitespace@543..544 " "
+              Equals@544..545 "="
+              RAngle@545..546 ">"
+              Whitespace@546..547 " "
+              BytesParseType@547..566
+                BytesKw@547..552 "bytes"
+                Whitespace@552..553 " "
+                RepeatLenDecl@553..566
+                  Identifier@553..556 "len"
+                  Whitespace@556..557 " "
+                  InfixExpr@557..566
+                    FieldAccess@557..562
+                      Dot@557..558 "."
+                      BareField@558..562
+                        Identifier@558..562 "size"
                     Whitespace@562..563 " "
-                    Atom@563..564
-                      DecimalIntegerLiteral@563..564 "8"
-              Comma@564..565 ","
-              Whitespace@565..570 "\n    "
-              RBrace@570..571 "}"
-            Semicolon@571..572 ";"
-          Whitespace@572..573 "\n"
-          RBrace@573..574 "}"
-      RBracket@574..575 "]"
-      Whitespace@575..576 " "
-      RepeatWhileDecl@576..609
-        Identifier@576..581 "while"
-        Whitespace@581..582 " "
-        InfixExpr@582..609
-          Metavar@582..589
-            Dollar@582..583 "$"
-            Identifier@583..589 "offset"
-          Whitespace@589..590 " "
-          Op@590..591
-            LAngle@590..591 "<"
+                    Op@563..564
+                      Minus@563..564 "-"
+                    Whitespace@564..565 " "
+                    Atom@565..566
+                      DecimalIntegerLiteral@565..566 "8"
+              Comma@566..567 ","
+              Whitespace@567..572 "\n    "
+              RBrace@572..573 "}"
+            Semicolon@573..574 ";"
+          Whitespace@574..575 "\n"
+          RBrace@575..576 "}"
+      RBracket@576..577 "]"
+      Whitespace@577..578 " "
+      RepeatWhileDecl@578..612
+        Identifier@578..583 "while"
+        Whitespace@583..584 " "
+        InfixExpr@584..612
+          Metavar@584..591
+            Dollar@584..585 "$"
+            Identifier@585..591 "offset"
           Whitespace@591..592 " "
-          InfixExpr@592..609
-            FieldAccess@592..604
-              Atom@592..599
-                Identifier@592..599 "dataset"
-              Dot@599..600 "."
-              Identifier@600..604 "size"
-            Whitespace@604..605 " "
-            Op@605..606
-              Plus@605..606 "+"
-            Whitespace@606..607 " "
-            Atom@607..609
-              DecimalIntegerLiteral@607..609 "64"
-    Semicolon@609..610 ";"
-  Whitespace@610..611 "\n"
+          Op@592..593
+            LAngle@592..593 "<"
+          Whitespace@593..594 " "
+          InfixExpr@594..612
+            FieldAccess@594..607
+              FieldAccess@594..602
+                Dot@594..595 "."
+                BareField@595..602
+                  Identifier@595..602 "dataset"
+              Dot@602..603 "."
+              BareField@603..607
+                Identifier@603..607 "size"
+            Whitespace@607..608 " "
+            Op@608..609
+              Plus@608..609 "+"
+            Whitespace@609..610 " "
+            Atom@610..612
+              DecimalIntegerLiteral@610..612 "64"
+    Semicolon@612..613 ";"
+  Whitespace@613..614 "\n"
 
 --- diagnostics ---
 no diagnostics

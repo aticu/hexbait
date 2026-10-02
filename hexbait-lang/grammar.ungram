@@ -203,7 +203,8 @@ Expr =
 | ConcatExpr
 
 // An atomic expression.
-// This includes literals (such as `42`, `true` and `"hi"`) and field names of the currently parsed `struct`.
+// This includes literals (such as `42`, `true` and `"hi"`).
+// Bare identifiers are currently reserved and rejected during lowering.
 Atom =
   'bin_lit'
 | 'oct_lit'
@@ -217,7 +218,7 @@ Atom =
 // A meta-variable that refers to a value in the current parsing context.
 // The following meta-variables are defined. Some of them are only valid in some contexts.
 // - `$offset`: the current parsing offset in the current scope
-// - `$parent`: refers to the parent `struct` (can be used to read values from there such as `$parent.size`)
+// - `$parent`: refers to the parent `struct` (can be used to read values from there such as `$parent.size` or `$parent.$parent.size`)
 // - `$last`: the last parsed element in a repetition (only valid in a `while` repetition condition and only if at least one element has been parsed (can be checked with `$len`))
 // - `$len`: the number of already parsed elements in a repetition (only valid in a `while` repetition condition)
 Metavar =
@@ -269,9 +270,25 @@ InfixExpr =
 
 // An expression that accesses a field of a `struct` value.
 //
-// The expression here must be an ident, `$parent`, '$last' or another `FieldAccess`, otherwise this will be rejected later.
+// If the expression is omitted (as in `.len`), the field is accessed on the currently parsed `struct`.
+// The expression here must be `$parent`, '$last' or another `FieldAccess`, otherwise this will be rejected later.
 FieldAccess =
-  Expr '.' field:'ident'
+  Expr? '.' FieldName
+
+// The name of an accessed field.
+FieldName =
+  BareField
+| MetaField
+
+// A bare field using an identifier.
+BareField =
+  name:'ident'
+
+// A metafield like `$parent`.
+//
+// Only usable in some contexts.
+MetaField =
+  '$' name:'ident'
 
 // Parses a value of the parse type at `offset` (or the current offset) without updating the offset.
 PeekExpr =
@@ -291,6 +308,8 @@ ConcatArgDirect =
   Expr
 
 // Expands an array of `bytes` and concatenates them together.
+//
+// The two `.` must not be separated by trivia (`...x` expands `.x`).
 ConcatArgExpanding =
   '..' Expr
 

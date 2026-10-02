@@ -1,12 +1,41 @@
 //! Implements parsing of expressions.
 
 use crate::compile::{
+    Diagnostic,
+    diagnostics::Label,
     lexer::TokenKind,
     parser::infrastructure::{CompletedMarker, Parser},
     syntax::NodeKind,
 };
 
 use super::nested_parse_type;
+
+/// Consumes the tokens of a metavariable, but does not wrap them in a `Metavar` node.
+fn metavar_raw(p: &mut Parser) {
+    p.expect(TokenKind::Dollar);
+    if let Some(t) = p.peek().next()
+        && t.preceeded_by_trivia
+    {
+        p.raw_diagnostic(Diagnostic::error(
+            "unexpected separation between `$` and `ident`",
+            Label::new("unexpected separator before this", t.span),
+        ));
+    }
+    p.expect(TokenKind::Identifier);
+}
+
+/// Parses a field name.
+fn field_name(p: &mut Parser) {
+    p.node(|p| {
+        if p.at(TokenKind::Dollar) {
+            metavar_raw(p);
+            NodeKind::MetaField
+        } else {
+            p.expect(TokenKind::Identifier);
+            NodeKind::BareField
+        }
+    });
+}
 
 /// Parses an atomic expression.
 fn atom(p: &mut Parser) -> CompletedMarker {
@@ -26,9 +55,13 @@ fn atom(p: &mut Parser) -> CompletedMarker {
                 NodeKind::Atom
             }
             Some(TokenKind::Dollar) => {
-                p.expect(TokenKind::Dollar);
-                p.expect(TokenKind::Identifier);
+                metavar_raw(p);
                 NodeKind::Metavar
+            }
+            Some(TokenKind::Dot) => {
+                p.expect(TokenKind::Dot);
+                field_name(p);
+                NodeKind::FieldAccess
             }
             Some(TokenKind::PeekKw) => {
                 p.expect(TokenKind::PeekKw);
@@ -63,9 +96,18 @@ fn atom(p: &mut Parser) -> CompletedMarker {
                             }
                         }
 
+                        let mut peek = p.peek();
+                        let is_spread = matches!(
+                            (
+                                peek.next().map(|t| t.kind),
+                                peek.next().map(|t| (t.kind, t.preceeded_by_trivia))
+                            ),
+                            (Some(TokenKind::Dot), Some((TokenKind::Dot, false)))
+                        );
+
                         match p.cur() {
                             Some(TokenKind::RParen) => break,
-                            Some(TokenKind::Dot) => {
+                            _ if is_spread => {
                                 p.node(|p| {
                                     p.expect(TokenKind::Dot);
                                     p.expect(TokenKind::Dot);
@@ -120,6 +162,7 @@ fn atom(p: &mut Parser) -> CompletedMarker {
                 p.expect_error(&[
                     "identifier",
                     "literal",
+                    "`.`",
                     "`peek`",
                     "`concat`",
                     "`$`",
@@ -161,7 +204,7 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> CompletedMarker {
             Some(TokenKind::Dot) => {
                 lhs = p.precede_with(lhs, |p| {
                     p.expect(TokenKind::Dot);
-                    p.expect(TokenKind::Identifier);
+                    field_name(p);
                     NodeKind::FieldAccess
                 });
             }

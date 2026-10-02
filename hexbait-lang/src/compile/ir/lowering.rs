@@ -417,7 +417,13 @@ impl LoweringCtx<'_> {
             }
             TokenKind::TrueKw => ExprKind::Lit(Lit::Bool(true)),
             TokenKind::FalseKw => ExprKind::Lit(Lit::Bool(false)),
-            TokenKind::Identifier => ExprKind::VarUse(Spanned::<Symbol>::from(token)),
+            TokenKind::Identifier => {
+                self.add_diagnostic(Diagnostic::error(
+                    "bare variables are reserved syntax",
+                    Label::new("bare variable are unsupported", atom.span()),
+                ));
+                ExprKind::Error
+            }
             _ => parser_unreachable!(),
         }
     }
@@ -477,33 +483,38 @@ impl LoweringCtx<'_> {
 
     /// Lowers the given AST field access expression to IR.
     fn lower_field_access(&mut self, field_access: ast::FieldAccess) -> ExprKind {
-        let expr = field_access.expr().parser_expect();
-        let field = Spanned::<Symbol>::from(
-            required_field!(field_access => field ? self => ExprKind::Error),
-        );
+        let field_raw = required_field!(field_access => field_name ? self => ExprKind::Error);
+        let field_span = field_raw.span();
+        let Some(field) = self.lower_field_name(field_raw) else {
+            return ExprKind::Error;
+        };
+        let StructRefPart::Named(field) = field else {
+            self.add_diagnostic(Diagnostic::error(
+                "expected final field to be a bare field",
+                Label::new("must be a bare field", field_span),
+            ));
+            return ExprKind::Error;
+        };
 
         fn lower_struct_ref(
             lowering_ctx: &mut LoweringCtx,
             parts: &mut Vec<Spanned<StructRefPart>>,
-            expr: ast::Expr,
+            expr: Option<ast::Expr>,
         ) -> Option<()> {
+            let expr = match expr {
+                Some(expr) => expr,
+                None => return Some(()),
+            };
+
             let span = expr.span();
             let mut err = || {
                 lowering_ctx.add_diagnostic(Diagnostic::error(
-                    "expected `$parent`, `$last`, identifier or another field access",
+                    "expected `$parent`, `$last` or another field access",
                     Label::new("unexpected field access", span),
                 ));
             };
 
-            let span = expr.span();
-
             match expr {
-                ast::Expr::Atom(atom) if atom.child_kind() == Some(TokenKind::Identifier) => {
-                    parts.push(Spanned {
-                        inner: StructRefPart::Named(Symbol::from(atom.child().parser_expect())),
-                        span,
-                    });
-                }
                 ast::Expr::Metavar(metavar) => {
                     if metavar.text() == "$parent" {
                         parts.push(Spanned {
@@ -521,13 +532,22 @@ impl LoweringCtx<'_> {
                     }
                 }
                 ast::Expr::FieldAccess(field_access) => {
-                    lower_struct_ref(lowering_ctx, parts, field_access.expr().parser_expect())?;
-                    let field = required_field!(field_access => field ? lowering_ctx => None);
-                    let span = Span::from(field.text_range());
-                    parts.push(Spanned {
-                        inner: StructRefPart::Named(Symbol::from(field)),
-                        span,
-                    });
+                    lower_struct_ref(lowering_ctx, parts, field_access.expr())?;
+                    let field_raw =
+                        required_field!(field_access => field_name ? lowering_ctx => None);
+                    let span = field_raw.span();
+                    let field = lowering_ctx.lower_field_name(field_raw)?;
+                    if parts.is_empty() && !matches!(field, StructRefPart::Named(..)) {
+                        lowering_ctx.add_diagnostic(
+                            Diagnostic::error(
+                                "only sibling field accesses are allowed after the initial `.`",
+                                Label::new("illegal field access", field_access.span()),
+                            )
+                            .with_help("remove the leading `.`"),
+                        );
+                        return None;
+                    }
+                    parts.push(Spanned { inner: field, span });
                 }
                 _ => {
                     err();
@@ -539,13 +559,37 @@ impl LoweringCtx<'_> {
         }
 
         let mut parts = Vec::new();
-        let Some(()) = lower_struct_ref(self, &mut parts, expr) else {
+        let Some(()) = lower_struct_ref(self, &mut parts, field_access.expr()) else {
             return ExprKind::Error;
         };
 
         ExprKind::FieldAccess {
             struct_ref: StructRef { parts },
-            field,
+            field: Spanned {
+                inner: field,
+                span: field_span,
+            },
+        }
+    }
+
+    /// Lowers the given AST field name to IR.
+    fn lower_field_name(&mut self, field_name: ast::FieldName) -> Option<StructRefPart> {
+        match field_name {
+            ast::FieldName::BareField(bare_field) => Some(StructRefPart::Named(Symbol::from(
+                required_field!(bare_field => name ? self => None),
+            ))),
+            ast::FieldName::MetaField(meta_field) => {
+                let name = required_field!(meta_field => name ? self => None);
+                if name.text() == "parent" {
+                    Some(StructRefPart::Parent)
+                } else {
+                    self.add_diagnostic(Diagnostic::error(
+                        "unknown meta field name",
+                        Label::new("expected `parent`", meta_field.span()),
+                    ));
+                    None
+                }
+            }
         }
     }
 

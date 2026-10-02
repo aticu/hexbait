@@ -1,0 +1,7 @@
+a u8;
+b {
+	c u8;
+	d {
+		let e = $parent.$parent.a;
+	};
+};

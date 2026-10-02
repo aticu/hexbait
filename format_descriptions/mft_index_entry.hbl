@@ -14,17 +14,17 @@ header {
     };
 };
 
-let fixup_value = peek(bytes len 2 at header.fixup_value_offset);
-let fixup_values = peek([bytes len 2] len header.num_fixup_values - 1 at header.fixup_value_offset + 2);
+let fixup_value = peek(bytes len 2 at .header.fixup_value_offset);
+let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .header.fixup_value_offset + 2);
 
-!seek to header.index_node_header.index_values_offset + 24;
+!seek to .header.index_node_header.index_values_offset + 24;
 
 values [{
     file_reference u64;
     index_value_size u16;
     index_key_data_size u16;
     index_value_flags u32;
-    index_key_data switch index_key_data_size >= 66 {
+    index_key_data switch .index_key_data_size >= 66 {
         true => {
             parent_file_reference u64;
             creation_time u64;
@@ -37,9 +37,9 @@ values [{
             extended_data u32;
             name_string_size u8;
             namespace u8;
-            name bytes len name_string_size * 2;
+            name bytes len .name_string_size * 2;
         },
-        _ => bytes len index_key_data_size,
+        _ => bytes len .index_key_data_size,
     };
     !align 8;
 }] while $len == 0 || $last.index_value_flags & 2 != 2;

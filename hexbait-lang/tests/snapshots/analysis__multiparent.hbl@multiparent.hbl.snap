@@ -1,0 +1,12 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "a u8;\nb {\n\tc u8;\n\td {\n\t\tlet e = $parent.$parent.a;\n\t\tlet f = $parent.$parent.$parent.a;\n\t};\n};\n"
+input_file: hexbait-lang/tests/analysis-cases/multiparent.hbl
+---
+error: `$parent` used when there is no more parent
+  ┌─ multiparent.hbl:6:27
+  │
+5 │         let e = $parent.$parent.a;
+6 │         let f = $parent.$parent.$parent.a;
+  │                                 ^^^^^^^ no parent here
+7 │     };

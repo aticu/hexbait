@@ -1,9 +1,9 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: result
+expression: "!endian le;\n\nx {\n\tlen u32;\n\t!scope at $offset {\n\t\tas_bytes bytes len .len;\n\t}\n\t!scope at $offset {\n\t\tas_u8_arr [u8] len .len;\n\t}\n};\n"
 input_file: hexbait-lang/tests/parser-cases/struct.hbl
 ---
-File@0..130
+File@0..132
   EndiannessDeclaration@0..11
     ExclamationMark@0..1 "!"
     Identifier@1..7 "endian"
@@ -11,11 +11,11 @@ File@0..130
     Identifier@8..10 "le"
     Semicolon@10..11 ";"
   Whitespace@11..13 "\n\n"
-  StructField@13..129
+  StructField@13..131
     Identifier@13..14 "x"
     Whitespace@14..15 " "
-    AnonymousStructParseType@15..128
-      StructBlock@15..128
+    AnonymousStructParseType@15..130
+      StructBlock@15..130
         LBrace@15..16 "{"
         Whitespace@16..18 "\n\t"
         StructField@18..26
@@ -25,7 +25,7 @@ File@0..130
             Identifier@22..25 "u32"
           Semicolon@25..26 ";"
         Whitespace@26..28 "\n\t"
-        ScopeAtDeclaration@28..76
+        ScopeAtDeclaration@28..77
           ExclamationMark@28..29 "!"
           Identifier@29..34 "scope"
           Whitespace@34..35 " "
@@ -35,58 +35,62 @@ File@0..130
             Dollar@38..39 "$"
             Identifier@39..45 "offset"
           Whitespace@45..46 " "
-          StructBlock@46..76
+          StructBlock@46..77
             LBrace@46..47 "{"
             Whitespace@47..50 "\n\t\t"
-            StructField@50..73
+            StructField@50..74
               Identifier@50..58 "as_bytes"
               Whitespace@58..59 " "
-              BytesParseType@59..72
+              BytesParseType@59..73
                 BytesKw@59..64 "bytes"
                 Whitespace@64..65 " "
-                RepeatLenDecl@65..72
+                RepeatLenDecl@65..73
                   Identifier@65..68 "len"
                   Whitespace@68..69 " "
-                  Atom@69..72
-                    Identifier@69..72 "len"
-              Semicolon@72..73 ";"
-            Whitespace@73..75 "\n\t"
-            RBrace@75..76 "}"
-        Whitespace@76..78 "\n\t"
-        ScopeAtDeclaration@78..126
-          ExclamationMark@78..79 "!"
-          Identifier@79..84 "scope"
-          Whitespace@84..85 " "
-          Identifier@85..87 "at"
-          Whitespace@87..88 " "
-          Metavar@88..95
-            Dollar@88..89 "$"
-            Identifier@89..95 "offset"
-          Whitespace@95..96 " "
-          StructBlock@96..126
-            LBrace@96..97 "{"
-            Whitespace@97..100 "\n\t\t"
-            StructField@100..123
-              Identifier@100..109 "as_u8_arr"
-              Whitespace@109..110 " "
-              RepeatParseType@110..122
-                LBracket@110..111 "["
-                NamedParseType@111..113
-                  Identifier@111..113 "u8"
-                RBracket@113..114 "]"
-                Whitespace@114..115 " "
-                RepeatLenDecl@115..122
-                  Identifier@115..118 "len"
-                  Whitespace@118..119 " "
-                  Atom@119..122
-                    Identifier@119..122 "len"
-              Semicolon@122..123 ";"
-            Whitespace@123..125 "\n\t"
-            RBrace@125..126 "}"
-        Whitespace@126..127 "\n"
-        RBrace@127..128 "}"
-    Semicolon@128..129 ";"
-  Whitespace@129..130 "\n"
+                  FieldAccess@69..73
+                    Dot@69..70 "."
+                    BareField@70..73
+                      Identifier@70..73 "len"
+              Semicolon@73..74 ";"
+            Whitespace@74..76 "\n\t"
+            RBrace@76..77 "}"
+        Whitespace@77..79 "\n\t"
+        ScopeAtDeclaration@79..128
+          ExclamationMark@79..80 "!"
+          Identifier@80..85 "scope"
+          Whitespace@85..86 " "
+          Identifier@86..88 "at"
+          Whitespace@88..89 " "
+          Metavar@89..96
+            Dollar@89..90 "$"
+            Identifier@90..96 "offset"
+          Whitespace@96..97 " "
+          StructBlock@97..128
+            LBrace@97..98 "{"
+            Whitespace@98..101 "\n\t\t"
+            StructField@101..125
+              Identifier@101..110 "as_u8_arr"
+              Whitespace@110..111 " "
+              RepeatParseType@111..124
+                LBracket@111..112 "["
+                NamedParseType@112..114
+                  Identifier@112..114 "u8"
+                RBracket@114..115 "]"
+                Whitespace@115..116 " "
+                RepeatLenDecl@116..124
+                  Identifier@116..119 "len"
+                  Whitespace@119..120 " "
+                  FieldAccess@120..124
+                    Dot@120..121 "."
+                    BareField@121..124
+                      Identifier@121..124 "len"
+              Semicolon@124..125 ";"
+            Whitespace@125..127 "\n\t"
+            RBrace@127..128 "}"
+        Whitespace@128..129 "\n"
+        RBrace@129..130 "}"
+    Semicolon@130..131 ";"
+  Whitespace@131..132 "\n"
 
 --- diagnostics ---
 no diagnostics

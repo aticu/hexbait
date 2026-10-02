@@ -1,5 +1,5 @@
 x u8;
-!if x == 0 {
+!if .x == 0 {
 	!endian le;
 } else {
 	!endian be;

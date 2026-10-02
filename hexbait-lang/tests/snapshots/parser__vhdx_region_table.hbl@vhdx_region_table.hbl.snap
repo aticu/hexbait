@@ -1,9 +1,9 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\nsignature bytes = \"regi\";\nchecksum u32;\nnumber_of_entries u32;\nreserved u32;\n\nentries [{\n    region_type_identifier bytes len 16;\n    region_data_offset u64;\n    region_data_size u32;\n    is_required_flag u32;\n}] len number_of_entries;\n"
+expression: "!endian le;\n\nsignature bytes = \"regi\";\nchecksum u32;\nnumber_of_entries u32;\nreserved u32;\n\nentries [{\n    region_type_identifier bytes len 16;\n    region_data_offset u64;\n    region_data_size u32;\n    is_required_flag u32;\n}] len .number_of_entries;\n"
 input_file: format_descriptions/vhdx_region_table.hbl
 ---
-File@0..249
+File@0..250
   EndiannessDeclaration@0..11
     ExclamationMark@0..1 "!"
     Identifier@1..7 "endian"
@@ -44,10 +44,10 @@ File@0..249
       Identifier@85..88 "u32"
     Semicolon@88..89 ";"
   Whitespace@89..91 "\n\n"
-  StructField@91..248
+  StructField@91..249
     Identifier@91..98 "entries"
     Whitespace@98..99 " "
-    RepeatParseType@99..247
+    RepeatParseType@99..248
       LBracket@99..100 "["
       AnonymousStructParseType@100..224
         StructBlock@100..224
@@ -90,13 +90,15 @@ File@0..249
           RBrace@223..224 "}"
       RBracket@224..225 "]"
       Whitespace@225..226 " "
-      RepeatLenDecl@226..247
+      RepeatLenDecl@226..248
         Identifier@226..229 "len"
         Whitespace@229..230 " "
-        Atom@230..247
-          Identifier@230..247 "number_of_entries"
-    Semicolon@247..248 ";"
-  Whitespace@248..249 "\n"
+        FieldAccess@230..248
+          Dot@230..231 "."
+          BareField@231..248
+            Identifier@231..248 "number_of_entries"
+    Semicolon@248..249 ";"
+  Whitespace@249..250 "\n"
 
 --- diagnostics ---
 no diagnostics

@@ -8,5 +8,5 @@ outer [{
     leaf {
       w u8;
     };
-  }] len m;
-}] len n;
+  }] len .m;
+}] len .n;

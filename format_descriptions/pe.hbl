@@ -6,7 +6,7 @@ mz_header {
     new_exe_header u32;
 };
 
-!seek to mz_header.new_exe_header;
+!seek to .mz_header.new_exe_header;
 
 pe_header {
     magic bytes = <"PE" 00 00>;
@@ -32,7 +32,7 @@ optional_header {
 };
 
 let size_of_pe_header = 24;
-!seek to mz_header.new_exe_header + pe_header.size_of_optional_header + size_of_pe_header;
+!seek to .mz_header.new_exe_header + .pe_header.size_of_optional_header + .size_of_pe_header;
 
 sections [{
     !scope at $offset {
@@ -49,7 +49,7 @@ sections [{
     number_of_relocations u16;
     number_of_line_numbers u16;
     characteristics u32;
-    !scope at pointer_to_raw_data {
-        content bytes len size_of_raw_data;
+    !scope at .pointer_to_raw_data {
+        content bytes len .size_of_raw_data;
     }
-}] len pe_header.num_of_sections;
+}] len .pe_header.num_of_sections;

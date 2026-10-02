@@ -1,9 +1,9 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\na switch 1 {\n    0 => u8,\n};\nb switch a {\n    a => u8,\n    _ => u16,\n};\n"
+expression: "!endian le;\n\na switch 1 {\n    0 => u8,\n};\nb switch .a {\n    .a => u8,\n    _ => u16,\n};\n"
 input_file: hexbait-lang/tests/parser-cases/parse_and_lower_errors.hbl
 ---
-File@0..85
+File@0..87
   EndiannessDeclaration@0..11
     ExclamationMark@0..1 "!"
     Identifier@1..7 "endian"
@@ -37,40 +37,44 @@ File@0..85
       RBrace@39..40 "}"
     Semicolon@40..41 ";"
   Whitespace@41..42 "\n"
-  StructField@42..84
+  StructField@42..86
     Identifier@42..43 "b"
     Whitespace@43..44 " "
-    SwitchParseType@44..83
+    SwitchParseType@44..85
       SwitchKw@44..50 "switch"
       Whitespace@50..51 " "
-      Atom@51..52
-        Identifier@51..52 "a"
-      Whitespace@52..53 " "
-      LBrace@53..54 "{"
-      Whitespace@54..59 "\n    "
-      SwitchParseTypeArm@59..67
-        Atom@59..60
-          Identifier@59..60 "a"
-        Whitespace@60..61 " "
-        Equals@61..62 "="
-        RAngle@62..63 ">"
-        Whitespace@63..64 " "
-        NamedParseType@64..66
-          Identifier@64..66 "u8"
-        Comma@66..67 ","
-      Whitespace@67..72 "\n    "
-      Underscore@72..73 "_"
-      Whitespace@73..74 " "
-      Equals@74..75 "="
-      RAngle@75..76 ">"
-      Whitespace@76..77 " "
-      NamedParseType@77..80
-        Identifier@77..80 "u16"
-      Comma@80..81 ","
-      Whitespace@81..82 "\n"
-      RBrace@82..83 "}"
-    Semicolon@83..84 ";"
-  Whitespace@84..85 "\n"
+      FieldAccess@51..53
+        Dot@51..52 "."
+        BareField@52..53
+          Identifier@52..53 "a"
+      Whitespace@53..54 " "
+      LBrace@54..55 "{"
+      Whitespace@55..60 "\n    "
+      SwitchParseTypeArm@60..69
+        FieldAccess@60..62
+          Dot@60..61 "."
+          BareField@61..62
+            Identifier@61..62 "a"
+        Whitespace@62..63 " "
+        Equals@63..64 "="
+        RAngle@64..65 ">"
+        Whitespace@65..66 " "
+        NamedParseType@66..68
+          Identifier@66..68 "u8"
+        Comma@68..69 ","
+      Whitespace@69..74 "\n    "
+      Underscore@74..75 "_"
+      Whitespace@75..76 " "
+      Equals@76..77 "="
+      RAngle@77..78 ">"
+      Whitespace@78..79 " "
+      NamedParseType@79..82
+        Identifier@79..82 "u16"
+      Comma@82..83 ","
+      Whitespace@83..84 "\n"
+      RBrace@84..85 "}"
+    Semicolon@85..86 ";"
+  Whitespace@86..87 "\n"
 
 --- diagnostics ---
 error: expected `_`
@@ -79,13 +83,13 @@ error: expected `_`
 4 │     0 => u8,
 5 │ };
   │ ^ found unexpected token `}`
-6 │ b switch a {
+6 │ b switch .a {
 
 
 error: switch branch must be a literal
   ┌─ parse_and_lower_errors.hbl:7:5
   │
-6 │ b switch a {
-7 │     a => u8,
-  │     ^ not a literal
+6 │ b switch .a {
+7 │     .a => u8,
+  │     ^^ not a literal
 8 │     _ => u16,

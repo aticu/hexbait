@@ -10,4 +10,4 @@ entries [{
     metadata_item_offset u32;
     metadata_item_size u32;
     unknown u64;
-}] len number_of_entries;
+}] len .number_of_entries;
