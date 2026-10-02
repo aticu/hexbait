@@ -1,0 +1,13 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!assert 8KiB == 8 * 1024;\n!assert 8KB == 8 * 1000;\n\n!assert 1KiB == 1024;\n!assert 1MiB == 1024 * 1024;\n!assert 1GiB == 1024 * 1024 * 1024;\n!assert 1TiB == 1024 * 1024 * 1024 * 1024;\n!assert 1PiB == 1024 * 1024 * 1024 * 1024 * 1024;\n!assert 1EiB == 1024 * 1024 * 1024 * 1024 * 1024 * 1024;\n\n!assert 1KB == 1000;\n!assert 1MB == 1000 * 1000;\n!assert 1GB == 1000 * 1000 * 1000;\n!assert 1TB == 1000 * 1000 * 1000 * 1000;\n!assert 1PB == 1000 * 1000 * 1000 * 1000 * 1000;\n!assert 1EB == 1000 * 1000 * 1000 * 1000 * 1000 * 1000;\n\n\n=== Hex ===\n"
+input_file: hexbait-parse/tests/cases/suffixes/spec.hbl
+---
+{
+  "value": {
+    "value": {},
+    "provenance": ""
+  },
+  "errors": [],
+  "warnings": []
+}

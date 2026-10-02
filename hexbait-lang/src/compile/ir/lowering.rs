@@ -403,25 +403,43 @@ impl LoweringCtx<'_> {
         let token = atom.child().parser_expect();
         let kind = atom.child_kind().parser_expect();
 
+        fn int_text_and_multiplier(text: &str) -> (&str, u64) {
+            if text.ends_with('B') {
+                let i_present = text.ends_with("iB");
+                let (text, suffix) = text.split_at(text.len() - if i_present { 3 } else { 2 });
+                let base = if i_present { 1024u64 } else { 1000u64 };
+                let multiplier = match suffix.chars().next().unwrap() {
+                    'K' => base.pow(1),
+                    'M' => base.pow(2),
+                    'G' => base.pow(3),
+                    'T' => base.pow(4),
+                    'P' => base.pow(5),
+                    'E' => base.pow(6),
+                    _ => unreachable!(),
+                };
+
+                (text, multiplier)
+            } else {
+                (text, 1)
+            }
+        }
+
         match kind {
-            TokenKind::BinaryIntegerLiteral => {
-                let text = token.text().strip_prefix("0b").parser_expect();
-                let int = int_from_str(2, text).parser_expect();
-                ExprKind::Lit(Lit::Int(int))
-            }
-            TokenKind::OctalIntegerLiteral => {
-                let text = token.text().strip_prefix("0o").parser_expect();
-                let int = int_from_str(8, text).parser_expect();
-                ExprKind::Lit(Lit::Int(int))
-            }
-            TokenKind::DecimalIntegerLiteral => {
-                let int = int_from_str(10, token.text()).parser_expect();
-                ExprKind::Lit(Lit::Int(int))
-            }
-            TokenKind::HexadecimalIntegerLiteral => {
-                let text = token.text().strip_prefix("0x").parser_expect();
-                let int = int_from_str(16, text).parser_expect();
-                ExprKind::Lit(Lit::Int(int))
+            TokenKind::BinaryIntegerLiteral
+            | TokenKind::OctalIntegerLiteral
+            | TokenKind::DecimalIntegerLiteral
+            | TokenKind::HexadecimalIntegerLiteral => {
+                let (base, prefix) = match kind {
+                    TokenKind::BinaryIntegerLiteral => (2, "0b"),
+                    TokenKind::OctalIntegerLiteral => (8, "0o"),
+                    TokenKind::DecimalIntegerLiteral => (10, ""),
+                    TokenKind::HexadecimalIntegerLiteral => (16, "0x"),
+                    _ => unreachable!(),
+                };
+                let text = token.text().strip_prefix(prefix).parser_expect();
+                let (text, multiplier) = int_text_and_multiplier(text);
+                let int = int_from_str(base, text).parser_expect();
+                ExprKind::Lit(Lit::Int(int * multiplier))
             }
             TokenKind::StringLiteral => {
                 let text = token.text();

@@ -34,16 +34,16 @@ pub enum TokenKind {
 
     // Expression contents
     /// A binary integer literal.
-    #[regex("0b[01][01]*")]
+    #[regex("0b[01][01]*([KMGTPE]i?B)?")]
     BinaryIntegerLiteral,
     /// An octal integer literal.
-    #[regex("0o[0-7][0-7]*")]
+    #[regex("0o[0-7][0-7]*([KMGTPE]i?B)?")]
     OctalIntegerLiteral,
     /// A hexadecimal integer literal.
-    #[regex("0x[0-9a-fA-F][0-9a-fA-F]*")]
+    #[regex("0x[0-9a-fA-F][0-9a-fA-F]*([KMGTPE]i?B)?")]
     HexadecimalIntegerLiteral,
     /// A decimal integer literal.
-    #[regex("[0-9][0-9]*", priority = 10)]
+    #[regex("[0-9][0-9]*([KMGTPE]i?B)?", priority = 10)]
     DecimalIntegerLiteral,
     /// A byte literal.
     // This has a low priority so that valid decimal integer literals are parsed as such.
