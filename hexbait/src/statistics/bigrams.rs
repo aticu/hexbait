@@ -75,10 +75,6 @@ impl BigramStatistics {
 }
 
 impl Statistics for BigramStatistics {
-    fn empty() -> Self {
-        BigramStatistics::empty()
-    }
-
     fn approximate_memory_usage(&self) -> u64 {
         std::mem::size_of::<[[u64; 256]; 256]>() as u64
     }

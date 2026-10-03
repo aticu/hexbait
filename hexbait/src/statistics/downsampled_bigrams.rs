@@ -121,12 +121,8 @@ impl DownsampledBigramStatistics {
 }
 
 impl Statistics for DownsampledBigramStatistics {
-    fn empty() -> Self {
-        DownsampledBigramStatistics::empty()
-    }
-
     fn approximate_memory_usage(&self) -> u64 {
-        std::mem::size_of::<[[u64; 256]; 256]>() as u64
+        std::mem::size_of::<[[u64; 16]; 16]>() as u64
     }
 
     fn compute(input: &Input, window: Window) -> Result<DownsampledBigramStatistics, io::Error> {

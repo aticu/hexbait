@@ -17,9 +17,6 @@ use crate::window::Window;
 
 /// A shared trait between different statistics measures.
 trait Statistics: for<'a> AddAssign<&'a Self> {
-    /// Creates empty statistics.
-    fn empty() -> Self;
-
     /// Returns an approximation of the number of bytes needed to store this statistics value.
     fn approximate_memory_usage(&self) -> u64;
 

@@ -4,7 +4,7 @@ use hexbait_common::{AbsoluteOffset, Len};
 
 use crate::{
     statistics::{
-        MetricsQuality, Statistics as _, StatisticsMetrics,
+        MetricsQuality, StatisticsMetrics,
         downsampled_bigrams::DownsampledBigramStatistics,
         handler::{
             MIN_SAMPLE_SIZE,
@@ -239,29 +239,7 @@ impl MetricComputation {
 
                 let computation_window =
                     Window::from_start_len(old_offset, self.computation_size());
-
-                match self.mode {
-                    ComputationMode::Estimation => {
-                        // don't use the compute bin mechanism for estimation to avoid polluting the statistics tree with stray MIN_SAMPLE_SIZE windows that cannot be merged
-                        let compute_result = DownsampledBigramStatistics::compute(
-                            &computation_state.input,
-                            computation_window,
-                        );
-
-                        let Ok(statistics) = compute_result else {
-                            continue;
-                        };
-                        let metrics = statistics.metrics();
-                        computation_state
-                            .derived_values
-                            .insert(computation_window, metrics);
-
-                        self.write_metrics(metrics, computation_state);
-                    }
-                    ComputationMode::FullQuality => {
-                        self.compute_bin = Some(ComputeBin::new_downsampled(computation_window));
-                    }
-                }
+                self.compute_bin = Some(ComputeBin::new_downsampled(computation_window));
             }
 
             // make sure the final bin is finished

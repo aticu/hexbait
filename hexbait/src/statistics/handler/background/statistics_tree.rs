@@ -9,7 +9,7 @@ use crate::{statistics::handler::MIN_SAMPLE_SIZE, window::Window};
 /// The branching factor of the tree.
 ///
 /// This number determines how many child nodes must be joined to create the parent node.
-const BRANCHING_FACTOR: u64 = 2;
+const BRANCHING_FACTOR: u64 = 8;
 
 /// The size of a leaf node in the tree.
 pub const LEAF_NODE_SIZE: Len = MIN_SAMPLE_SIZE;
@@ -153,12 +153,18 @@ impl<Statistics: crate::statistics::Statistics> StatisticsTree<Statistics> {
             return None;
         }
 
-        let mut parent_statistics = Statistics::empty();
-        for window in parent_window.subwindows_of_size(size) {
+        let mut iter = parent_window.subwindows_of_size(size);
+        let mut parent_statistics = self
+            .nodes
+            .remove(&iter.next().unwrap().start())
+            .expect("we have checked that all child statistics are present")
+            .statistics;
+        self.memory_usage -= parent_statistics.approximate_memory_usage();
+        for window in iter {
             let node = self
                 .nodes
                 .remove(&window.start())
-                .expect("we have checked that all child statistics ar present");
+                .expect("we have checked that all child statistics are present");
             self.memory_usage -= node.statistics.approximate_memory_usage();
 
             parent_statistics += &node.statistics;
@@ -270,6 +276,7 @@ impl<Statistics: crate::statistics::Statistics> StatisticsTree<Statistics> {
         if self.memory_usage <= memory_limit {
             return;
         }
+        let target_memory = (memory_limit as f64 * 0.75) as u64;
 
         debug_assert!(
             windows.windows(2).all(|pair| {
@@ -298,7 +305,7 @@ impl<Statistics: crate::statistics::Statistics> StatisticsTree<Statistics> {
 
             let memory_before = self.memory_usage;
             for (_, offset) in candidates {
-                if self.memory_usage <= memory_limit {
+                if self.memory_usage <= target_memory {
                     return;
                 }
                 self.try_promote(offset);
@@ -315,7 +322,7 @@ impl<Statistics: crate::statistics::Statistics> StatisticsTree<Statistics> {
 /// The maximum tier difference allowed between adjacent priority zones
 /// during garbage collection. Prevents outer zones from being coarsened
 /// so aggressively that large jumps require full recomputation.
-const MAX_ZONE_TIER_GAP: u64 = 2;
+const MAX_ZONE_TIER_GAP: u64 = 1;
 
 /// Sort key for garbage collection candidates.
 ///
