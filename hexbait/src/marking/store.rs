@@ -31,6 +31,11 @@ impl SingleTypeStore {
         self.marks.len()
     }
 
+    /// Whether there are any marks in the store.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Inserts a new mark into the store.
     pub fn insert(&mut self, window: Window) {
         self.dirty = true;

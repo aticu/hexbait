@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use arboard::Clipboard;
 pub use console_state::{ConsoleEntry, ConsoleState};
 pub use format_discovery_state::{ColumnInfo, ColumnType, FormatDiscoveryState};
 use hexbait_common::{Endianness, Input};
@@ -28,6 +29,8 @@ mod statistics_display_state;
 
 /// The state of the hexbait application.
 pub struct State {
+    /// The system clipboard.
+    pub clipboard: Clipboard,
     /// The user settings.
     pub settings: Settings,
     /// The search state.
@@ -56,6 +59,7 @@ impl State {
     /// Creates new state for the hexbait application.
     pub fn new(input: &Input, custom_parsers: Vec<PathBuf>) -> State {
         State {
+            clipboard: Clipboard::new().unwrap(),
             settings: Settings::new(),
             search: SearchState::new(input),
             scroll_state: ScrollState::new(input),

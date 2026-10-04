@@ -143,6 +143,23 @@ impl MarkStore {
         self.per_type.remove(&ty);
     }
 
+    /// Whether there are any marks of th given type.
+    pub fn contains_marks_of_type(&self, ty: MarkType) -> bool {
+        match self.per_type.get(&ty) {
+            Some(store) => !store.is_empty(),
+            None => false,
+        }
+    }
+
+    /// Converts all marks of the source type to the target type.
+    pub fn convert_marks_to(&mut self, src_ty: MarkType, target_ty: MarkType) {
+        let Some(old_store) = self.per_type.remove(&src_ty) else {
+            return;
+        };
+
+        self.batch_add(old_store.iter(), target_ty);
+    }
+
     /// Removes all marks that match the filter and (if it is `Some(_)`) `ty`.
     pub fn remove_where(&mut self, ty: Option<MarkType>, mut filter: impl FnMut(MarkRef) -> bool) {
         match ty {
@@ -174,6 +191,14 @@ impl MarkStore {
                 ControlFlow::Continue(())
             });
         }
+    }
+
+    /// Iterates over all user marks.
+    pub fn iter_user_marks<'store>(&'store self) -> impl Iterator<Item = MarkRef<'store>> {
+        self.per_type
+            .iter()
+            .filter(|(ty, _)| matches!(ty, MarkType::UserMark { .. }))
+            .flat_map(|(ty, store)| store.iter().map(|window| MarkRef { window, ty }))
     }
 
     /// Iterates over all marks of the given type.
