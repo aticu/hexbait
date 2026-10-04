@@ -10,13 +10,17 @@ use hexbait_lang::{
             path::{Path, PathComponent},
         },
     },
-    eval::{Diagnostic, DiagnosticId, DiagnosticLevel, StructContent, Value, ValueKind, View},
+    eval::{
+        Diagnostic, DiagnosticId, DiagnosticLevel, ParseResult, StructContent, Value, ValueKind,
+        View,
+    },
 };
 
 use crate::{
     gui::diagnostic_emitter::emit_diagnostics,
-    marking::MarkType,
+    marking::{MarkStore, MarkType},
     state::{ParseType, ScrollState, Settings, State},
+    window::Window,
 };
 
 /// Shows the parsed value module.
@@ -146,44 +150,17 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     let view = view.subview(parse_offset.to_relative()..view.len().as_relative_offset());
     let result = hexbait_lang::eval::eval_ir(parse_type, view, RelativeOffset::ZERO);
 
-    let hovered = ScrollArea::vertical()
+    ScrollArea::vertical()
         .auto_shrink([false, true])
         .show(ui, |ui| {
             show_value(
                 ui,
                 &state.settings,
                 &mut state.scroll_state,
-                Path::new(),
-                None,
-                &result.value,
-                &result.diagnostics,
+                &mut state.marked_locations,
+                &result,
             )
-        })
-        .inner;
-
-    match hovered {
-        HoverInfo::Nothing => (),
-        HoverInfo::Value { path } => {
-            if let Some(value) = result.value.subvalue_at_path(&path) {
-                for range in value.provenance.byte_ranges() {
-                    state.marked_locations.add(
-                        (AbsoluteOffset::from(*range.start())..=AbsoluteOffset::from(*range.end()))
-                            .into(),
-                        MarkType::HoveredParsed,
-                    );
-                }
-            }
-        }
-        HoverInfo::Error { id } => {
-            for range in result.diagnostics[id.raw_idx()].provenance.byte_ranges() {
-                state.marked_locations.add(
-                    (AbsoluteOffset::from(*range.start())..=AbsoluteOffset::from(*range.end()))
-                        .into(),
-                    MarkType::HoveredParseErr,
-                );
-            }
-        }
-    }
+        });
 }
 
 /// Information about what is hovered.
@@ -203,10 +180,51 @@ pub enum HoverInfo {
     },
 }
 
+/// Displays the given [`ParseResult`] in the GUI.
+pub fn show_value(
+    ui: &mut Ui,
+    settings: &Settings,
+    scroll_state: &mut ScrollState,
+    marked_locations: &mut MarkStore,
+    result: &ParseResult,
+) {
+    match show_value_raw(
+        ui,
+        settings,
+        scroll_state,
+        Path::new(),
+        None,
+        &result.value,
+        &result.diagnostics,
+    ) {
+        HoverInfo::Nothing => (),
+        HoverInfo::Value { path } => {
+            if let Some(value) = result.value.subvalue_at_path(&path) {
+                let mut locations = Vec::new();
+                for range in value.provenance.byte_ranges() {
+                    locations.push(Window::from(
+                        AbsoluteOffset::from(*range.start())..=AbsoluteOffset::from(*range.end()),
+                    ));
+                }
+                marked_locations.mark_hovered_parsed_value(locations);
+            }
+        }
+        HoverInfo::Error { id } => {
+            let mut locations = Vec::new();
+            for range in result.diagnostics[id.raw_idx()].provenance.byte_ranges() {
+                locations.push(Window::from(
+                    AbsoluteOffset::from(*range.start())..=AbsoluteOffset::from(*range.end()),
+                ));
+            }
+            marked_locations.mark_hovered_parse_err(locations);
+        }
+    }
+}
+
 /// Displays the given [`Value`] in the GUI.
 ///
 /// The return value is the path of the hovered value.
-pub fn show_value(
+pub fn show_value_raw(
     ui: &mut Ui,
     settings: &Settings,
     scroll_state: &mut ScrollState,
@@ -320,7 +338,7 @@ pub fn show_value(
                                     let mut path = path.clone();
                                     path.push(PathComponent::FieldAccess(name.clone()));
 
-                                    let hovered = show_value(
+                                    let hovered = show_value_raw(
                                         ui,
                                         settings,
                                         scroll_state,
@@ -365,7 +383,7 @@ pub fn show_value(
                             let mut path = path.clone();
                             path.push(PathComponent::Indexing(i));
 
-                            let hovered = show_value(
+                            let hovered = show_value_raw(
                                 ui,
                                 settings,
                                 scroll_state,

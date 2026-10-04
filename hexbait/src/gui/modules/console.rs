@@ -3,7 +3,7 @@
 use egui::Ui;
 use hexbait_common::{AbsoluteOffset, Input, Len};
 use hexbait_lang::{
-    compile::{CompileResult, compile_expr, ir::path::Path},
+    compile::{CompileResult, compile_expr},
     eval::{ValueKind, View, eval_expr},
 };
 
@@ -28,10 +28,8 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
                 ui,
                 &state.settings,
                 &mut state.scroll_state,
-                Path::new(),
-                None,
-                &result.value,
-                &result.diagnostics,
+                &mut state.marked_locations,
+                result,
             );
 
             if let ValueKind::Integer(int) = &result.value.kind

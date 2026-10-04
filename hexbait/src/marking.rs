@@ -101,14 +101,55 @@ impl MarkType {
     }
 }
 
+/// Implements a storage for hovered values that can be used form different places without disturbing the state.
+///
+/// The reason this is needed is because the order between the consumer of the value and the producer is not guaranteed.
+/// It is therefore not clear who should be responsible for clearing the value when it's not hovered anymore and when.
+/// With a single producer the producer itself can clear the hover before possibly setting it, but for multiple producers this stops working.
+struct HoveredValue<T> {
+    /// The current value.
+    current_frame: Option<T>,
+    /// The value that was produced in this frame so far.
+    ///
+    /// This will be live during the next frame.
+    next_frame: Option<T>,
+}
+
+impl<T> HoveredValue<T> {
+    /// Creates a new hovered value.
+    fn new() -> HoveredValue<T> {
+        HoveredValue {
+            current_frame: None,
+            next_frame: None,
+        }
+    }
+
+    /// Sets the hovered value.
+    fn set(&mut self, value: T) {
+        self.next_frame = Some(value);
+    }
+
+    /// Returns the currently hovered value.
+    fn get(&self) -> Option<&T> {
+        self.current_frame.as_ref()
+    }
+
+    /// Performs the required book keeping at the end of a frame.
+    fn end_of_frame(&mut self) {
+        self.current_frame = self.next_frame.take();
+    }
+}
+
 /// A store for marked locations.
 pub struct MarkStore {
     /// The actual stores separated by mark type.
     per_type: BTreeMap<MarkType, SingleTypeStore>,
-    /// The currently hovered location.
-    hovered_location: Option<Mark>,
-    /// The new location that was hovered this frame.
-    new_hovered_location: Option<Mark>,
+    /// The hovered location.
+    hovered_location: HoveredValue<Mark>,
+    /// The currently hovered parsed values.
+    hovered_parsed_value: HoveredValue<Vec<Window>>,
+    /// The currently hovered parse error.
+    hovered_parse_err: HoveredValue<Vec<Window>>,
     /// The name of the current mark.
     pub current_mark_name: String,
 }
@@ -118,8 +159,9 @@ impl MarkStore {
     pub fn new() -> MarkStore {
         MarkStore {
             per_type: BTreeMap::new(),
-            hovered_location: None,
-            new_hovered_location: None,
+            hovered_location: HoveredValue::new(),
+            hovered_parsed_value: HoveredValue::new(),
+            hovered_parse_err: HoveredValue::new(),
             current_mark_name: String::new(),
         }
     }
@@ -263,17 +305,45 @@ impl MarkStore {
 
     /// Returns the hovered mark, if any.
     pub fn hovered(&self) -> Option<&Mark> {
-        self.hovered_location.as_ref()
+        self.hovered_location.get()
     }
 
     /// Marks the given mark as hovered.
     pub fn mark_hovered(&mut self, mark: Mark) {
-        self.new_hovered_location = Some(mark);
+        self.hovered_location.set(mark);
+    }
+
+    /// Marks the given locations as the hovered parsed value.
+    pub fn mark_hovered_parsed_value(&mut self, locations: Vec<Window>) {
+        self.hovered_parsed_value.set(locations);
+    }
+
+    /// Marks the given locations as the hovered parse error.
+    pub fn mark_hovered_parse_err(&mut self, locations: Vec<Window>) {
+        self.hovered_parse_err.set(locations);
     }
 
     /// Marks the end of the frame, updating the marked location.
     pub fn end_of_frame(&mut self) {
-        self.hovered_location = self.new_hovered_location.take();
+        self.clear_marks_of_type(MarkType::HoveredParsed);
+        self.clear_marks_of_type(MarkType::HoveredParseErr);
+
+        self.hovered_location.end_of_frame();
+        self.hovered_parsed_value.end_of_frame();
+        self.hovered_parse_err.end_of_frame();
+
+        if let Some(locations) = self.hovered_parsed_value.get() {
+            // add manually to satify the borrow checker
+            let store = self.per_type.entry(MarkType::HoveredParsed).or_default();
+            store.extend(locations.iter().copied());
+            store.consolidate();
+        }
+        if let Some(locations) = self.hovered_parse_err.get() {
+            // add manually to satify the borrow checker
+            let store = self.per_type.entry(MarkType::HoveredParseErr).or_default();
+            store.extend(locations.iter().copied());
+            store.consolidate();
+        }
     }
 }
 
