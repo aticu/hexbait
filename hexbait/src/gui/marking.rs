@@ -7,7 +7,7 @@ use hexbait_common::Len;
 
 use crate::{
     gui::{highlighting::trace_path, modules::scrollbars::offset_on_bar},
-    marking::{MarkRef, MarkStore, MarkType},
+    marking::{MarkRef, MarkStore},
     window::Window,
 };
 
@@ -15,19 +15,15 @@ use super::color;
 
 /// Shows the hover overlay for a marked location.
 pub fn hover_marking(ui: &mut Ui, mark: MarkRef) {
-    let description = match &mark.ty {
-        MarkType::SearchResult => "Search result",
-        MarkType::UserMark { .. } => "User mark",
-        MarkType::Selection => "Selection",
-        MarkType::HoveredParsed => "Hovered parsed value",
-        MarkType::HoveredParseErr => "Hovered parsing error",
-    };
+    let description = &mark.ty.description();
 
-    ui.label(description);
-    if let MarkType::UserMark { name } = &mark.ty {
-        if name.is_empty() {
+    ui.label(&**description);
+    match mark.ty.name() {
+        None => (),
+        Some(None) => {
             ui.label(RichText::new("unnamed").italics());
-        } else {
+        }
+        Some(Some(name)) => {
             ui.label(name);
         }
     }

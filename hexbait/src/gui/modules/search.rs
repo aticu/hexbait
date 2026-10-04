@@ -79,7 +79,9 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
             state.search.searcher.stop_search();
         }
 
-        if state.marked_locations.count_of_type(MarkType::SearchResult) != 0
+        if state
+            .marked_locations
+            .contains_marks_of_type(MarkType::SearchResult)
             && ui.button("clear results").clicked()
         {
             state
@@ -90,7 +92,9 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
         ui.label(format!(
             "search {:.02}% complete ({} results)",
             state.search.searcher.progress() * 100.0,
-            state.marked_locations.count_of_type(MarkType::SearchResult)
+            state
+                .marked_locations
+                .count_of_type(&MarkType::SearchResult)
         ));
     });
 }

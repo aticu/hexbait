@@ -6,6 +6,7 @@ use arboard::Clipboard;
 pub use console_state::{ConsoleEntry, ConsoleState};
 pub use format_discovery_state::{ColumnInfo, ColumnType, FormatDiscoveryState};
 use hexbait_common::{Endianness, Input};
+pub use marking_menu_state::MarkingMenuState;
 pub use parse_state::{ParseState, ParseType};
 pub use scroll_state::{InteractionState, ScrollState, Scrollbar};
 pub use search_state::SearchState;
@@ -20,6 +21,7 @@ use crate::{
 
 mod console_state;
 mod format_discovery_state;
+mod marking_menu_state;
 mod parse_state;
 mod scroll_state;
 mod search_state;
@@ -47,6 +49,8 @@ pub struct State {
     pub statistics_handler: StatisticsHandler,
     /// The marked locations.
     pub marked_locations: MarkStore,
+    /// The state of the marking menu.
+    pub marking_menu: MarkingMenuState,
     /// The format discovery mode state.
     pub format_discovery: FormatDiscoveryState,
     /// The console state.
@@ -68,6 +72,7 @@ impl State {
             parse_state: ParseState::new(custom_parsers),
             statistics_handler: StatisticsHandler::new(input.clone()),
             marked_locations: MarkStore::new(),
+            marking_menu: MarkingMenuState::new(),
             format_discovery: FormatDiscoveryState::new(),
             console: ConsoleState::new(),
             endianness: Endianness::native(),

@@ -99,6 +99,30 @@ impl MarkType {
             MarkType::HoveredParseErr => Color32::LIGHT_RED,
         }
     }
+
+    /// A description of the mark.
+    pub fn description(&self) -> &str {
+        match &self {
+            MarkType::SearchResult => "Search result",
+            MarkType::UserMark { .. } => "User mark",
+            MarkType::Selection => "Selection",
+            MarkType::HoveredParsed => "Hovered parsed value",
+            MarkType::HoveredParseErr => "Hovered parsing error",
+        }
+    }
+
+    /// The name of the user mark if it is one.
+    ///
+    /// Returns `None` for non-user-marks and `Some(None)` for unnamed user marks.
+    pub fn name(&self) -> Option<Option<&str>> {
+        match &self {
+            MarkType::UserMark { name } => Some((!name.is_empty()).then_some(name)),
+            MarkType::SearchResult
+            | MarkType::Selection
+            | MarkType::HoveredParsed
+            | MarkType::HoveredParseErr => None,
+        }
+    }
 }
 
 /// Implements a storage for hovered values that can be used form different places without disturbing the state.
@@ -298,9 +322,21 @@ impl MarkStore {
         out
     }
 
+    /// Returns the different types of marks currently present.
+    pub fn types(&self) -> impl Iterator<Item = &MarkType> {
+        self.per_type
+            .iter()
+            .filter_map(|(ty, store)| (!store.is_empty()).then_some(ty))
+    }
+
+    /// The total mark count.
+    pub fn total_count(&self) -> usize {
+        self.per_type.values().map(|store| store.len()).sum()
+    }
+
     /// Returns the number of marks with the given type.
-    pub fn count_of_type(&self, ty: MarkType) -> usize {
-        self.per_type.get(&ty).map(|store| store.len()).unwrap_or(0)
+    pub fn count_of_type(&self, ty: &MarkType) -> usize {
+        self.per_type.get(ty).map(|store| store.len()).unwrap_or(0)
     }
 
     /// Returns the hovered mark, if any.
