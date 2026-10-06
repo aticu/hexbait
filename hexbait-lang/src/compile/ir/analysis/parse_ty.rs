@@ -17,7 +17,7 @@ use crate::compile::{
 impl Env<'_> {
     /// Checks the given parse type.
     pub fn check_parse_type(&self, ctx: &mut AnalysisCtx, parse_ty: &ParseType) -> Ty {
-        let kind = 'ty: {
+        let kind = {
             match &parse_ty.kind {
                 ParseTypeKind::Named { name } => self.check_named_parse_ty(ctx, name),
                 ParseTypeKind::Integer { bit_width, signed } => {
@@ -36,39 +36,7 @@ impl Env<'_> {
                     scrutinee,
                     branches,
                     default,
-                } => {
-                    let scrutinee_ty = self.check_expr(ctx, scrutinee, &ExtraExprCtx::none());
-                    if !scrutinee_ty.supports_comparisons() {
-                        ctx.add_diagnostic(Diagnostic::error(
-                            "`switch` scrutinee type does not support comparisons",
-                            Label::new("type does not support comparisons", scrutinee.span),
-                        ));
-                        break 'ty TyKind::Error;
-                    }
-
-                    let mut branch_tys = Vec::new();
-
-                    for (lit, lit_span, parse_ty) in branches {
-                        let lit_ty = self.check_lit(lit);
-
-                        if !scrutinee_ty.kind.unifies(&lit_ty) {
-                            break 'ty ctx.ty_err(
-                                "expected branch literal to be of the same type as the scrutinee",
-                                &Ty {
-                                    kind: lit_ty,
-                                    span: *lit_span,
-                                },
-                                *lit_span,
-                            );
-                        }
-
-                        branch_tys.push(self.check_parse_type(ctx, parse_ty));
-                    }
-
-                    branch_tys.push(self.check_parse_type(ctx, default));
-
-                    Ty::join(&branch_tys, parse_ty.span, false).kind
-                }
+                } => self.check_switch_parse_ty(ctx, scrutinee, branches, default, parse_ty.span),
                 ParseTypeKind::Error => {
                     assert!(ctx.diagnostics.contains_errors());
                     TyKind::Error
@@ -263,5 +231,47 @@ impl Env<'_> {
         TyKind::Struct {
             struct_ty: env.values,
         }
+    }
+
+    /// Checks a switch parse type.
+    fn check_switch_parse_ty(
+        &self,
+        ctx: &mut AnalysisCtx,
+        scrutinee: &Expr,
+        branches: &[(Lit, Span, ParseType)],
+        default: &ParseType,
+        span: Span,
+    ) -> TyKind {
+        let scrutinee_ty = self.check_expr(ctx, scrutinee, &ExtraExprCtx::none());
+        if !scrutinee_ty.supports_comparisons() {
+            ctx.add_diagnostic(Diagnostic::error(
+                "`switch` scrutinee type does not support comparisons",
+                Label::new("type does not support comparisons", scrutinee.span),
+            ));
+            return TyKind::Error;
+        }
+
+        let mut branch_tys = Vec::new();
+
+        for (lit, lit_span, parse_ty) in branches {
+            let lit_ty = self.check_lit(lit);
+
+            if !scrutinee_ty.kind.unifies(&lit_ty) {
+                return ctx.ty_err(
+                    "expected branch literal to be of the same type as the scrutinee",
+                    &Ty {
+                        kind: lit_ty,
+                        span: *lit_span,
+                    },
+                    *lit_span,
+                );
+            }
+
+            branch_tys.push(self.check_parse_type(ctx, parse_ty));
+        }
+
+        branch_tys.push(self.check_parse_type(ctx, default));
+
+        Ty::join(&branch_tys, span, false).kind
     }
 }

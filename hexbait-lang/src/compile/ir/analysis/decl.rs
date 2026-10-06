@@ -83,42 +83,22 @@ impl Env<'_> {
 
     /// Checks the given `seek by` declaration.
     fn check_seek_by_decl(&mut self, ctx: &mut AnalysisCtx, expr: &Expr) {
-        let expr_ty = self.check_expr(ctx, expr, &ExtraExprCtx::none());
-
-        if !matches!(&expr_ty.kind, TyKind::Int { .. }) {
-            ctx.ty_err(
-                "expected integer as argument to `seek by`",
-                &expr_ty,
-                expr.span,
-            );
-        }
+        self.check_int(ctx, expr, "expected argument to `seek by` to be an integer");
     }
 
     /// Checks the given `seek to` declaration.
     fn check_seek_to_decl(&mut self, ctx: &mut AnalysisCtx, expr: &Expr) {
-        self.check_positive_int(
-            ctx,
-            expr,
-            "expected argument to `seek to` to be a positive integer",
-        );
+        self.check_int(ctx, expr, "expected argument to `seek to` to be an integer");
     }
 
     /// Checks the given scope declaration.
     fn check_scope_decl(&mut self, ctx: &mut AnalysisCtx, kind: &ScopeKind, block: &Block) {
         match kind {
             ScopeKind::At { start, end } => {
-                self.check_positive_int(
-                    ctx,
-                    start,
-                    "expected scope start to be a positive integer",
-                );
+                self.check_int(ctx, start, "expected scope start to be an integer");
 
                 if let Some(end) = end {
-                    self.check_positive_int(
-                        ctx,
-                        end,
-                        "expected scope end to be a positive integer",
-                    );
+                    self.check_int(ctx, end, "expected scope end to be an integer");
                 }
             }
             ScopeKind::In { bytes } => {
@@ -281,10 +261,6 @@ impl Env<'_> {
 
     /// Checks the given recover at declaration.
     fn check_recover_at_decl(&mut self, ctx: &mut AnalysisCtx, at: &Expr) {
-        self.check_positive_int(
-            ctx,
-            at,
-            "expected recovery position to be a positive integer",
-        );
+        self.check_int(ctx, at, "expected recovery position to be an integer");
     }
 }

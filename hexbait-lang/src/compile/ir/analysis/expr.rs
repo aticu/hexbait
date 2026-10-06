@@ -512,15 +512,9 @@ impl Env<'_> {
     ) -> TyKind {
         if let Some(offset) = offset {
             let offset_ty = self.check_expr(ctx, offset, extra_ctx);
-            if !matches!(
-                offset_ty.kind,
-                TyKind::Int {
-                    non_zero: _,
-                    non_negative: true
-                }
-            ) {
+            if !matches!(offset_ty.kind, TyKind::Int { .. }) {
                 return ctx.ty_err(
-                    "offset must be a non-negative integer",
+                    "expected peek offset to be an integer",
                     &offset_ty,
                     offset.span,
                 );
@@ -577,22 +571,11 @@ impl Env<'_> {
         }
     }
 
-    /// Checks that the given expression evaluates to a positive integer.
-    pub fn check_positive_int(
-        &self,
-        ctx: &mut AnalysisCtx,
-        expr: &Expr,
-        message: impl ToString,
-    ) -> bool {
+    /// Checks that the given expression evaluates to an integer.
+    pub fn check_int(&self, ctx: &mut AnalysisCtx, expr: &Expr, message: impl ToString) -> bool {
         let expr_ty = self.check_expr(ctx, expr, &ExtraExprCtx::none());
 
-        if matches!(
-            &expr_ty.kind,
-            TyKind::Int {
-                non_negative: true,
-                ..
-            }
-        ) {
+        if matches!(&expr_ty.kind, TyKind::Int { .. }) {
             true
         } else {
             ctx.ty_err(message, &expr_ty, expr.span);
