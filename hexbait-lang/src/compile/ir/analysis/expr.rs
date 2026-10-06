@@ -75,6 +75,9 @@ impl Env<'_> {
             },
             Lit::Bytes(_) => TyKind::Bytes,
             Lit::Bool(_) => TyKind::Bool,
+            Lit::Enum(name) => TyKind::EnumLit {
+                known_name: Some(name.clone()),
+            },
         }
     }
 
@@ -427,10 +430,8 @@ impl Env<'_> {
                     }
                 })
             }
-            BinOp::Eq | BinOp::Neq => {
-                if lhs_ty.unifies(&rhs_ty) && lhs_ty.supports_comparisons() {
-                    TyKind::Bool
-                } else {
+            BinOp::Eq | BinOp::Neq => match lhs_ty.supports_comparisons_with(&rhs_ty) {
+                Some(incomparable_reason) => {
                     ctx.add_diagnostic(
                         Diagnostic::error(
                             format!(
@@ -441,11 +442,13 @@ impl Env<'_> {
                             Label::new("unsupported comparison", expr_span),
                         )
                         .with_label(Label::new("left type", lhs_ty.span))
-                        .with_label(Label::new("right type", rhs_ty.span)),
+                        .with_label(Label::new("right type", rhs_ty.span))
+                        .with_help(incomparable_reason),
                     );
                     TyKind::Error
                 }
-            }
+                None => TyKind::Bool,
+            },
             BinOp::Gt | BinOp::Geq | BinOp::Lt | BinOp::Leq => {
                 both_sides_match!("ints": (TyKind::Int { .. }, TyKind::Int { .. }) => {
                     TyKind::Bool

@@ -64,6 +64,12 @@ fn atom(p: &mut Parser) -> CompletedMarker {
                 field_name(p);
                 NodeKind::FieldAccess
             }
+            Some(TokenKind::EnumKw) => {
+                p.expect(TokenKind::EnumKw);
+                p.expect(TokenKind::Dot);
+                p.expect(TokenKind::Identifier);
+                NodeKind::EnumValue
+            }
             Some(TokenKind::PeekKw) => {
                 p.expect(TokenKind::PeekKw);
                 p.expect(TokenKind::LParen);

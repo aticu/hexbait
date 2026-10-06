@@ -194,6 +194,7 @@ LetStatement =
 Expr =
   Atom
 | Metavar
+| EnumValue
 | ByteConcat
 | ParenExpr
 | PrefixExpr
@@ -223,6 +224,10 @@ Atom =
 // - `$len`: the number of already parsed elements in a repetition (only valid in a `while` repetition condition)
 Metavar =
   '$' name:'ident'
+
+// An enum value literal like `enum.field`.
+EnumValue =
+  'enum' '.' field:'ident'
 
 // Concatenates constant byte values and string literals together.
 // For example `<"test" 7a 00>` is equivalent to `"test\x7a\x00"`.

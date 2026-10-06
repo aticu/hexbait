@@ -3,9 +3,11 @@ source: hexbait-lang/tests/analysis.rs
 expression: "x u8 = \"test\";\n"
 input_file: hexbait-lang/tests/analysis-cases/expected_value_type_mismatch.hbl
 ---
-error: the expected type does not match the field type
+error: expected value cannot be checked because the type does not support comparisons with the parsed type
   ┌─ expected_value_type_mismatch.hbl:1:8
   │
 1 │ x u8 = "test";
-  │        ^^^^^^ unexpected type `int`
-2 │
+  │        ^^^^^^ cannot be compared to the parsed type
+2 │ 
+  │
+  = help: the types differ

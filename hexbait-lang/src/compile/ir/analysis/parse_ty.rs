@@ -243,28 +243,22 @@ impl Env<'_> {
         span: Span,
     ) -> TyKind {
         let scrutinee_ty = self.check_expr(ctx, scrutinee, &ExtraExprCtx::none());
-        if !scrutinee_ty.supports_comparisons() {
-            ctx.add_diagnostic(Diagnostic::error(
-                "`switch` scrutinee type does not support comparisons",
-                Label::new("type does not support comparisons", scrutinee.span),
-            ));
-            return TyKind::Error;
-        }
 
         let mut branch_tys = Vec::new();
 
         for (lit, lit_span, parse_ty) in branches {
             let lit_ty = self.check_lit(lit);
 
-            if !scrutinee_ty.kind.unifies(&lit_ty) {
-                return ctx.ty_err(
-                    "expected branch literal to be of the same type as the scrutinee",
-                    &Ty {
-                        kind: lit_ty,
-                        span: *lit_span,
-                    },
-                    *lit_span,
+            if let Some(incomparable_reason) = scrutinee_ty.kind.supports_comparisons_with(&lit_ty)
+            {
+                ctx.add_diagnostic(
+                    Diagnostic::error(
+                        "`switch` branch literal cannot be compared to the scrutinee",
+                        Label::new("cannot be compared to scrutinee", *lit_span),
+                    )
+                    .with_help(incomparable_reason),
                 );
+                return TyKind::Error;
             }
 
             branch_tys.push(self.check_parse_type(ctx, parse_ty));

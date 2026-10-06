@@ -69,6 +69,8 @@ pub enum ValueKind {
         /// An error that occurred while parsing the array.
         error: Option<DiagnosticId>,
     },
+    /// An enum literal like `enum.value`.
+    EnumLit(String),
 }
 
 impl fmt::Debug for ValueKind {
@@ -137,6 +139,9 @@ impl fmt::Debug for ValueKind {
                 } else {
                     arr.finish()
                 }
+            }
+            Self::EnumLit(value) => {
+                write!(f, "enum.{value}")
             }
         }
     }
@@ -294,6 +299,7 @@ impl PartialEq<Lit> for ValueKind {
                     false
                 }
             }
+            Lit::Enum(_) => false,
         }
     }
 }

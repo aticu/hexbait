@@ -58,18 +58,11 @@ impl Env<'_> {
         if let Some(expected) = expected {
             let expected_ty = self.check_expr(ctx, expected, &ExtraExprCtx::none());
 
-            if !ty.unifies(&expected_ty) {
-                ctx.ty_err(
-                    "the expected type does not match the field type",
-                    &ty,
-                    expected.span,
-                );
-            }
-            if !ty.supports_comparisons() {
+            if let Some(incomparable_reason) = ty.supports_comparisons_with(&expected_ty) {
                 ctx.add_diagnostic(Diagnostic::error(
-                    "expected value cannot be checked because the type does not support comparisons",
-                    Label::new("type does not support comparisons", expected.span)
-                ));
+                    "expected value cannot be checked because the type does not support comparisons with the parsed type",
+                    Label::new("cannot be compared to the parsed type", expected.span)
+                ).with_help(incomparable_reason));
             }
         }
 

@@ -133,6 +133,15 @@ fn value_to_json(value: &hexbait_lang::eval::Value, result: &ParseResult, detail
                     .collect(),
             )
         }
+        ValueKind::EnumLit(variant) => {
+            let mut map = Map::new();
+            map.insert(
+                "enum_literal_variant".to_string(),
+                Value::String(variant.clone()),
+            );
+
+            Value::Object(map)
+        }
     };
 
     if detailed {

@@ -15,6 +15,8 @@ pub enum Lit {
     Bytes(Arc<[u8]>),
     /// A boolean literal.
     Bool(bool),
+    /// An enum literal like `enum.name`.
+    Enum(String),
 }
 
 /// A unary operator.

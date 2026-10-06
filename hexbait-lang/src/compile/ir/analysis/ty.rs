@@ -23,9 +23,11 @@ impl Ty {
     pub fn contains_err(&self) -> bool {
         match &self.kind {
             TyKind::Error => true,
-            TyKind::Indeterminate { .. } | TyKind::Bool | TyKind::Int { .. } | TyKind::Bytes => {
-                false
-            }
+            TyKind::Indeterminate { .. }
+            | TyKind::Bool
+            | TyKind::Int { .. }
+            | TyKind::Bytes
+            | TyKind::EnumLit { .. } => false,
             TyKind::Struct { struct_ty: ty } => {
                 ty.fields.iter().any(|field| field.ty.contains_err())
             }
@@ -33,17 +35,9 @@ impl Ty {
         }
     }
 
-    /// Whether this type is logically equivalent to `other`.
-    pub fn unifies(&self, other: &Ty) -> bool {
-        self.kind.unifies(&other.kind)
-    }
-
-    /// Whether the type supports comparisons.
-    pub fn supports_comparisons(&self) -> bool {
-        match &self.kind {
-            TyKind::Error | TyKind::Bool | TyKind::Int { .. } | TyKind::Bytes => true,
-            TyKind::Indeterminate { .. } | TyKind::Struct { .. } | TyKind::Array { .. } => false,
-        }
+    /// Whether the type supports comparisons with the other type.
+    pub fn supports_comparisons_with(&self, other: &Ty) -> Option<ComparisonUnsupportedReason> {
+        self.kind.supports_comparisons_with(&other.kind)
     }
 
     /// Joins the type of multiple branches into one type.
@@ -54,6 +48,7 @@ impl Ty {
             TyKind::Int { .. } => Ty::join_int(branches),
             TyKind::Struct { .. } => Ty::join_struct(branches, span, last_branch_is_missing_else),
             TyKind::Array { .. } => Ty::join_array(branches, span, last_branch_is_missing_else),
+            TyKind::EnumLit { .. } => Ty::join_enum_lit(branches),
         };
 
         Ty { kind, span }
@@ -227,6 +222,32 @@ impl Ty {
             Err(kind) => kind,
         }
     }
+
+    /// Joins multiple branches into an enum literal type.
+    fn join_enum_lit(branches: &[Ty]) -> TyKind {
+        let mut current_name = None;
+        let mut unify_impossible = false;
+
+        match Ty::join_generic(branches, |ty| {
+            if let TyKind::EnumLit { known_name } = &ty.kind {
+                if known_name.is_none() || unify_impossible {
+                    unify_impossible = true;
+                } else if current_name.is_none() {
+                    current_name = known_name.clone();
+                } else if known_name != &current_name {
+                    unify_impossible = true;
+                }
+                true
+            } else {
+                false
+            }
+        }) {
+            Ok(()) => TyKind::EnumLit {
+                known_name: if unify_impossible { None } else { current_name },
+            },
+            Err(kind) => kind,
+        }
+    }
 }
 
 /// The kind of a type in the hexbait language.
@@ -251,6 +272,11 @@ pub enum TyKind {
         non_zero: bool,
         /// Whether the integer is guaranteed to be non-negative.
         non_negative: bool,
+    },
+    /// An `enum.field` literal.
+    EnumLit {
+        /// Whether the name of the literal is known.
+        known_name: Option<String>,
     },
     /// A bytes value.
     Bytes,
@@ -277,41 +303,37 @@ impl TyKind {
             TyKind::Bytes => TyName::Bytes,
             TyKind::Struct { .. } => TyName::Struct,
             TyKind::Array { item_ty } => TyName::Array(Box::new(item_ty.name())),
+            TyKind::EnumLit { .. } => TyName::EnumLit,
         }
     }
 
-    /// Whether this type is logically equivalent to `other`.
-    pub fn unifies(&self, other: &TyKind) -> bool {
+    /// Whether the type supports comparisons with the other type.
+    pub fn supports_comparisons_with(&self, other: &TyKind) -> Option<ComparisonUnsupportedReason> {
+        #[expect(
+            unreachable_patterns,
+            reason = "to make the last code path explicit and unify it with the others"
+        )]
         match (self, other) {
-            // error unifies with everything
-            (TyKind::Error, _) | (_, TyKind::Error) => true,
-
-            // indeterminate unifies with nothing
-            (TyKind::Indeterminate { .. }, _) | (_, TyKind::Indeterminate { .. }) => false,
-
-            // primitives only unify with themselves
-            (TyKind::Bool, TyKind::Bool) => true,
-            (TyKind::Bool, _) | (_, TyKind::Bool) => false,
-            (TyKind::Int { .. }, TyKind::Int { .. }) => true,
-            (TyKind::Int { .. }, _) | (_, TyKind::Int { .. }) => false,
-            (TyKind::Bytes, TyKind::Bytes) => true,
-            (TyKind::Bytes, _) | (_, TyKind::Bytes) => false,
-
-            // structs unify with themselves if all fields match
-            (TyKind::Struct { struct_ty: left }, TyKind::Struct { struct_ty: right }) => {
-                left.unifies(right)
+            (TyKind::Error, _)
+            | (_, TyKind::Error)
+            | (TyKind::Bool, TyKind::Bool)
+            | (TyKind::Int { .. }, TyKind::Int { .. })
+            | (TyKind::Bytes, TyKind::Bytes) => None,
+            (TyKind::EnumLit { .. }, _) | (_, TyKind::EnumLit { .. }) => {
+                Some(ComparisonUnsupportedReason::EnumLitsIncomparable)
             }
-            (TyKind::Struct { .. }, _) | (_, TyKind::Struct { .. }) => false,
-
-            // array unify with themselves if the elements unify
-            (TyKind::Array { item_ty: left_ty }, TyKind::Array { item_ty: right_ty }) => {
-                left_ty.unifies(right_ty)
-            }
-            #[expect(
-                unreachable_patterns,
-                reason = "to make the last code path explicit and unify it with the others"
-            )]
-            (TyKind::Array { .. }, _) | (_, TyKind::Array { .. }) => false,
+            (TyKind::Bool, _)
+            | (_, TyKind::Bool)
+            | (TyKind::Int { .. }, _)
+            | (_, TyKind::Int { .. })
+            | (TyKind::Bytes, _)
+            | (_, TyKind::Bytes) => Some(ComparisonUnsupportedReason::DifferentTypes),
+            (TyKind::Indeterminate { .. }, _)
+            | (_, TyKind::Indeterminate { .. })
+            | (TyKind::Struct { .. }, _)
+            | (_, TyKind::Struct { .. })
+            | (TyKind::Array { .. }, _)
+            | (_, TyKind::Array { .. }) => Some(ComparisonUnsupportedReason::IncomparableType),
         }
     }
 }
@@ -337,26 +359,6 @@ impl StructTy {
     /// Returns the field with the given name.
     pub fn field(&self, name: &Symbol) -> Option<&FieldTy> {
         self.fields.iter().find(|field| &field.name == name)
-    }
-
-    /// Whether the structs are logically equivalent.
-    fn unifies(&self, other: &StructTy) -> bool {
-        if self.fields.len() != other.fields.len() {
-            return false;
-        }
-
-        self.fields.iter().all(|field| {
-            let Some(other_field) = other.field(&field.name) else {
-                return false;
-            };
-
-            if !field.availability.is_guaranteed() || !other_field.availability.is_guaranteed() {
-                // we cannot guarantee anything about non-guaranteed fields, so they cannot even unify with themselves
-                return false;
-            }
-
-            field.ty.unifies(&other_field.ty)
-        })
     }
 }
 
@@ -412,6 +414,8 @@ pub enum TyName {
     Struct,
     /// An array type.
     Array(Box<TyName>),
+    /// An enum literal type.
+    EnumLit,
 }
 
 impl fmt::Display for TyName {
@@ -423,6 +427,32 @@ impl fmt::Display for TyName {
             TyName::Bytes => write!(f, "bytes"),
             TyName::Struct => write!(f, "{{ .. }}"),
             TyName::Array(ty_name) => write!(f, "[{ty_name}]"),
+            TyName::EnumLit => write!(f, "enum literal"),
+        }
+    }
+}
+
+/// The reason why types cannot be compared.
+pub enum ComparisonUnsupportedReason {
+    /// The types are different and not directly comparable.
+    DifferentTypes,
+    /// One of the types supports no comparisons in general.
+    IncomparableType,
+    /// Enum literals are only comparable against enum values.
+    EnumLitsIncomparable,
+}
+
+impl fmt::Display for ComparisonUnsupportedReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "help: ")?;
+        match self {
+            ComparisonUnsupportedReason::DifferentTypes => write!(f, "the types differ"),
+            ComparisonUnsupportedReason::IncomparableType => {
+                write!(f, "at least one of the types is incomparable")
+            }
+            ComparisonUnsupportedReason::EnumLitsIncomparable => {
+                write!(f, "enum literals can only be compared to enum values")
+            }
         }
     }
 }

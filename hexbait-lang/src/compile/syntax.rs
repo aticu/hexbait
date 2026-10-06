@@ -151,6 +151,8 @@ pub enum NodeKind {
     Atom,
     /// A meta variable such as `$offset` or `$parent`.
     Metavar,
+    /// An enum value literal like `enum.name`.
+    EnumValue,
     /// A byte concatenation expression.
     ByteConcat,
     /// An operator used in expressions.

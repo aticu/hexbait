@@ -258,7 +258,10 @@ pub fn show_value_raw(
             hovered_diagnostic =
                 hovered_diagnostic.or(render_diagnostic_and_return_hovered(ui, *err, diagnostics));
         }
-        ValueKind::Boolean(_) | ValueKind::Integer(_) | ValueKind::Float(_) => {
+        ValueKind::Boolean(_)
+        | ValueKind::Integer(_)
+        | ValueKind::Float(_)
+        | ValueKind::EnumLit(_) => {
             handle_response(ui.label(format!("{name_prefix}{:?},", value.kind)));
         }
         ValueKind::Bytes(bytes) => {

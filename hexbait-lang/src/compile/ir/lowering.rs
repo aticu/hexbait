@@ -338,6 +338,11 @@ impl LoweringCtx<'_> {
                     }
                 }
             }
+            ast::Expr::EnumValue(enum_value) => {
+                let field = required_field!(enum_value => field ? self => ExprKind::Error);
+
+                ExprKind::Lit(Lit::Enum(field.text().to_string()))
+            }
             ast::Expr::ByteConcat(byte_concat) => {
                 let mut out = Vec::new();
 

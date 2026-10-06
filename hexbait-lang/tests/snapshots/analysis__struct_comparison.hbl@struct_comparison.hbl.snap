@@ -13,4 +13,6 @@ error: binary operator `==` cannot be applied to `{ .. }` and `{ .. }`
   │         │     right type
   │         unsupported comparison
   │         left type
-8 │
+8 │ 
+  │
+  = help: at least one of the types is incomparable

@@ -147,6 +147,9 @@ pub enum TokenKind {
     /// The `let` keyword.
     #[token("let")]
     LetKw,
+    /// The `enum` keyword.
+    #[token("enum")]
+    EnumKw,
     /// The `peek` keyword.
     #[token("peek")]
     PeekKw,
@@ -212,6 +215,7 @@ impl TokenKind {
             TokenKind::BytesKw => "`bytes`",
             TokenKind::StructKw => "`struct`",
             TokenKind::LetKw => "`let`",
+            TokenKind::EnumKw => "`enum`",
             TokenKind::PeekKw => "`peek`",
             TokenKind::ConcatKw => "`concat`",
             TokenKind::SwitchKw => "`switch`",
@@ -264,6 +268,7 @@ impl TokenKind {
             | TokenKind::BytesKw
             | TokenKind::StructKw
             | TokenKind::LetKw
+            | TokenKind::EnumKw
             | TokenKind::PeekKw
             | TokenKind::ConcatKw
             | TokenKind::SwitchKw

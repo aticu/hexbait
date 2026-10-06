@@ -35,6 +35,7 @@ impl ParseContext {
                     Lit::Int(int) => ValueKind::Integer(int.clone()),
                     Lit::Bytes(bytes) => ValueKind::Bytes(BytesValue::Lit(Arc::clone(bytes))),
                     Lit::Bool(val) => ValueKind::Boolean(*val),
+                    Lit::Enum(variant_name) => ValueKind::EnumLit(variant_name.clone()),
                 },
                 provenance: Provenance::empty(),
             }),

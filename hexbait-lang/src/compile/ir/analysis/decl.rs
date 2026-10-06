@@ -212,7 +212,8 @@ impl Env<'_> {
             | TyKind::Bool
             | TyKind::Int { .. }
             | TyKind::Bytes
-            | TyKind::Array { .. } => unreachable!(),
+            | TyKind::Array { .. }
+            | TyKind::EnumLit { .. } => unreachable!(),
         };
 
         self.values = struct_ty;
