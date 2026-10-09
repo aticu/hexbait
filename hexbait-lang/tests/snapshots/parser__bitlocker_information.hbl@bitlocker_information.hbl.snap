@@ -1,9 +1,9 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\nsignature bytes = \"-FVE-FS-\";\nsize u16;\nversion u16;\ncurrent_state u16;\nnext_state u16;\nencrypted_volume_size u64;\nconvert_size u32;\nnum_of_backup_sectors u32;\ninformation_offsets [u64] len 3;\nboot_sector_backup u64;\n\ndataset {\n    size u32;\n    unknown1 u32;\n    header_size u32;\n    copy_size u32;\n    guid bytes len 16;\n    next_counter u32;\n    algorithm u16;\n    trash u16;\n    timestamp u64;\n};\n\ndatums [{\n    size u16;\n    entry_type u16;\n    value_type u16;\n    error_status u16;\n    content switch .value_type {\n        _ => bytes len .size - 8,\n    };\n}] while $offset < .dataset.size + 64;\n"
+expression: "!endian le;\n\nsignature bytes = \"-FVE-FS-\";\nsize u16;\nversion u16;\ncurrent_state u16;\nnext_state u16;\nencrypted_volume_size u64;\nconvert_size u32;\nnum_of_backup_sectors u32;\ninformation_offsets [u64] len 3;\nboot_sector_backup u64;\n\ndataset {\n    size u32;\n    unknown1 u32;\n    header_size u32;\n    copy_size u32;\n    guid bytes len 16;\n    next_counter u32;\n    algorithm u16;\n    trash u16;\n    timestamp u64;\n};\n\ndatums [{\n    size u16;\n    entry_type enum u16 {\n        none = 0x0,\n        volume_master_key = 0x2,\n        full_volume_encryption_key = 0x3,\n        validation = 0x4,\n        startup_key = 0x6,\n        description = 0x7,\n    };\n    value_type enum u16 {\n        erased = 0x0,\n        key = 0x1,\n        unicode_string = 0x2,\n        stretch_key = 0x3,\n        use_key = 0x4,\n        aes_ccm_encrypted_key = 0x5,\n        tpm_encoded_key = 0x6,\n        validation = 0x7,\n        volume_master_key = 0x8,\n        external_key = 0x9,\n        update = 0xa,\n        error = 0xb,\n        metadata_area_descriptors = 0xf\n    };\n    error_status u16;\n    content switch .value_type {\n        _ => bytes len .size - 8,\n    };\n}] while $offset < .dataset.size + 64;\n"
 input_file: format_descriptions/bitlocker_information.hbl
 ---
-File@0..614
+File@0..1174
   EndiannessDeclaration@0..11
     ExclamationMark@0..1 "!"
     Identifier@1..7 "endian"
@@ -174,13 +174,13 @@ File@0..614
         RBrace@411..412 "}"
     Semicolon@412..413 ";"
   Whitespace@413..415 "\n\n"
-  StructField@415..613
+  StructField@415..1173
     Identifier@415..421 "datums"
     Whitespace@421..422 " "
-    RepeatParseType@422..612
+    RepeatParseType@422..1172
       LBracket@422..423 "["
-      AnonymousStructParseType@423..576
-        StructBlock@423..576
+      AnonymousStructParseType@423..1136
+        StructBlock@423..1136
           LBrace@423..424 "{"
           Whitespace@424..429 "\n    "
           StructField@429..438
@@ -190,98 +190,282 @@ File@0..614
               Identifier@434..437 "u16"
             Semicolon@437..438 ";"
           Whitespace@438..443 "\n    "
-          StructField@443..458
+          StructField@443..646
             Identifier@443..453 "entry_type"
             Whitespace@453..454 " "
-            NamedParseType@454..457
-              Identifier@454..457 "u16"
-            Semicolon@457..458 ";"
-          Whitespace@458..463 "\n    "
-          StructField@463..478
-            Identifier@463..473 "value_type"
-            Whitespace@473..474 " "
-            NamedParseType@474..477
-              Identifier@474..477 "u16"
-            Semicolon@477..478 ";"
-          Whitespace@478..483 "\n    "
-          StructField@483..500
-            Identifier@483..495 "error_status"
-            Whitespace@495..496 " "
-            NamedParseType@496..499
-              Identifier@496..499 "u16"
-            Semicolon@499..500 ";"
-          Whitespace@500..505 "\n    "
-          StructField@505..574
-            Identifier@505..512 "content"
-            Whitespace@512..513 " "
-            SwitchParseType@513..573
-              SwitchKw@513..519 "switch"
-              Whitespace@519..520 " "
-              FieldAccess@520..531
-                Dot@520..521 "."
-                BareField@521..531
-                  Identifier@521..531 "value_type"
-              Whitespace@531..532 " "
-              LBrace@532..533 "{"
-              Whitespace@533..542 "\n        "
-              Underscore@542..543 "_"
-              Whitespace@543..544 " "
-              Equals@544..545 "="
-              RAngle@545..546 ">"
-              Whitespace@546..547 " "
-              BytesParseType@547..566
-                BytesKw@547..552 "bytes"
+            EnumParseType@454..645
+              EnumKw@454..458 "enum"
+              Whitespace@458..459 " "
+              NamedParseType@459..462
+                Identifier@459..462 "u16"
+              Whitespace@462..463 " "
+              LBrace@463..464 "{"
+              Whitespace@464..473 "\n        "
+              EnumParseTypeArm@473..484
+                Identifier@473..477 "none"
+                Whitespace@477..478 " "
+                Equals@478..479 "="
+                Whitespace@479..480 " "
+                Atom@480..483
+                  HexadecimalIntegerLiteral@480..483 "0x0"
+                Comma@483..484 ","
+              Whitespace@484..493 "\n        "
+              EnumParseTypeArm@493..517
+                Identifier@493..510 "volume_master_key"
+                Whitespace@510..511 " "
+                Equals@511..512 "="
+                Whitespace@512..513 " "
+                Atom@513..516
+                  HexadecimalIntegerLiteral@513..516 "0x2"
+                Comma@516..517 ","
+              Whitespace@517..526 "\n        "
+              EnumParseTypeArm@526..559
+                Identifier@526..552 "full_volume_encryptio ..."
                 Whitespace@552..553 " "
-                RepeatLenDecl@553..566
-                  Identifier@553..556 "len"
-                  Whitespace@556..557 " "
-                  InfixExpr@557..566
-                    FieldAccess@557..562
-                      Dot@557..558 "."
-                      BareField@558..562
-                        Identifier@558..562 "size"
-                    Whitespace@562..563 " "
-                    Op@563..564
-                      Minus@563..564 "-"
-                    Whitespace@564..565 " "
-                    Atom@565..566
-                      DecimalIntegerLiteral@565..566 "8"
-              Comma@566..567 ","
-              Whitespace@567..572 "\n    "
-              RBrace@572..573 "}"
-            Semicolon@573..574 ";"
-          Whitespace@574..575 "\n"
-          RBrace@575..576 "}"
-      RBracket@576..577 "]"
-      Whitespace@577..578 " "
-      RepeatWhileDecl@578..612
-        Identifier@578..583 "while"
-        Whitespace@583..584 " "
-        InfixExpr@584..612
-          Metavar@584..591
-            Dollar@584..585 "$"
-            Identifier@585..591 "offset"
-          Whitespace@591..592 " "
-          Op@592..593
-            LAngle@592..593 "<"
-          Whitespace@593..594 " "
-          InfixExpr@594..612
-            FieldAccess@594..607
-              FieldAccess@594..602
-                Dot@594..595 "."
-                BareField@595..602
-                  Identifier@595..602 "dataset"
-              Dot@602..603 "."
-              BareField@603..607
-                Identifier@603..607 "size"
-            Whitespace@607..608 " "
-            Op@608..609
-              Plus@608..609 "+"
-            Whitespace@609..610 " "
-            Atom@610..612
-              DecimalIntegerLiteral@610..612 "64"
-    Semicolon@612..613 ";"
-  Whitespace@613..614 "\n"
+                Equals@553..554 "="
+                Whitespace@554..555 " "
+                Atom@555..558
+                  HexadecimalIntegerLiteral@555..558 "0x3"
+                Comma@558..559 ","
+              Whitespace@559..568 "\n        "
+              EnumParseTypeArm@568..585
+                Identifier@568..578 "validation"
+                Whitespace@578..579 " "
+                Equals@579..580 "="
+                Whitespace@580..581 " "
+                Atom@581..584
+                  HexadecimalIntegerLiteral@581..584 "0x4"
+                Comma@584..585 ","
+              Whitespace@585..594 "\n        "
+              EnumParseTypeArm@594..612
+                Identifier@594..605 "startup_key"
+                Whitespace@605..606 " "
+                Equals@606..607 "="
+                Whitespace@607..608 " "
+                Atom@608..611
+                  HexadecimalIntegerLiteral@608..611 "0x6"
+                Comma@611..612 ","
+              Whitespace@612..621 "\n        "
+              EnumParseTypeArm@621..639
+                Identifier@621..632 "description"
+                Whitespace@632..633 " "
+                Equals@633..634 "="
+                Whitespace@634..635 " "
+                Atom@635..638
+                  HexadecimalIntegerLiteral@635..638 "0x7"
+                Comma@638..639 ","
+              Whitespace@639..644 "\n    "
+              RBrace@644..645 "}"
+            Semicolon@645..646 ";"
+          Whitespace@646..651 "\n    "
+          StructField@651..1038
+            Identifier@651..661 "value_type"
+            Whitespace@661..662 " "
+            EnumParseType@662..1037
+              EnumKw@662..666 "enum"
+              Whitespace@666..667 " "
+              NamedParseType@667..670
+                Identifier@667..670 "u16"
+              Whitespace@670..671 " "
+              LBrace@671..672 "{"
+              Whitespace@672..681 "\n        "
+              EnumParseTypeArm@681..694
+                Identifier@681..687 "erased"
+                Whitespace@687..688 " "
+                Equals@688..689 "="
+                Whitespace@689..690 " "
+                Atom@690..693
+                  HexadecimalIntegerLiteral@690..693 "0x0"
+                Comma@693..694 ","
+              Whitespace@694..703 "\n        "
+              EnumParseTypeArm@703..713
+                Identifier@703..706 "key"
+                Whitespace@706..707 " "
+                Equals@707..708 "="
+                Whitespace@708..709 " "
+                Atom@709..712
+                  HexadecimalIntegerLiteral@709..712 "0x1"
+                Comma@712..713 ","
+              Whitespace@713..722 "\n        "
+              EnumParseTypeArm@722..743
+                Identifier@722..736 "unicode_string"
+                Whitespace@736..737 " "
+                Equals@737..738 "="
+                Whitespace@738..739 " "
+                Atom@739..742
+                  HexadecimalIntegerLiteral@739..742 "0x2"
+                Comma@742..743 ","
+              Whitespace@743..752 "\n        "
+              EnumParseTypeArm@752..770
+                Identifier@752..763 "stretch_key"
+                Whitespace@763..764 " "
+                Equals@764..765 "="
+                Whitespace@765..766 " "
+                Atom@766..769
+                  HexadecimalIntegerLiteral@766..769 "0x3"
+                Comma@769..770 ","
+              Whitespace@770..779 "\n        "
+              EnumParseTypeArm@779..793
+                Identifier@779..786 "use_key"
+                Whitespace@786..787 " "
+                Equals@787..788 "="
+                Whitespace@788..789 " "
+                Atom@789..792
+                  HexadecimalIntegerLiteral@789..792 "0x4"
+                Comma@792..793 ","
+              Whitespace@793..802 "\n        "
+              EnumParseTypeArm@802..830
+                Identifier@802..823 "aes_ccm_encrypted_key"
+                Whitespace@823..824 " "
+                Equals@824..825 "="
+                Whitespace@825..826 " "
+                Atom@826..829
+                  HexadecimalIntegerLiteral@826..829 "0x5"
+                Comma@829..830 ","
+              Whitespace@830..839 "\n        "
+              EnumParseTypeArm@839..861
+                Identifier@839..854 "tpm_encoded_key"
+                Whitespace@854..855 " "
+                Equals@855..856 "="
+                Whitespace@856..857 " "
+                Atom@857..860
+                  HexadecimalIntegerLiteral@857..860 "0x6"
+                Comma@860..861 ","
+              Whitespace@861..870 "\n        "
+              EnumParseTypeArm@870..887
+                Identifier@870..880 "validation"
+                Whitespace@880..881 " "
+                Equals@881..882 "="
+                Whitespace@882..883 " "
+                Atom@883..886
+                  HexadecimalIntegerLiteral@883..886 "0x7"
+                Comma@886..887 ","
+              Whitespace@887..896 "\n        "
+              EnumParseTypeArm@896..920
+                Identifier@896..913 "volume_master_key"
+                Whitespace@913..914 " "
+                Equals@914..915 "="
+                Whitespace@915..916 " "
+                Atom@916..919
+                  HexadecimalIntegerLiteral@916..919 "0x8"
+                Comma@919..920 ","
+              Whitespace@920..929 "\n        "
+              EnumParseTypeArm@929..948
+                Identifier@929..941 "external_key"
+                Whitespace@941..942 " "
+                Equals@942..943 "="
+                Whitespace@943..944 " "
+                Atom@944..947
+                  HexadecimalIntegerLiteral@944..947 "0x9"
+                Comma@947..948 ","
+              Whitespace@948..957 "\n        "
+              EnumParseTypeArm@957..970
+                Identifier@957..963 "update"
+                Whitespace@963..964 " "
+                Equals@964..965 "="
+                Whitespace@965..966 " "
+                Atom@966..969
+                  HexadecimalIntegerLiteral@966..969 "0xa"
+                Comma@969..970 ","
+              Whitespace@970..979 "\n        "
+              EnumParseTypeArm@979..991
+                Identifier@979..984 "error"
+                Whitespace@984..985 " "
+                Equals@985..986 "="
+                Whitespace@986..987 " "
+                Atom@987..990
+                  HexadecimalIntegerLiteral@987..990 "0xb"
+                Comma@990..991 ","
+              Whitespace@991..1000 "\n        "
+              EnumParseTypeArm@1000..1031
+                Identifier@1000..1025 "metadata_area_descrip ..."
+                Whitespace@1025..1026 " "
+                Equals@1026..1027 "="
+                Whitespace@1027..1028 " "
+                Atom@1028..1031
+                  HexadecimalIntegerLiteral@1028..1031 "0xf"
+              Whitespace@1031..1036 "\n    "
+              RBrace@1036..1037 "}"
+            Semicolon@1037..1038 ";"
+          Whitespace@1038..1043 "\n    "
+          StructField@1043..1060
+            Identifier@1043..1055 "error_status"
+            Whitespace@1055..1056 " "
+            NamedParseType@1056..1059
+              Identifier@1056..1059 "u16"
+            Semicolon@1059..1060 ";"
+          Whitespace@1060..1065 "\n    "
+          StructField@1065..1134
+            Identifier@1065..1072 "content"
+            Whitespace@1072..1073 " "
+            SwitchParseType@1073..1133
+              SwitchKw@1073..1079 "switch"
+              Whitespace@1079..1080 " "
+              FieldAccess@1080..1091
+                Dot@1080..1081 "."
+                BareField@1081..1091
+                  Identifier@1081..1091 "value_type"
+              Whitespace@1091..1092 " "
+              LBrace@1092..1093 "{"
+              Whitespace@1093..1102 "\n        "
+              Underscore@1102..1103 "_"
+              Whitespace@1103..1104 " "
+              Equals@1104..1105 "="
+              RAngle@1105..1106 ">"
+              Whitespace@1106..1107 " "
+              BytesParseType@1107..1126
+                BytesKw@1107..1112 "bytes"
+                Whitespace@1112..1113 " "
+                RepeatLenDecl@1113..1126
+                  Identifier@1113..1116 "len"
+                  Whitespace@1116..1117 " "
+                  InfixExpr@1117..1126
+                    FieldAccess@1117..1122
+                      Dot@1117..1118 "."
+                      BareField@1118..1122
+                        Identifier@1118..1122 "size"
+                    Whitespace@1122..1123 " "
+                    Op@1123..1124
+                      Minus@1123..1124 "-"
+                    Whitespace@1124..1125 " "
+                    Atom@1125..1126
+                      DecimalIntegerLiteral@1125..1126 "8"
+              Comma@1126..1127 ","
+              Whitespace@1127..1132 "\n    "
+              RBrace@1132..1133 "}"
+            Semicolon@1133..1134 ";"
+          Whitespace@1134..1135 "\n"
+          RBrace@1135..1136 "}"
+      RBracket@1136..1137 "]"
+      Whitespace@1137..1138 " "
+      RepeatWhileDecl@1138..1172
+        Identifier@1138..1143 "while"
+        Whitespace@1143..1144 " "
+        InfixExpr@1144..1172
+          Metavar@1144..1151
+            Dollar@1144..1145 "$"
+            Identifier@1145..1151 "offset"
+          Whitespace@1151..1152 " "
+          Op@1152..1153
+            LAngle@1152..1153 "<"
+          Whitespace@1153..1154 " "
+          InfixExpr@1154..1172
+            FieldAccess@1154..1167
+              FieldAccess@1154..1162
+                Dot@1154..1155 "."
+                BareField@1155..1162
+                  Identifier@1155..1162 "dataset"
+              Dot@1162..1163 "."
+              BareField@1163..1167
+                Identifier@1163..1167 "size"
+            Whitespace@1167..1168 " "
+            Op@1168..1169
+              Plus@1168..1169 "+"
+            Whitespace@1169..1170 " "
+            Atom@1170..1172
+              DecimalIntegerLiteral@1170..1172 "64"
+    Semicolon@1172..1173 ";"
+  Whitespace@1173..1174 "\n"
 
 --- diagnostics ---
 no diagnostics

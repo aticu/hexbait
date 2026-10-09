@@ -211,9 +211,10 @@ impl Env<'_> {
             TyKind::Indeterminate { .. }
             | TyKind::Bool
             | TyKind::Int { .. }
+            | TyKind::EnumLit { .. }
+            | TyKind::EnumVal { .. }
             | TyKind::Bytes
-            | TyKind::Array { .. }
-            | TyKind::EnumLit { .. } => unreachable!(),
+            | TyKind::Array { .. } => unreachable!(),
         };
 
         self.values = struct_ty;

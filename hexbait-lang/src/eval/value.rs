@@ -7,7 +7,7 @@ use hexbait_common::{Len, ReadBytes, RelativeOffset};
 use crate::{
     Int,
     compile::ir::{
-        Lit, Symbol,
+        EnumInfo, Lit, Symbol,
         path::{Path, PathComponent},
     },
     eval::{View, parse::DiagnosticId},
@@ -24,12 +24,6 @@ pub struct Value {
     pub provenance: Provenance,
 }
 
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind
-    }
-}
-
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -42,7 +36,7 @@ impl fmt::Debug for Value {
 }
 
 /// The different kinds of values that can be parsed.
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub enum ValueKind {
     /// An error.
     Error(DiagnosticId),
@@ -71,6 +65,13 @@ pub enum ValueKind {
     },
     /// An enum literal like `enum.value`.
     EnumLit(String),
+    /// An enum value.
+    EnumValue {
+        /// The raw integer value.
+        raw: Int,
+        /// The information about the enum variants.
+        enum_info: Arc<EnumInfo>,
+    },
 }
 
 impl fmt::Debug for ValueKind {
@@ -143,6 +144,21 @@ impl fmt::Debug for ValueKind {
             Self::EnumLit(value) => {
                 write!(f, "enum.{value}")
             }
+            Self::EnumValue { raw, enum_info } => {
+                let name = if let Some(variant) = enum_info.resolve(raw) {
+                    variant.name.inner.as_str()
+                } else {
+                    "$unresolved"
+                };
+
+                if raw.sign() == num_bigint::Sign::Minus {
+                    write!(f, "{name} ({raw}, -0x{:x})", -raw)?;
+                } else {
+                    write!(f, "{name} ({raw}, 0x{raw:x})")?;
+                }
+
+                Ok(())
+            }
         }
     }
 }
@@ -166,6 +182,18 @@ impl ValueKind {
     /// This function will panic if the value is not an integer.
     #[track_caller]
     pub fn expect_int(&self) -> &Int {
+        match self {
+            ValueKind::Integer(value) => value,
+            _ => unreachable!("expected an integer value"),
+        }
+    }
+
+    /// Expects the value to be an integer, panicking if this is false.
+    ///
+    /// # Panics
+    /// This function will panic if the value is not an integer.
+    #[track_caller]
+    pub fn expect_int_take(self) -> Int {
         match self {
             ValueKind::Integer(value) => value,
             _ => unreachable!("expected an integer value"),
@@ -281,6 +309,8 @@ impl PartialEq<Lit> for ValueKind {
             Lit::Int(other) => {
                 if let ValueKind::Integer(this) = self {
                     this == other
+                } else if let ValueKind::EnumValue { raw, .. } = self {
+                    raw == other
                 } else {
                     false
                 }
@@ -299,13 +329,21 @@ impl PartialEq<Lit> for ValueKind {
                     false
                 }
             }
-            Lit::Enum(_) => false,
+            Lit::Enum(name) => {
+                if let ValueKind::EnumValue { raw, enum_info } = self
+                    && let Some(variant) = enum_info.resolve(raw)
+                {
+                    variant.name.inner.as_str() == name
+                } else {
+                    false
+                }
+            }
         }
     }
 }
 
 /// A single part of the content of a `struct`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum StructContent {
     /// The content is a `struct` field.
     Field {

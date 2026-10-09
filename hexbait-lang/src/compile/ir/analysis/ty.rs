@@ -1,8 +1,11 @@
 //! Implements the types of the hexbait language.
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
-use crate::compile::{Span, ir::Symbol};
+use crate::compile::{
+    Span,
+    ir::{EnumInfo, Symbol},
+};
 
 /// A type in the hexbait language.
 #[derive(Clone)]
@@ -26,8 +29,9 @@ impl Ty {
             TyKind::Indeterminate { .. }
             | TyKind::Bool
             | TyKind::Int { .. }
-            | TyKind::Bytes
-            | TyKind::EnumLit { .. } => false,
+            | TyKind::EnumLit { .. }
+            | TyKind::EnumVal { .. }
+            | TyKind::Bytes => false,
             TyKind::Struct { struct_ty: ty } => {
                 ty.fields.iter().any(|field| field.ty.contains_err())
             }
@@ -46,9 +50,10 @@ impl Ty {
             TyKind::Error | TyKind::Indeterminate { .. } => branches[0].kind.clone(),
             TyKind::Bool | TyKind::Bytes => Ty::join_primitive(branches, &branches[0].kind),
             TyKind::Int { .. } => Ty::join_int(branches),
+            TyKind::EnumLit { .. } => Ty::join_enum_lit(branches),
+            TyKind::EnumVal { .. } => TyKind::Error, // TODO: eventually implement this by checking the values but not the spans
             TyKind::Struct { .. } => Ty::join_struct(branches, span, last_branch_is_missing_else),
             TyKind::Array { .. } => Ty::join_array(branches, span, last_branch_is_missing_else),
-            TyKind::EnumLit { .. } => Ty::join_enum_lit(branches),
         };
 
         Ty { kind, span }
@@ -278,6 +283,11 @@ pub enum TyKind {
         /// Whether the name of the literal is known.
         known_name: Option<String>,
     },
+    /// An enum value.
+    EnumVal {
+        /// The info about the enum variants.
+        enum_info: Arc<EnumInfo>,
+    },
     /// A bytes value.
     Bytes,
     /// A struct value.
@@ -300,10 +310,11 @@ impl TyKind {
             TyKind::Indeterminate { .. } => TyName::Indeterminate,
             TyKind::Bool => TyName::Bool,
             TyKind::Int { .. } => TyName::Int,
+            TyKind::EnumLit { .. } => TyName::EnumLit,
+            TyKind::EnumVal { .. } => TyName::EnumVal,
             TyKind::Bytes => TyName::Bytes,
             TyKind::Struct { .. } => TyName::Struct,
             TyKind::Array { item_ty } => TyName::Array(Box::new(item_ty.name())),
-            TyKind::EnumLit { .. } => TyName::EnumLit,
         }
     }
 
@@ -318,7 +329,26 @@ impl TyKind {
             | (_, TyKind::Error)
             | (TyKind::Bool, TyKind::Bool)
             | (TyKind::Int { .. }, TyKind::Int { .. })
+            | (TyKind::EnumVal { .. }, TyKind::EnumVal { .. } | TyKind::Int { .. })
+            | (TyKind::EnumVal { .. } | TyKind::Int { .. }, TyKind::EnumVal { .. })
             | (TyKind::Bytes, TyKind::Bytes) => None,
+            (TyKind::EnumVal { enum_info }, TyKind::EnumLit { known_name })
+            | (TyKind::EnumLit { known_name }, TyKind::EnumVal { enum_info }) => {
+                if let Some(known_name) = known_name {
+                    if enum_info
+                        .variants
+                        .iter()
+                        .find(|variant| variant.name.inner.as_str() == known_name)
+                        .is_some()
+                    {
+                        None
+                    } else {
+                        Some(ComparisonUnsupportedReason::EnumVariantUnknown)
+                    }
+                } else {
+                    None
+                }
+            }
             (TyKind::EnumLit { .. }, _) | (_, TyKind::EnumLit { .. }) => {
                 Some(ComparisonUnsupportedReason::EnumLitsIncomparable)
             }
@@ -326,6 +356,8 @@ impl TyKind {
             | (_, TyKind::Bool)
             | (TyKind::Int { .. }, _)
             | (_, TyKind::Int { .. })
+            | (TyKind::EnumLit { .. }, _)
+            | (_, TyKind::EnumLit { .. })
             | (TyKind::Bytes, _)
             | (_, TyKind::Bytes) => Some(ComparisonUnsupportedReason::DifferentTypes),
             (TyKind::Indeterminate { .. }, _)
@@ -416,6 +448,8 @@ pub enum TyName {
     Array(Box<TyName>),
     /// An enum literal type.
     EnumLit,
+    /// An enum type.
+    EnumVal,
 }
 
 impl fmt::Display for TyName {
@@ -428,6 +462,7 @@ impl fmt::Display for TyName {
             TyName::Struct => write!(f, "{{ .. }}"),
             TyName::Array(ty_name) => write!(f, "[{ty_name}]"),
             TyName::EnumLit => write!(f, "enum literal"),
+            TyName::EnumVal => write!(f, "enum value"),
         }
     }
 }
@@ -440,6 +475,8 @@ pub enum ComparisonUnsupportedReason {
     IncomparableType,
     /// Enum literals are only comparable against enum values.
     EnumLitsIncomparable,
+    /// The enum variant is unknown.
+    EnumVariantUnknown,
 }
 
 impl fmt::Display for ComparisonUnsupportedReason {
@@ -452,6 +489,9 @@ impl fmt::Display for ComparisonUnsupportedReason {
             }
             ComparisonUnsupportedReason::EnumLitsIncomparable => {
                 write!(f, "enum literals can only be compared to enum values")
+            }
+            ComparisonUnsupportedReason::EnumVariantUnknown => {
+                write!(f, "enum variant is unknown")
             }
         }
     }

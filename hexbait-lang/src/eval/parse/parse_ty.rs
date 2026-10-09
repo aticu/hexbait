@@ -1,5 +1,7 @@
 //! Implements evaluation of a parse type.
 
+use std::sync::Arc;
+
 use hexbait_common::{Endianness, Len};
 use num_traits::Signed as _;
 
@@ -241,6 +243,20 @@ impl ParseContext {
                     }
 
                     self.eval_parse_type(default, cursor, struct_ctx)?
+                }
+            }
+            ParseTypeKind::Enum {
+                backing_type,
+                enum_info,
+            } => {
+                let val = self.eval_parse_type(backing_type, cursor, struct_ctx)?;
+
+                Value {
+                    kind: ValueKind::EnumValue {
+                        raw: val.kind.expect_int_take(),
+                        enum_info: Arc::clone(enum_info),
+                    },
+                    provenance: val.provenance,
                 }
             }
             ParseTypeKind::Error => static_analysis_impossible(),

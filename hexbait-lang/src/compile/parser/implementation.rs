@@ -367,6 +367,39 @@ fn parse_type_raw(p: &mut Parser, nested: bool) {
 
             NodeKind::SwitchParseType
         }
+        Some(TokenKind::EnumKw) => {
+            p.expect(TokenKind::EnumKw);
+            nested_parse_type(p);
+            p.expect(TokenKind::LBrace);
+            p.with_consuming_recovery(TokenKind::RBrace, |p| {
+                while !p.at_recovery_token() {
+                    p.ensure_progress(|p| {
+                        p.node(|p| {
+                            p.with_unconsuming_recovery(TokenKind::Comma, |p| {
+                                p.expect(TokenKind::Identifier);
+                                p.expect(TokenKind::Equals);
+                                expr(p);
+
+                                if p.at(TokenKind::Dot) {
+                                    p.expect(TokenKind::Dot);
+                                    p.expect(TokenKind::Dot);
+                                    p.expect(TokenKind::Equals);
+                                    expr(p);
+                                }
+                            });
+
+                            if !p.at_recovery_token() {
+                                p.expect(TokenKind::Comma);
+                            }
+
+                            NodeKind::EnumParseTypeArm
+                        })
+                    });
+                }
+            });
+
+            NodeKind::EnumParseType
+        }
         _ => {
             p.expect_error(&["an identifier", "`{`", "`[`", "`bytes`", "`switch`"]);
             p.recover();

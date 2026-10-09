@@ -11,6 +11,7 @@ use crate::{
         parse::{
             cursor::Cursor,
             diagnostics::{Diagnostics, Result},
+            expr::value_eq,
             struct_context::StructContext,
         },
     },
@@ -129,7 +130,7 @@ impl ParseContext {
         if let Some(expected) = &field.expected {
             let span = expected.span;
             let expected = self.eval_expr(expected, cursor, struct_ctx, Default::default())?;
-            if expected != value {
+            if !value_eq(&expected.kind, &value.kind) {
                 return Err(self
                     .diagnostics
                     .new_err(

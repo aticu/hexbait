@@ -1,5 +1,7 @@
 //! Implements lowering the AST to the IR.
 
+use std::sync::Arc;
+
 use crate::{
     Int,
     compile::{
@@ -7,8 +9,9 @@ use crate::{
         ast::{self, AstNode as _},
         diagnostics::Label,
         ir::{
-            Block, ConcatArg, DeclarationKind, IfBlock, IfChain, ParseTypeKind, Repetition,
-            ScopeKind, StructContentKind, StructRef, StructRefPart,
+            Block, ConcatArg, DeclarationKind, EnumInfo, EnumVariant, EnumVariantKind, IfBlock,
+            IfChain, ParseTypeKind, Repetition, ScopeKind, StructContentKind, StructRef,
+            StructRefPart,
         },
         lexer::TokenKind,
         span::Span,
@@ -280,6 +283,82 @@ impl LoweringCtx<'_> {
                 ));
 
                 ParseTypeKind::Switch { scrutinee, branches, default }
+            }
+            ast::ParseType::EnumParseType(enum_parse_type) => {
+                let backing_type = self.lower_parse_type(required_field!(enum_parse_type => size ? self => ParseTypeKind::Error), &None);
+
+                let mut variants = Vec::new();
+                for arm in enum_parse_type.enum_parse_type_arm() {
+                    let name = Spanned::<Symbol>::from(required_field!(arm => name ? self => ParseTypeKind::Error));
+                    let start = self.lower_expr(required_field!(arm => start ? self => ParseTypeKind::Error));
+                    let end = arm.end().map(|end| self.lower_expr(end));
+
+                    fn extract_lit(this: &mut LoweringCtx, expr: Expr) -> Option<Int> {
+                        match expr.kind {
+                            ExprKind::Lit(lit) => match lit {
+                                Lit::Int(int) => Some(int),
+                                Lit::Bytes(_) |
+                                Lit::Bool(_) |
+                                Lit::Enum(_) => {
+                                    this.add_diagnostic(Diagnostic::error(
+                                        "expected integer literal",
+                                        Label::new("unexpected literal type", expr.span)
+                                    ));
+                                    None
+                                }
+                            }
+                            ExprKind::Offset |
+                            ExprKind::Last |
+                            ExprKind::Len |
+                            ExprKind::FieldAccess {..} |
+                            ExprKind::BinOp {..} |
+                            ExprKind::Peek {..} |
+                            ExprKind::Concat { .. } => {
+                                this.add_diagnostic(Diagnostic::error(
+                                    "expected integer literal",
+                                    Label::new("unexpected expression type", expr.span)
+                                ));
+                                None
+                            }
+                            ExprKind::Error => None,
+                            ExprKind::UnOp { op, operand } => match op {
+                                UnOp::Neg => extract_lit(this, *operand).map(|lit| -lit),
+                                UnOp::Plus => extract_lit(this, *operand),
+                                UnOp::Not => {
+                                    this.add_diagnostic(Diagnostic::error(
+                                        "expected integer literal",
+                                        Label::new("unexpected literal type", expr.span)
+                                    ));
+                                    None
+                                },
+                            }
+                        }
+                    }
+
+                    let start_span = start.span;
+                    let Some(start) = extract_lit(self, start) else {
+                        return ParseTypeKind::Error;
+                    };
+                    let kind = match end {
+                        Some(end) => {
+                            let end_span = end.span;
+                            let Some(end) = extract_lit(self, end) else {
+                                return ParseTypeKind::Error;
+                            };
+                            Spanned { inner: EnumVariantKind::Range { start, end }, span: start_span.join(end_span) }
+                        }
+                        None => Spanned { inner: EnumVariantKind::SingleValue(start), span: start_span },
+                    };
+
+                    variants.push(EnumVariant {
+                        name,
+                        kind,
+                    });
+                }
+
+                ParseTypeKind::Enum { backing_type: Box::new(backing_type), enum_info: Arc::new(EnumInfo {
+                    variants,
+                })}
             }
         }
     }

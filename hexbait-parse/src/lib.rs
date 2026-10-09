@@ -142,6 +142,28 @@ fn value_to_json(value: &hexbait_lang::eval::Value, result: &ParseResult, detail
 
             Value::Object(map)
         }
+        ValueKind::EnumValue { raw, enum_info } => {
+            let mut map = Map::new();
+            map.insert(
+                "raw".to_string(),
+                value_to_json(
+                    &hexbait_lang::eval::Value {
+                        kind: ValueKind::Integer(raw.clone()),
+                        provenance: value.provenance.clone(),
+                    },
+                    result,
+                    detailed,
+                ),
+            );
+            if let Some(variant) = enum_info.resolve(raw) {
+                map.insert(
+                    "variant".to_string(),
+                    Value::String(variant.name.inner.as_str().to_string()),
+                );
+            }
+
+            Value::Object(map)
+        }
     };
 
     if detailed {

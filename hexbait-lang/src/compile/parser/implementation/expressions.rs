@@ -208,7 +208,7 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> CompletedMarker {
     loop {
         let next_token = p.peek().map(|t| t.kind).next();
         match next_token {
-            Some(TokenKind::Dot) => {
+            Some(TokenKind::Dot) if p.peek().nth(1).map(|t| t.kind) != Some(TokenKind::Dot) => {
                 lhs = p.precede_with(lhs, |p| {
                     p.expect(TokenKind::Dot);
                     field_name(p);

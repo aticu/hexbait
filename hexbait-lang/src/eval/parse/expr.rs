@@ -165,11 +165,11 @@ impl ParseContext {
                         provenance,
                     },
                     OpKind::Eq => Value {
-                        kind: ValueKind::Boolean(lhs == rhs),
+                        kind: ValueKind::Boolean(value_eq(&lhs, &rhs)),
                         provenance,
                     },
                     OpKind::Neq => Value {
-                        kind: ValueKind::Boolean(lhs != rhs),
+                        kind: ValueKind::Boolean(!value_eq(&lhs, &rhs)),
                         provenance,
                     },
                     OpKind::BoolRhsIdentity => Value {
@@ -251,4 +251,41 @@ pub struct AdditionalExprContext<'parent> {
     pub last: Option<&'parent Value>,
     /// The length of the current repeat expression.
     pub len: Option<&'parent Value>,
+}
+
+/// Determines if two values are equal.
+pub fn value_eq(lhs: &ValueKind, rhs: &ValueKind) -> bool {
+    match (&lhs, &rhs) {
+        (ValueKind::Boolean(lhs), ValueKind::Boolean(rhs)) => lhs == rhs,
+        (ValueKind::Integer(lhs), ValueKind::Integer(rhs)) => lhs == rhs,
+        (ValueKind::Float(lhs), ValueKind::Float(rhs)) => lhs == rhs,
+        (ValueKind::Bytes(lhs), ValueKind::Bytes(rhs)) => lhs == rhs,
+        (
+            ValueKind::EnumValue {
+                raw: lhs,
+                enum_info: lhs_info,
+            },
+            ValueKind::EnumValue {
+                raw: rhs,
+                enum_info: rhs_info,
+            },
+        ) => {
+            if let (Some(lhs), Some(rhs)) = (lhs_info.resolve(lhs), rhs_info.resolve(rhs)) {
+                lhs.name.inner.as_str() == rhs.name.inner.as_str()
+            } else {
+                lhs == rhs
+            }
+        }
+        (ValueKind::EnumValue { raw, enum_info }, ValueKind::EnumLit(name))
+        | (ValueKind::EnumLit(name), ValueKind::EnumValue { raw, enum_info }) => {
+            if let Some(variant) = enum_info.resolve(raw) {
+                variant.name.inner.as_str() == name
+            } else {
+                false
+            }
+        }
+        (ValueKind::EnumValue { raw, enum_info: _ }, ValueKind::Integer(int))
+        | (ValueKind::Integer(int), ValueKind::EnumValue { raw, enum_info: _ }) => raw == int,
+        _ => unreachable!(),
+    }
 }

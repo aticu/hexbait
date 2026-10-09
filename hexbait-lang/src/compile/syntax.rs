@@ -109,6 +109,10 @@ pub enum NodeKind {
     SwitchParseType,
     /// A single arm of a switch parse type.
     SwitchParseTypeArm,
+    /// An enum parse type.
+    EnumParseType,
+    /// A single arm of an enum parse type.
+    EnumParseTypeArm,
 
     // Repeating types
     /// A repetition of a fixed number of elements.

@@ -25,8 +25,29 @@ dataset {
 
 datums [{
     size u16;
-    entry_type u16;
-    value_type u16;
+    entry_type enum u16 {
+        none = 0x0,
+        volume_master_key = 0x2,
+        full_volume_encryption_key = 0x3,
+        validation = 0x4,
+        startup_key = 0x6,
+        description = 0x7,
+    };
+    value_type enum u16 {
+        erased = 0x0,
+        key = 0x1,
+        unicode_string = 0x2,
+        stretch_key = 0x3,
+        use_key = 0x4,
+        aes_ccm_encrypted_key = 0x5,
+        tpm_encoded_key = 0x6,
+        validation = 0x7,
+        volume_master_key = 0x8,
+        external_key = 0x9,
+        update = 0xa,
+        error = 0xb,
+        metadata_area_descriptors = 0xf
+    };
     error_status u16;
     content switch .value_type {
         _ => bytes len .size - 8,

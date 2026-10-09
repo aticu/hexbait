@@ -68,7 +68,26 @@ let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .heade
         !recover at $offset + ._size;
 
         !scope at $offset until $offset + ._size {
-            type u32;
+            type enum u32 {
+                STANDARD_INFORMATION = 0x10,
+                ATTRIBUTE_LIST = 0x20,
+                FILE_NAME = 0x30,
+                OBJECT_ID = 0x40,
+                SECURITY_DESCRIPTOR = 0x50,
+                VOLUME_NAME = 0x60,
+                VOLUME_INFORMATION = 0x70,
+                DATA = 0x80,
+                INDEX_ROOT = 0x90,
+                INDEX_ALLOCATION = 0xa0,
+                BITMAP = 0xb0,
+                REPARSE_POINT = 0xc0,
+                EA_INFORMATION = 0xd0,
+                EA = 0xe0,
+                PROPERTY_SET = 0xf0,
+                LOGGED_UTILITY_STREAM = 0x100,
+                USER_DEFINED = 0x1000..=0xfffffffe,
+                END_OF_ATTRIBUTES = 0xffffffff
+            };
             size u32;
             nonresident u8;
             name_size u8;
@@ -86,7 +105,7 @@ let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .heade
 
                     !scope at .data_offset until .data_offset + .data_size {
                         content switch $parent.type {
-                            0x10 => {
+                            enum.STANDARD_INFORMATION => {
                                 creation_time u64;
                                 modification_time u64;
                                 changed_time u64;
@@ -104,7 +123,7 @@ let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .heade
                                     update_sequence_number u64;
                                 }
                             },
-                            0x30 => {
+                            enum.FILE_NAME => {
                                 parent_file_reference u64;
                                 creation_time u64;
                                 modification_time u64;
@@ -118,7 +137,7 @@ let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .heade
                                 namespace u8;
                                 name bytes len .name_string_size * 2;
                             },
-                            0x90 => {
+                            enum.INDEX_ROOT => {
                                 attribute_type u32;
                                 collation_type u32;
                                 index_entry_size u32;

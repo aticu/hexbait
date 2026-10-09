@@ -1,11 +1,15 @@
 //! Implements analysis of parse types.
 
+use std::sync::Arc;
+
+use range_set_blaze::RangeMapBlaze;
+
 use crate::compile::{
     Diagnostic, Span,
     diagnostics::Label,
     ir::{
-        BinOp, Expr, ExprKind, Lit, ParseType, ParseTypeKind, RepeatKind, Repetition, Spanned,
-        StructContent, Symbol,
+        BinOp, EnumInfo, EnumVariantKind, Expr, ExprKind, Lit, ParseType, ParseTypeKind,
+        RepeatKind, Repetition, Spanned, StructContent, Symbol,
         analysis::{
             AnalysisCtx, Env,
             expr::ExtraExprCtx,
@@ -37,6 +41,10 @@ impl Env<'_> {
                     branches,
                     default,
                 } => self.check_switch_parse_ty(ctx, scrutinee, branches, default, parse_ty.span),
+                ParseTypeKind::Enum {
+                    backing_type,
+                    enum_info,
+                } => self.check_enum_parse_ty(ctx, backing_type, enum_info),
                 ParseTypeKind::Error => {
                     assert!(ctx.diagnostics.contains_errors());
                     TyKind::Error
@@ -267,5 +275,80 @@ impl Env<'_> {
         branch_tys.push(self.check_parse_type(ctx, default));
 
         Ty::join(&branch_tys, span, false).kind
+    }
+
+    /// Checks an enum parse type.
+    fn check_enum_parse_ty(
+        &self,
+        ctx: &mut AnalysisCtx,
+        backing_type: &ParseType,
+        enum_info: &Arc<EnumInfo>,
+    ) -> TyKind {
+        let backing_ty = self.check_parse_type(ctx, backing_type);
+        if !matches!(&backing_ty.kind, TyKind::Int { .. }) {
+            return ctx.ty_err(
+                "expected enum backing type to be an integer",
+                &backing_ty,
+                backing_type.span,
+            );
+        }
+
+        macro_rules! check_int_val {
+            ($expr:ident, $span:expr) => {
+                if let Ok(int_val) = i128::try_from($expr)
+                {
+                    int_val
+                } else {
+                    ctx.add_diagnostic(Diagnostic::error(
+                        format!("only integer literals in the range from `{}` to `{}` are allowed in enum variant values", i128::MIN, i128::MAX),
+                        Label::new("invalid enum literal", $span)
+                    ));
+                    return TyKind::Error;
+                }
+            };
+        }
+
+        let mut covered_ranges = RangeMapBlaze::<i128, Span>::new();
+        macro_rules! check_range_overlap {
+            ($range:expr, $span:expr) => {
+                if $range.start() > $range.end() {
+                    ctx.add_diagnostic(Diagnostic::error(
+                        "enum value range start must be smaller than or equal to end",
+                        Label::new("invalid range", $span),
+                    ));
+                }
+                if let Some((_, overlap_span)) = covered_ranges.range($range).next() {
+                    ctx.add_diagnostic(
+                        Diagnostic::error(
+                            "overlapping enum value is not allowed",
+                            Label::new("overlapping enum value", $span),
+                        )
+                        .with_label(Label::new("overlaps with this value", overlap_span)),
+                    );
+                    return TyKind::Error;
+                }
+                covered_ranges.ranges_insert($range, $span);
+            };
+        }
+
+        for variant in &enum_info.variants {
+            let span = variant.kind.span;
+
+            match &variant.kind.inner {
+                EnumVariantKind::SingleValue(expr) => {
+                    let expr_val = check_int_val!(expr, span);
+                    check_range_overlap!(expr_val..=expr_val, span);
+                }
+                EnumVariantKind::Range { start, end } => {
+                    let start_val = check_int_val!(start, span);
+                    let end_val = check_int_val!(end, span);
+                    check_range_overlap!(start_val..=end_val, span);
+                }
+            }
+        }
+
+        TyKind::EnumVal {
+            enum_info: Arc::clone(enum_info),
+        }
     }
 }

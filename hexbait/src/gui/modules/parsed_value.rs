@@ -261,7 +261,8 @@ pub fn show_value_raw(
         ValueKind::Boolean(_)
         | ValueKind::Integer(_)
         | ValueKind::Float(_)
-        | ValueKind::EnumLit(_) => {
+        | ValueKind::EnumLit(_)
+        | ValueKind::EnumValue { .. } => {
             handle_response(ui.label(format!("{name_prefix}{:?},", value.kind)));
         }
         ValueKind::Bytes(bytes) => {

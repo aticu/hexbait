@@ -33,6 +33,14 @@ impl Span {
     pub fn range(self) -> Range<usize> {
         self.start..self.end
     }
+
+    /// Joins the given spans together.
+    pub fn join(self, other: Span) -> Span {
+        Span {
+            start: std::cmp::min(self.start, other.start),
+            end: std::cmp::max(self.end, other.end),
+        }
+    }
 }
 
 impl fmt::Debug for Span {

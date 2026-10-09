@@ -1,11 +1,14 @@
 //! Implements an intermediate representation the hexbait language.
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use hexbait_common::Endianness;
 use smol_str::SmolStr;
 
-use crate::compile::{Span, syntax::SyntaxToken};
+use crate::{
+    Int,
+    compile::{Span, syntax::SyntaxToken},
+};
 
 pub use analysis::{check_expr, check_file};
 pub use expr::*;
@@ -266,8 +269,59 @@ pub enum ParseTypeKind {
         /// The default branch if no other branch matches.
         default: Box<ParseType>,
     },
+    /// Parses an integer and maps it to variants.
+    Enum {
+        /// The backing integer type of the enum.
+        backing_type: Box<ParseType>,
+        /// The info that is attached to the parsed integer value.
+        ///
+        /// This is an [`Arc`] to allow values to cheaply clone it and reference it too.
+        enum_info: Arc<EnumInfo>,
+    },
     /// A parse type that contained an error during parsing.
     Error,
+}
+
+/// The information on the fields of an enum.
+#[derive(Debug)]
+pub struct EnumInfo {
+    /// The variants of the enum.
+    pub variants: Vec<EnumVariant>,
+}
+
+impl EnumInfo {
+    /// Resolves the value to a possible variant.
+    pub fn resolve(&self, value: &Int) -> Option<&EnumVariant> {
+        self.variants
+            .iter()
+            .find(|variant| match &variant.kind.inner {
+                EnumVariantKind::SingleValue(val) => val == value,
+                EnumVariantKind::Range { start, end } => (start..=end).contains(&value),
+            })
+    }
+}
+
+/// A single variant of an enum.
+#[derive(Debug)]
+pub struct EnumVariant {
+    /// The name of the variant.
+    pub name: Spanned<Symbol>,
+    /// The kind of the variant.
+    pub kind: Spanned<EnumVariantKind>,
+}
+
+/// The kind of an enum variant.
+#[derive(Debug)]
+pub enum EnumVariantKind {
+    /// Only a single value maps to the variant.
+    SingleValue(Int),
+    /// Any value in the range maps to the variant.
+    Range {
+        /// The start of the range (inclusive).
+        start: Int,
+        /// The end of the range (inclusive).
+        end: Int,
+    },
 }
 
 /// The type of a repetition of a repeating parse type.

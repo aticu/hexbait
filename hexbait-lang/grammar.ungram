@@ -126,6 +126,7 @@ ParseType =
 | RepeatParseType
 | AnonymousStructParseType
 | SwitchParseType
+| EnumParseType
 
 // Refers by name to a different parse type by name.
 // This includes signed and unsigned integer types (`uN` and `iN` where `N` is a number respectively).
@@ -166,6 +167,19 @@ SwitchParseType =
 // A single arm of a switch.
 SwitchParseTypeArm =
   val:Expr '=>' ParseType ','
+
+// The parse type of an enumeration like `enum u16 { value1 = 0, value2 = 25, value3 = 30..=35 }`.
+// Enums can be compared to integers or to special enum value like `enum.value1`.
+EnumParseType =
+  'enum' size:ParseType '{' EnumParseTypeArm* '}'
+
+// A single arm of an enum parse type.
+// - A single value like `value1 = 0` indicates that the value must match exactly.
+// - An inclusive range like `value3 = 30..=35` means that any match within the range maps to that value.
+//   In this case a comparison to `enum.value3` would be true for any value in the range but a comparison to an integer only for that exact value.
+// The final `,` in only optional for the final value in the enum.
+EnumParseTypeArm =
+  name:'ident' '=' start:Expr ( '..=' end:Expr )? ','?
 
 // Declares how a parse type is repeating.
 RepeatDecl =
