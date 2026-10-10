@@ -1,0 +1,13 @@
+a enum u8 {
+	a = 0,
+	b = 1,
+};
+
+let b = .a == enum.c;
+
+c switch .a {
+	enum.a => u8,
+	enum.b => u8,
+	enum.c => u8,
+	_ => u8,
+};

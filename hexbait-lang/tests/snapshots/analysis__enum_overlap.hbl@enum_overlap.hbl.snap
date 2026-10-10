@@ -1,0 +1,25 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "a enum u8 {\n\ta = 0,\n\tb = 0,\n};\n\nb enum u8 {\n\ta = 42,\n\tb = 0..=255,\n};\n"
+input_file: hexbait-lang/tests/analysis-cases/enum_overlap.hbl
+---
+error: overlapping enum value is not allowed
+  ┌─ enum_overlap.hbl:3:6
+  │
+1 │ a enum u8 {
+2 │     a = 0,
+  │         - overlaps with this value
+3 │     b = 0,
+  │         ^ overlapping enum value
+4 │ };
+
+
+error: overlapping enum value is not allowed
+  ┌─ enum_overlap.hbl:8:6
+  │
+6 │ b enum u8 {
+7 │     a = 42,
+  │         -- overlaps with this value
+8 │     b = 0..=255,
+  │         ^^^^^^^ overlapping enum value
+9 │ };

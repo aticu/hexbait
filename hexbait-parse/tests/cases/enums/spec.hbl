@@ -1,0 +1,32 @@
+e enum u8 {
+	zero = 0,
+	one = 1,
+	other = 2..=254,
+};
+
+let is_zero = .e == enum.zero;
+let eq_one = .e == 1;
+let is_other = .e == enum.other;
+
+e2 enum u8 {
+	zero = 0,
+	one = 1,
+	other = 2..=253,
+};
+
+let eq = .e == .e2;
+
+s switch .e2 {
+	enum.zero => {
+		let x = 0;
+	},
+	enum.one => {
+		let x = 1;
+	},
+	enum.other => {
+		let x = 3;
+	},
+	_ => {
+		let x = 4;
+	}
+};

@@ -1,0 +1,59 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\ne enum u8 {\n\tzero = 0,\n\tone = 1,\n\tother = 2..=254,\n};\n\nlet is_zero = .e == enum.zero;\nlet eq_one = .e == 1;\nlet is_other = .e == enum.other;\n\ne2 enum u8 {\n\tzero = 0,\n\tone = 1,\n\tother = 2..=253,\n};\n\nlet eq = .e == .e2;\n\ns switch .e2 {\n\tenum.zero => {\n\t\tlet x = 0;\n\t},\n\tenum.one => {\n\t\tlet x = 1;\n\t},\n\tenum.other => {\n\t\tlet x = 3;\n\t},\n\t_ => {\n\t\tlet x = 4;\n\t}\n};\n\n\n=== Hex ===\n03 04\n"
+input_file: hexbait-parse/tests/cases/enums/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "e": {
+        "value": {
+          "raw": {
+            "value": 3,
+            "provenance": "0..=0"
+          },
+          "variant": "other"
+        },
+        "provenance": "0..=0"
+      },
+      "is_zero": {
+        "value": false,
+        "provenance": "0..=0"
+      },
+      "eq_one": {
+        "value": false,
+        "provenance": "0..=0"
+      },
+      "is_other": {
+        "value": true,
+        "provenance": "0..=0"
+      },
+      "e2": {
+        "value": {
+          "raw": {
+            "value": 4,
+            "provenance": "1..=1"
+          },
+          "variant": "other"
+        },
+        "provenance": "1..=1"
+      },
+      "eq": {
+        "value": true,
+        "provenance": "0..=1"
+      },
+      "s": {
+        "value": {
+          "x": {
+            "value": 3,
+            "provenance": ""
+          }
+        },
+        "provenance": ""
+      }
+    },
+    "provenance": "0..=1"
+  },
+  "errors": [],
+  "warnings": []
+}

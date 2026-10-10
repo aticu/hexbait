@@ -1,0 +1,29 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "a enum u8 {\n\ta = 0,\n\tb = 1,\n};\n\nlet b = .a == enum.c;\n\nc switch .a {\n\tenum.a => u8,\n\tenum.b => u8,\n\tenum.c => u8,\n\t_ => u8,\n};\n"
+input_file: hexbait-lang/tests/analysis-cases/enum_unknown_name.hbl
+---
+error: binary operator `==` cannot be applied to `enum value` and `enum literal`
+  ┌─ enum_unknown_name.hbl:6:9
+  │
+5 │ 
+6 │ let b = .a == enum.c;
+  │         ^^^^^^^^^^^^
+  │         │     │
+  │         │     right type
+  │         unsupported comparison
+  │         left type
+7 │ 
+  │
+  = help: enum variant is unknown
+
+
+error: `switch` branch literal cannot be compared to the scrutinee
+   ┌─ enum_unknown_name.hbl:11:2
+   │
+10 │     enum.b => u8,
+11 │     enum.c => u8,
+   │     ^^^^^^ cannot be compared to scrutinee
+12 │     _ => u8,
+   │
+   = help: enum variant is unknown
