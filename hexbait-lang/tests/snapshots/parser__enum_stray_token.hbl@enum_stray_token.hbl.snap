@@ -1,0 +1,87 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "a enum u8 { A = 0 ) };\nb enum u8 { A = 0 ], B = 1 };\nc u8;\n"
+input_file: hexbait-lang/tests/parser-cases/enum_stray_token.hbl
+---
+File@0..59
+  StructField@0..22
+    Identifier@0..1 "a"
+    Whitespace@1..2 " "
+    EnumParseType@2..21
+      EnumKw@2..6 "enum"
+      Whitespace@6..7 " "
+      NamedParseType@7..9
+        Identifier@7..9 "u8"
+      Whitespace@9..10 " "
+      LBrace@10..11 "{"
+      Whitespace@11..12 " "
+      EnumParseTypeArm@12..19
+        Identifier@12..13 "A"
+        Whitespace@13..14 " "
+        Equals@14..15 "="
+        Whitespace@15..16 " "
+        Atom@16..17
+          DecimalIntegerLiteral@16..17 "0"
+        Whitespace@17..18 " "
+        Error@18..19
+          RParen@18..19 ")"
+      Whitespace@19..20 " "
+      RBrace@20..21 "}"
+    Semicolon@21..22 ";"
+  Whitespace@22..23 "\n"
+  StructField@23..52
+    Identifier@23..24 "b"
+    Whitespace@24..25 " "
+    EnumParseType@25..51
+      EnumKw@25..29 "enum"
+      Whitespace@29..30 " "
+      NamedParseType@30..32
+        Identifier@30..32 "u8"
+      Whitespace@32..33 " "
+      LBrace@33..34 "{"
+      Whitespace@34..35 " "
+      EnumParseTypeArm@35..49
+        Identifier@35..36 "A"
+        Whitespace@36..37 " "
+        Equals@37..38 "="
+        Whitespace@38..39 " "
+        Atom@39..40
+          DecimalIntegerLiteral@39..40 "0"
+        Whitespace@40..41 " "
+        Error@41..49
+          RBracket@41..42 "]"
+          Comma@42..43 ","
+          Whitespace@43..44 " "
+          Identifier@44..45 "B"
+          Whitespace@45..46 " "
+          Equals@46..47 "="
+          Whitespace@47..48 " "
+          DecimalIntegerLiteral@48..49 "1"
+      Whitespace@49..50 " "
+      RBrace@50..51 "}"
+    Semicolon@51..52 ";"
+  Whitespace@52..53 "\n"
+  StructField@53..58
+    Identifier@53..54 "c"
+    Whitespace@54..55 " "
+    NamedParseType@55..57
+      Identifier@55..57 "u8"
+    Semicolon@57..58 ";"
+  Whitespace@58..59 "\n"
+
+--- diagnostics ---
+error: expected `,` or `}`
+  ┌─ enum_stray_token.hbl:1:19
+  │
+1 │ a enum u8 { A = 0 ) };
+  │                   ^ found unexpected token `)`
+2 │ b enum u8 { A = 0 ], B = 1 };
+
+
+error: expected `,` or `}`
+  ┌─ enum_stray_token.hbl:2:19
+  │
+1 │ a enum u8 { A = 0 ) };
+2 │ b enum u8 { A = 0 ], B = 1 };
+  │                   ^ found unexpected token `]`
+3 │ c u8;

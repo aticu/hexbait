@@ -2,7 +2,11 @@
 
 pub(crate) use expressions::expr;
 
-use crate::compile::{lexer::TokenKind, syntax::NodeKind};
+use crate::compile::{
+    lexer::TokenKind,
+    parser::implementation::expressions::EXPR_FIRST,
+    syntax::{NodeKind, TokenKindSet},
+};
 
 use super::infrastructure::Parser;
 
@@ -20,6 +24,14 @@ pub(crate) fn root(p: &mut Parser) {
         NodeKind::File
     });
 }
+
+/// The tokens that can start struct content (see [`struct_content`]).
+const STRUCT_CONTENT_FIRST: TokenKindSet = TokenKindSet::of(&[
+    TokenKind::StructKw,
+    TokenKind::LetKw,
+    TokenKind::ExclamationMark,
+    TokenKind::Identifier,
+]);
 
 /// Parses the content of a struct.
 fn struct_content(p: &mut Parser) {
@@ -40,7 +52,7 @@ fn struct_block(p: &mut Parser) {
     p.node(|p| {
         p.expect(TokenKind::LBrace);
         p.with_consuming_recovery(TokenKind::RBrace, |p| {
-            while !p.at_recovery_token() {
+            while p.at_list_item(STRUCT_CONTENT_FIRST) {
                 p.ensure_progress(|p| {
                     struct_content(p);
                 });
@@ -340,7 +352,7 @@ fn parse_type_raw(p: &mut Parser, nested: bool) {
             p.expect(TokenKind::LBrace);
             p.with_consuming_recovery(TokenKind::RBrace, |p| {
                 p.with_consuming_recovery(TokenKind::Underscore, |p| {
-                    while !p.at_recovery_token() {
+                    while p.at_list_item(EXPR_FIRST) {
                         p.ensure_progress(|p| {
                             p.node(|p| {
                                 p.with_consuming_recovery(TokenKind::Comma, |p| {
@@ -372,7 +384,7 @@ fn parse_type_raw(p: &mut Parser, nested: bool) {
             nested_parse_type(p);
             p.expect(TokenKind::LBrace);
             p.with_consuming_recovery(TokenKind::RBrace, |p| {
-                while !p.at_recovery_token() {
+                while p.at_list_item(TokenKindSet::from(TokenKind::Identifier)) {
                     p.ensure_progress(|p| {
                         p.node(|p| {
                             p.with_unconsuming_recovery(TokenKind::Comma, |p| {
@@ -388,8 +400,11 @@ fn parse_type_raw(p: &mut Parser, nested: bool) {
                                 }
                             });
 
-                            if !p.at_recovery_token() {
-                                p.expect(TokenKind::Comma);
+                            if p.at(TokenKind::Comma) {
+                                p.bump();
+                            } else if !p.at_recovery_token() {
+                                p.expect_error(&["`,`", "`}`"]);
+                                p.recover();
                             }
 
                             NodeKind::EnumParseTypeArm

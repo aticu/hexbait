@@ -1,0 +1,50 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "a enum u8 { A = 0, B = 1;\nb u8;\n"
+input_file: hexbait-lang/tests/parser-cases/enum_missing_brace.hbl
+---
+File@0..32
+  StructField@0..25
+    Identifier@0..1 "a"
+    Whitespace@1..2 " "
+    EnumParseType@2..24
+      EnumKw@2..6 "enum"
+      Whitespace@6..7 " "
+      NamedParseType@7..9
+        Identifier@7..9 "u8"
+      Whitespace@9..10 " "
+      LBrace@10..11 "{"
+      Whitespace@11..12 " "
+      EnumParseTypeArm@12..18
+        Identifier@12..13 "A"
+        Whitespace@13..14 " "
+        Equals@14..15 "="
+        Whitespace@15..16 " "
+        Atom@16..17
+          DecimalIntegerLiteral@16..17 "0"
+        Comma@17..18 ","
+      Whitespace@18..19 " "
+      EnumParseTypeArm@19..24
+        Identifier@19..20 "B"
+        Whitespace@20..21 " "
+        Equals@21..22 "="
+        Whitespace@22..23 " "
+        Atom@23..24
+          DecimalIntegerLiteral@23..24 "1"
+    Semicolon@24..25 ";"
+  Whitespace@25..26 "\n"
+  StructField@26..31
+    Identifier@26..27 "b"
+    Whitespace@27..28 " "
+    NamedParseType@28..30
+      Identifier@28..30 "u8"
+    Semicolon@30..31 ";"
+  Whitespace@31..32 "\n"
+
+--- diagnostics ---
+error: expected `}`
+  ┌─ enum_missing_brace.hbl:1:25
+  │
+1 │ a enum u8 { A = 0, B = 1;
+  │                         ^ found unexpected token `;`
+2 │ b u8;

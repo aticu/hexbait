@@ -211,6 +211,17 @@ impl TokenKindSet {
         TokenKindSet(1 << (value as u16))
     }
 
+    /// Creates a set containing all the given token kinds.
+    pub const fn of(kinds: &[TokenKind]) -> TokenKindSet {
+        let mut set = TokenKindSet::empty();
+        let mut i = 0;
+        while i < kinds.len() {
+            set = set.union(TokenKindSet::from(kinds[i]));
+            i += 1;
+        }
+        set
+    }
+
     /// Computes the union of this set and the other set.
     pub const fn union(self, other: TokenKindSet) -> TokenKindSet {
         TokenKindSet(self.0 | other.0)

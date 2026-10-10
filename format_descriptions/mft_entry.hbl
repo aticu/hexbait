@@ -134,7 +134,12 @@ let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .heade
                                 file_attribute_flags u32;
                                 extended_data u32;
                                 name_string_size u8;
-                                namespace u8;
+                                namespace enum u8 {
+                                    POSIX = 0,
+                                    FILE_NAME_NTFS = 1,
+                                    FILE_NAME_DOS = 2,
+                                    DOS_WINDOWS = 3,
+                                };
                                 name bytes len .name_string_size * 2;
                             },
                             enum.INDEX_ROOT => {

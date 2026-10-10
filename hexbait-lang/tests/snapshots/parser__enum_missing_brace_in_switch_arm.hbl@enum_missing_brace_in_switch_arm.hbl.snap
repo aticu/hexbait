@@ -1,0 +1,109 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "a switch 0 {\n\t0 => enum u8 { A = 0, B = 1,\n\t1 => u16,\n\t_ => {},\n};\nb u8;\n"
+input_file: hexbait-lang/tests/parser-cases/enum_missing_brace_in_switch_arm.hbl
+---
+File@0..73
+  StructField@0..66
+    Identifier@0..1 "a"
+    Whitespace@1..2 " "
+    SwitchParseType@2..65
+      SwitchKw@2..8 "switch"
+      Whitespace@8..9 " "
+      Atom@9..10
+        DecimalIntegerLiteral@9..10 "0"
+      Whitespace@10..11 " "
+      LBrace@11..12 "{"
+      Whitespace@12..14 "\n\t"
+      SwitchParseTypeArm@14..53
+        Atom@14..15
+          DecimalIntegerLiteral@14..15 "0"
+        Whitespace@15..16 " "
+        Equals@16..17 "="
+        RAngle@17..18 ">"
+        Whitespace@18..19 " "
+        EnumParseType@19..52
+          EnumKw@19..23 "enum"
+          Whitespace@23..24 " "
+          NamedParseType@24..26
+            Identifier@24..26 "u8"
+          Whitespace@26..27 " "
+          LBrace@27..28 "{"
+          Whitespace@28..29 " "
+          EnumParseTypeArm@29..35
+            Identifier@29..30 "A"
+            Whitespace@30..31 " "
+            Equals@31..32 "="
+            Whitespace@32..33 " "
+            Atom@33..34
+              DecimalIntegerLiteral@33..34 "0"
+            Comma@34..35 ","
+          Whitespace@35..36 " "
+          EnumParseTypeArm@36..42
+            Identifier@36..37 "B"
+            Whitespace@37..38 " "
+            Equals@38..39 "="
+            Whitespace@39..40 " "
+            Atom@40..41
+              DecimalIntegerLiteral@40..41 "1"
+            Comma@41..42 ","
+          Whitespace@42..44 "\n\t"
+          EnumParseTypeArm@44..52
+            Atom@44..45
+              DecimalIntegerLiteral@44..45 "1"
+            Whitespace@45..46 " "
+            Error@46..52
+              Equals@46..47 "="
+              RAngle@47..48 ">"
+              Whitespace@48..49 " "
+              Identifier@49..52 "u16"
+        Comma@52..53 ","
+      Whitespace@53..55 "\n\t"
+      Underscore@55..56 "_"
+      Whitespace@56..57 " "
+      Equals@57..58 "="
+      RAngle@58..59 ">"
+      Whitespace@59..60 " "
+      AnonymousStructParseType@60..62
+        StructBlock@60..62
+          LBrace@60..61 "{"
+          RBrace@61..62 "}"
+      Comma@62..63 ","
+      Whitespace@63..64 "\n"
+      RBrace@64..65 "}"
+    Semicolon@65..66 ";"
+  Whitespace@66..67 "\n"
+  StructField@67..72
+    Identifier@67..68 "b"
+    Whitespace@68..69 " "
+    NamedParseType@69..71
+      Identifier@69..71 "u8"
+    Semicolon@71..72 ";"
+  Whitespace@72..73 "\n"
+
+--- diagnostics ---
+error: expected identifier
+  ┌─ enum_missing_brace_in_switch_arm.hbl:3:2
+  │
+2 │     0 => enum u8 { A = 0, B = 1,
+3 │     1 => u16,
+  │     ^ found unexpected token decimal integer
+4 │     _ => {},
+
+
+error: expected `,` or `}`
+  ┌─ enum_missing_brace_in_switch_arm.hbl:3:4
+  │
+2 │     0 => enum u8 { A = 0, B = 1,
+3 │     1 => u16,
+  │       ^ found unexpected token `=`
+4 │     _ => {},
+
+
+error: expected `}`
+  ┌─ enum_missing_brace_in_switch_arm.hbl:3:10
+  │
+2 │     0 => enum u8 { A = 0, B = 1,
+3 │     1 => u16,
+  │             ^ found unexpected token `,`
+4 │     _ => {},

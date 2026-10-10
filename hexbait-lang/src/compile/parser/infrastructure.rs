@@ -156,6 +156,16 @@ impl<'src> Parser<'src> {
             .unwrap_or(true) // EOF always implicitly recovers
     }
 
+    /// Checks if a list should continue with another item at the current token.
+    ///
+    /// Tokens that can start an item belong to the list, even if an enclosing construct would
+    /// recover at them. The recovery set is only consulted for tokens the list cannot use.
+    /// Tokens that are neither still continue the list, so the item can report and recover from
+    /// the error.
+    pub(crate) fn at_list_item(&self, first: TokenKindSet) -> bool {
+        self.cur().is_some_and(|t| first.contains(t)) || !self.at_recovery_token()
+    }
+
     /// Checks if the parser is currently at the given contextual keyword.
     pub(crate) fn at_contextual_kw(&self, kw: &str) -> bool {
         self.at(TokenKind::Identifier) && self.peek().next().map(|t| t.text) == Some(kw)

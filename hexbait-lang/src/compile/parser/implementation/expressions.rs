@@ -5,10 +5,34 @@ use crate::compile::{
     diagnostics::Label,
     lexer::TokenKind,
     parser::infrastructure::{CompletedMarker, Parser},
-    syntax::NodeKind,
+    syntax::{NodeKind, TokenKindSet},
 };
 
 use super::nested_parse_type;
+
+/// The tokens that can start an expression (see [`atom`] and [`PrefixOp::peek`]).
+pub(crate) const EXPR_FIRST: TokenKindSet = TokenKindSet::of(&[
+    // atoms
+    TokenKind::Identifier,
+    TokenKind::BinaryIntegerLiteral,
+    TokenKind::OctalIntegerLiteral,
+    TokenKind::DecimalIntegerLiteral,
+    TokenKind::HexadecimalIntegerLiteral,
+    TokenKind::TrueKw,
+    TokenKind::FalseKw,
+    TokenKind::StringLiteral,
+    TokenKind::Dollar,
+    TokenKind::Dot,
+    TokenKind::EnumKw,
+    TokenKind::PeekKw,
+    TokenKind::ConcatKw,
+    TokenKind::LAngle,
+    TokenKind::LParen,
+    // prefix operators
+    TokenKind::Minus,
+    TokenKind::Plus,
+    TokenKind::ExclamationMark,
+]);
 
 /// Consumes the tokens of a metavariable, but does not wrap them in a `Metavar` node.
 fn metavar_raw(p: &mut Parser) {
