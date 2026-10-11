@@ -18,7 +18,7 @@ use hexbait_lang::{
 
 use crate::{
     gui::diagnostic_emitter::emit_diagnostics,
-    marking::{MarkStore, MarkType},
+    marking::MarkStore,
     state::{ParseType, ScrollState, Settings, State},
     window::Window,
 };
@@ -94,13 +94,6 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
         &mut state.parse_state.sync_parse_offset_to_selection_start,
         "Sync parse offset to selection start",
     );
-
-    state
-        .marked_locations
-        .clear_marks_of_type(MarkType::HoveredParsed);
-    state
-        .marked_locations
-        .clear_marks_of_type(MarkType::HoveredParseErr);
 
     let ir;
     let parse_type = 'parse_type: {
