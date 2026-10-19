@@ -7,7 +7,7 @@ use hexbait_common::{Len, ReadBytes, RelativeOffset};
 use crate::{
     Int,
     compile::ir::{
-        EnumInfo, Lit, Symbol,
+        EnumInfo, FlagsInfo, Lit, Symbol,
         path::{Path, PathComponent},
     },
     eval::{View, parse::DiagnosticId},
@@ -72,6 +72,17 @@ pub enum ValueKind {
         /// The information about the enum variants.
         enum_info: Arc<EnumInfo>,
     },
+    /// A flags value.
+    FlagsValue(FlagsValue),
+}
+
+/// A flags value.
+#[derive(Clone)]
+pub struct FlagsValue {
+    /// The raw integer value.
+    pub raw: Int,
+    /// The information about the flags.
+    pub flags_info: Arc<FlagsInfo>,
 }
 
 impl fmt::Debug for ValueKind {
@@ -155,6 +166,32 @@ impl fmt::Debug for ValueKind {
                     write!(f, "{name} ({raw}, -0x{:x})", -raw)?;
                 } else {
                     write!(f, "{name} ({raw}, 0x{raw:x})")?;
+                }
+
+                Ok(())
+            }
+            Self::FlagsValue(FlagsValue { raw, flags_info }) => {
+                let mut iter = flags_info.iter(raw);
+                let mut first = true;
+
+                for name in &mut iter {
+                    if !first {
+                        write!(f, " | ")?;
+                    }
+                    write!(f, "{}", name.inner.as_str())?;
+                    first = false;
+                }
+
+                if iter.remaining() != 0 {
+                    if !first {
+                        write!(f, " | ")?;
+                    }
+                    write!(f, "0x{:x}", iter.remaining())?;
+                    first = false;
+                }
+
+                if first {
+                    write!(f, "0x0")?;
                 }
 
                 Ok(())

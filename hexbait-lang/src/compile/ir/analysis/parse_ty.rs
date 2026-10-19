@@ -8,7 +8,7 @@ use crate::compile::{
     Diagnostic, Span,
     diagnostics::Label,
     ir::{
-        BinOp, EnumInfo, EnumVariantKind, Expr, ExprKind, Lit, ParseType, ParseTypeKind,
+        BinOp, EnumInfo, EnumVariantKind, Expr, ExprKind, FlagsInfo, Lit, ParseType, ParseTypeKind,
         RepeatKind, Repetition, Spanned, StructContent, Symbol,
         analysis::{
             AnalysisCtx, Env,
@@ -45,6 +45,10 @@ impl Env<'_> {
                     backing_type,
                     enum_info,
                 } => self.check_enum_parse_ty(ctx, backing_type, enum_info),
+                ParseTypeKind::Flags {
+                    backing_type,
+                    flags_info,
+                } => self.check_flags_parse_ty(ctx, backing_type, flags_info),
                 ParseTypeKind::Error => {
                     assert!(ctx.diagnostics.contains_errors());
                     TyKind::Error
@@ -347,8 +351,41 @@ impl Env<'_> {
             }
         }
 
-        TyKind::EnumVal {
-            enum_info: Arc::clone(enum_info),
+        let variants = enum_info
+            .variants
+            .iter()
+            .map(|variant| (variant.name.inner.clone(), variant.name.span))
+            .collect();
+        TyKind::EnumVal { variants }
+    }
+
+    /// Checks a flags parse type.
+    fn check_flags_parse_ty(
+        &self,
+        ctx: &mut AnalysisCtx,
+        backing_type: &ParseType,
+        flags_info: &Arc<FlagsInfo>,
+    ) -> TyKind {
+        let backing_ty = self.check_parse_type(ctx, backing_type);
+        if !matches!(
+            &backing_ty.kind,
+            TyKind::Int {
+                non_negative: true,
+                ..
+            }
+        ) {
+            return ctx.ty_err(
+                "expected enum backing type to be a positive integer",
+                &backing_ty,
+                backing_type.span,
+            );
         }
+
+        let flags = flags_info
+            .flags
+            .values()
+            .map(|flag| (flag.inner.clone(), flag.span))
+            .collect();
+        TyKind::FlagsVal { flags }
     }
 }

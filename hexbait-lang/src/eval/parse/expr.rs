@@ -181,7 +181,7 @@ impl ParseContext {
             ExprKind::FieldAccess { struct_ref, field } => {
                 let struct_ref = struct_ctx.eval_struct_ref(struct_ref, additional_ctx.last);
 
-                Ok(struct_ref.field(&field.inner).clone())
+                Ok(struct_ref.field(&field.inner))
             }
             ExprKind::Peek { ty, offset } => {
                 let mut cursor = if let Some(offset_expr) = offset {

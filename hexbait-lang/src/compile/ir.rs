@@ -1,6 +1,10 @@
 //! Implements an intermediate representation the hexbait language.
 
-use std::{fmt, sync::Arc};
+use std::{
+    collections::{BTreeMap, btree_map},
+    fmt,
+    sync::Arc,
+};
 
 use hexbait_common::Endianness;
 use smol_str::SmolStr;
@@ -34,6 +38,12 @@ impl fmt::Debug for Symbol {
 impl From<SyntaxToken> for Symbol {
     fn from(token: SyntaxToken) -> Self {
         Symbol(token.text().into())
+    }
+}
+
+impl From<&str> for Symbol {
+    fn from(value: &str) -> Self {
+        Symbol(value.into())
     }
 }
 
@@ -278,6 +288,15 @@ pub enum ParseTypeKind {
         /// This is an [`Arc`] to allow values to cheaply clone it and reference it too.
         enum_info: Arc<EnumInfo>,
     },
+    /// Parses an interger and maps its bits to flags.
+    Flags {
+        /// The backing integer type of the flags.
+        backing_type: Box<ParseType>,
+        /// The info that is attached to the parsed integer value.
+        ///
+        /// This is an [`Arc`] to allow values to cheaply clone it and reference it too.
+        flags_info: Arc<FlagsInfo>,
+    },
     /// A parse type that contained an error during parsing.
     Error,
 }
@@ -322,6 +341,53 @@ pub enum EnumVariantKind {
         /// The end of the range (inclusive).
         end: Int,
     },
+}
+
+/// The information about a flags type.
+#[derive(Debug)]
+pub struct FlagsInfo {
+    /// The flag values.
+    pub flags: BTreeMap<u128, Spanned<Symbol>>,
+}
+
+impl FlagsInfo {
+    /// Returns an iterator over the flags.
+    pub fn iter(&self, flags: &Int) -> FlagsIter<'_> {
+        FlagsIter {
+            raw: u128::try_from(flags).unwrap(),
+            iter: self.flags.iter(),
+        }
+    }
+}
+
+/// An iterator over flags.
+pub struct FlagsIter<'info> {
+    /// The remaining raw value.
+    raw: u128,
+    /// The iterator over the flags.
+    iter: btree_map::Iter<'info, u128, Spanned<Symbol>>,
+}
+
+impl FlagsIter<'_> {
+    /// The remaining value.
+    pub fn remaining(&self) -> u128 {
+        self.raw
+    }
+}
+
+impl<'info> Iterator for FlagsIter<'info> {
+    type Item = &'info Spanned<Symbol>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for (mask, name) in &mut self.iter {
+            if mask & self.raw != 0 {
+                self.raw &= !mask;
+                return Some(name);
+            }
+        }
+
+        None
+    }
 }
 
 /// The type of a repetition of a repeating parse type.

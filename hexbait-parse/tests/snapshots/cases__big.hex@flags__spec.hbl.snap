@@ -1,0 +1,41 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\n!endian le;\n\nis_big u8;\n\n!if .is_big == 0 {\n\tflags flags u8 {\n\t\ta = bit 0,\n\t\tb = bit 7\n\t};\n} else {\n\tflags flags u16 {\n\t\ta = bit 0,\n\t\tb = bit 7,\n\t\tc = 0x100\n\t};\n}\n\nlet a_set = .flags.a;\nlet b_set = .flags.b;\n\n\n=== Hex ===\n01 ff ff\n"
+input_file: hexbait-parse/tests/cases/flags/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "is_big": {
+        "value": 1,
+        "provenance": "0..=0"
+      },
+      "flags": {
+        "value": {
+          "raw": {
+            "value": 65535,
+            "provenance": "1..=2"
+          },
+          "set_flags": [
+            "a",
+            "b",
+            "c"
+          ],
+          "remaining": 65150
+        },
+        "provenance": "1..=2"
+      },
+      "a_set": {
+        "value": true,
+        "provenance": "1..=2"
+      },
+      "b_set": {
+        "value": true,
+        "provenance": "1..=2"
+      }
+    },
+    "provenance": "0..=2"
+  },
+  "errors": [],
+  "warnings": []
+}

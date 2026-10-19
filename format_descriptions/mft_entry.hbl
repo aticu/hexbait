@@ -11,7 +11,12 @@ header {
     sequence_number u16;
     reference_count u16;
     first_attribute u16;
-    entry_flags u16;
+    entry_flags flags u16 {
+        IN_USE = 0x0001,
+        IS_DIRECTORY = 0x0002,
+        IN_EXTEND = 0x0004,
+        IS_VIEW_INDEX = 0x0008,
+    };
     used_entry_size u32;
     total_entry_size u32;
     base_record_file_reference u64;
@@ -93,7 +98,11 @@ let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .heade
             name_size u8;
             name_offset u16;
             let name = peek(bytes len .name_size * 2 at .name_offset);
-            attribute_data_flags u16;
+            attribute_data_flags flags u16 {
+                COMPRESSED = 0x0001,
+                ENCRYPTED = 0x4000,
+                SPARSE = 0x8000,
+            };
             attribute_identifier u16;
 
             content switch .nonresident {
@@ -110,7 +119,25 @@ let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .heade
                                 modification_time u64;
                                 changed_time u64;
                                 access_time u64;
-                                file_attribute_flags u32;
+                                file_attribute_flags flags u32 {
+                                    READONLY = 0x00000001,
+                                    HIDDEN = 0x00000002,
+                                    SYSTEM = 0x00000004,
+                                    VOLUME = 0x00000008,
+                                    DIRECTORY = 0x00000010,
+                                    ARCHIVE = 0x00000020,
+                                    DEVICE = 0x00000040,
+                                    NORMAL = 0x00000080,
+                                    TEMPORARY = 0x00000100,
+                                    SPARSE_FILE = 0x00000200,
+                                    REPARSE_POINT = 0x00000400,
+                                    COMPRESSED = 0x00000800,
+                                    OFFLINE = 0x00001000,
+                                    NOT_CONTENT_INDEXED = 0x00002000,
+                                    ENCRYPTED = 0x00004000,
+                                    VIRTUAL = 0x00010000,
+                                    INDEX_VIEW = 0x20000000,
+                                };
                                 maximum_number_of_versions u32;
                                 version_number u32;
                                 class_identifier u32;
@@ -131,7 +158,25 @@ let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .heade
                                 access_time u64;
                                 allocated_file_size u64;
                                 file_size u64;
-                                file_attribute_flags u32;
+                                file_attribute_flags flags u32 {
+                                    READONLY = 0x00000001,
+                                    HIDDEN = 0x00000002,
+                                    SYSTEM = 0x00000004,
+                                    VOLUME = 0x00000008,
+                                    DIRECTORY = 0x00000010,
+                                    ARCHIVE = 0x00000020,
+                                    DEVICE = 0x00000040,
+                                    NORMAL = 0x00000080,
+                                    TEMPORARY = 0x00000100,
+                                    SPARSE_FILE = 0x00000200,
+                                    REPARSE_POINT = 0x00000400,
+                                    COMPRESSED = 0x00000800,
+                                    OFFLINE = 0x00001000,
+                                    NOT_CONTENT_INDEXED = 0x00002000,
+                                    ENCRYPTED = 0x00004000,
+                                    VIRTUAL = 0x00010000,
+                                    INDEX_VIEW = 0x20000000,
+                                };
                                 extended_data u32;
                                 name_string_size u8;
                                 namespace enum u8 {
@@ -151,7 +196,9 @@ let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .heade
                                     index_values_offset u32;
                                     index_node_size u32;
                                     allocated_index_node_size u32;
-                                    index_node_flags u32;
+                                    index_node_flags flags u32 {
+                                        BRANCH = 0x00000001,
+                                    };
                                 };
                             },
                             _ => bytes len .data_size,

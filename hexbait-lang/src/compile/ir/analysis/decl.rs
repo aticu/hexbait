@@ -213,6 +213,7 @@ impl Env<'_> {
             | TyKind::Int { .. }
             | TyKind::EnumLit { .. }
             | TyKind::EnumVal { .. }
+            | TyKind::FlagsVal { .. }
             | TyKind::Bytes
             | TyKind::Array { .. } => unreachable!(),
         };

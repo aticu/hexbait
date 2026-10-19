@@ -21,6 +21,7 @@ use crate::{
             static_analysis_impossible,
             struct_context::StructContext,
         },
+        value::FlagsValue,
     },
 };
 
@@ -256,6 +257,20 @@ impl ParseContext {
                         raw: val.kind.expect_int_take(),
                         enum_info: Arc::clone(enum_info),
                     },
+                    provenance: val.provenance,
+                }
+            }
+            ParseTypeKind::Flags {
+                backing_type,
+                flags_info,
+            } => {
+                let val = self.eval_parse_type(backing_type, cursor, struct_ctx)?;
+
+                Value {
+                    kind: ValueKind::FlagsValue(FlagsValue {
+                        raw: val.kind.expect_int_take(),
+                        flags_info: Arc::clone(flags_info),
+                    }),
                     provenance: val.provenance,
                 }
             }

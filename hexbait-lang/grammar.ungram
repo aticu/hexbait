@@ -127,6 +127,7 @@ ParseType =
 | AnonymousStructParseType
 | SwitchParseType
 | EnumParseType
+| FlagsParseType
 
 // Refers by name to a different parse type by name.
 // This includes signed and unsigned integer types (`uN` and `iN` where `N` is a number respectively).
@@ -180,6 +181,28 @@ EnumParseType =
 // The final `,` in only optional for the final value in the enum.
 EnumParseTypeArm =
   name:'ident' '=' start:Expr ( '..=' end:Expr )? ','?
+
+// The parse type of flags like `flags u16 { flag1 = 1, flag2 = bit 15, flag3 = 0x4 }`.
+// The flag can either be specified by its bit (0 being the LSB) or by a literal with a single bit set.
+FlagsParseType =
+  'flags' size:ParseType '{' FlagsParseTypeArm* '}'
+
+// A single flag description.
+FlagsParseTypeArm =
+  name:'ident' '=' kind:FlagsParseTypeArmKind ','?
+
+// The kind of the flag description.
+FlagsParseTypeArmKind =
+  FlagsParseTypeRawArm
+| FlagsParseTypeBitArm
+
+// A raw flag description like `0x80`.
+FlagsParseTypeRawArm =
+  Expr
+
+// A flag description by bit position like `bit 7`.
+FlagsParseTypeBitArm =
+  'bit' Expr
 
 // Declares how a parse type is repeating.
 RepeatDecl =

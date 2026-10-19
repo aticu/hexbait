@@ -113,6 +113,16 @@ pub enum NodeKind {
     EnumParseType,
     /// A single arm of an enum parse type.
     EnumParseTypeArm,
+    /// A flags parse type.
+    FlagsParseType,
+    /// A single arm of a flags parse type.
+    FlagsParseTypeArm,
+    /// The kind of a flags parse type arm.
+    FlagsParseTypeArmKind,
+    /// A raw flags parse type arm kind like `0x80`.
+    FlagsParseTypeRawArm,
+    /// A flags parse type arm kind specified by bit position like `bit 7`.
+    FlagsParseTypeBitArm,
 
     // Repeating types
     /// A repetition of a fixed number of elements.

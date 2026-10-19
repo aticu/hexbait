@@ -2,7 +2,10 @@
 
 use std::str::FromStr as _;
 
-use hexbait_lang::eval::{DiagnosticLevel, ParseResult, Provenance, StructContent, ValueKind};
+use hexbait_lang::eval::{
+    DiagnosticLevel, ParseResult, Provenance, StructContent,
+    ValueKind::{self},
+};
 use serde_json::{Map, Number, Value};
 
 /// Converts the given parse result to JSON.
@@ -159,6 +162,35 @@ fn value_to_json(value: &hexbait_lang::eval::Value, result: &ParseResult, detail
                 map.insert(
                     "variant".to_string(),
                     Value::String(variant.name.inner.as_str().to_string()),
+                );
+            }
+
+            Value::Object(map)
+        }
+        ValueKind::FlagsValue(flags_value) => {
+            let mut map = Map::new();
+            map.insert(
+                "raw".to_string(),
+                value_to_json(
+                    &hexbait_lang::eval::Value {
+                        kind: ValueKind::Integer(flags_value.raw.clone()),
+                        provenance: value.provenance.clone(),
+                    },
+                    result,
+                    detailed,
+                ),
+            );
+            let mut iter = flags_value.flags_info.iter(&flags_value.raw);
+            let mut flags = Vec::new();
+            for name in &mut iter {
+                flags.push(Value::String(name.inner.as_str().to_string()));
+            }
+            map.insert("set_flags".to_string(), Value::Array(flags));
+
+            if iter.remaining() != 0 {
+                map.insert(
+                    "remaining".to_string(),
+                    Value::Number(Number::from_u128(iter.remaining()).unwrap()),
                 );
             }
 

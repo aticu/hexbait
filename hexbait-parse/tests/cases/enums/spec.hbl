@@ -14,8 +14,6 @@ e2 enum u8 {
 	other = 2..=253,
 };
 
-let eq = .e == .e2;
-
 s switch .e2 {
 	enum.zero => {
 		let x = 0;

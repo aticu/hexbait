@@ -1,0 +1,28 @@
+a flags u8 {
+	a = 1,
+	a = 2,
+};
+
+b flags i8 {};
+
+c flags u8 {
+	a = 1,
+	b = 1
+};
+
+d flags u8 {
+	a = 8,
+	b = bit 3
+};
+
+e flags u8 {
+	a = 3,
+};
+
+f flags u8 {
+	a = bit 128
+};
+
+g flags u8 {
+	a = 0
+};

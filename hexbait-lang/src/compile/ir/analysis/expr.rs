@@ -1,5 +1,7 @@
 //! Implements analysis of expressions.
 
+use std::collections::HashMap;
+
 use num_traits::{Signed as _, Zero as _};
 
 use crate::compile::{
@@ -138,7 +140,12 @@ impl Env<'_> {
     ) -> TyKind {
         enum StructRef<'parent> {
             Env(&'parent Env<'parent>),
-            Finished { value: &'parent StructTy },
+            Finished {
+                value: &'parent StructTy,
+            },
+            Flags {
+                value: &'parent HashMap<Symbol, Span>,
+            },
         }
 
         let mut current = StructRef::Env(self);
@@ -163,18 +170,29 @@ impl Env<'_> {
                         ));
                         return TyKind::Error;
                     }
+                    StructRef::Flags { .. } => {
+                        ctx.add_diagnostic(Diagnostic::error(
+                            "cannot access parent of a flags value",
+                            Label::new("cannot access parent", part.span),
+                        ));
+                        return TyKind::Error;
+                    }
                 },
                 StructRefPart::Last => match &extra_ctx.while_repetition_ty {
                     Some(ty) => {
                         if i == 0 {
-                            if let TyKind::Struct { struct_ty } = &ty.kind {
-                                StructRef::Finished { value: struct_ty }
-                            } else {
-                                ctx.add_diagnostic(Diagnostic::error(
-                                    "field access on something that is not a `struct`",
-                                    Label::new("cannot access field", part.span),
-                                ));
-                                return TyKind::Error;
+                            match &ty.kind {
+                                TyKind::Struct { struct_ty } => {
+                                    StructRef::Finished { value: struct_ty }
+                                }
+                                TyKind::FlagsVal { flags } => StructRef::Flags { value: flags },
+                                _ => {
+                                    ctx.add_diagnostic(Diagnostic::error(
+                                        "field access on something that is not a `struct`",
+                                        Label::new("cannot access field", part.span),
+                                    ));
+                                    return TyKind::Error;
+                                }
                             }
                         } else {
                             ctx.add_diagnostic(Diagnostic::error(
@@ -196,6 +214,13 @@ impl Env<'_> {
                     let value = match current {
                         StructRef::Env(env) => &env.values,
                         StructRef::Finished { value } => value,
+                        StructRef::Flags { .. } => {
+                            ctx.add_diagnostic(Diagnostic::error(
+                                "cannot reference flags value as a struct",
+                                Label::new("this is not a struct", part.span),
+                            ));
+                            return TyKind::Error;
+                        }
                     };
 
                     let Some(field) = value.field(name) else {
@@ -234,14 +259,16 @@ impl Env<'_> {
                         }
                     }
 
-                    if let TyKind::Struct { struct_ty } = &field.ty.kind {
-                        StructRef::Finished { value: struct_ty }
-                    } else {
-                        ctx.add_diagnostic(Diagnostic::error(
-                            "field access on something that is not a `struct`",
-                            Label::new("cannot access field", part.span),
-                        ));
-                        return TyKind::Error;
+                    match &field.ty.kind {
+                        TyKind::Struct { struct_ty } => StructRef::Finished { value: struct_ty },
+                        TyKind::FlagsVal { flags } => StructRef::Flags { value: flags },
+                        _ => {
+                            ctx.add_diagnostic(Diagnostic::error(
+                                "field access on something that is not a `struct`",
+                                Label::new("cannot access field", part.span),
+                            ));
+                            return TyKind::Error;
+                        }
                     }
                 }
             };
@@ -250,6 +277,17 @@ impl Env<'_> {
         let value = match current {
             StructRef::Env(env) => &env.values,
             StructRef::Finished { value } => value,
+            StructRef::Flags { value } => {
+                if value.contains_key(&field.inner) {
+                    return TyKind::Bool;
+                } else {
+                    ctx.add_diagnostic(Diagnostic::error(
+                        "cannot access non-existant flag",
+                        Label::new("flag does not exist", field.span),
+                    ));
+                    return TyKind::Error;
+                }
+            }
         };
 
         let Some(resolved_field) = value.field(&field.inner) else {

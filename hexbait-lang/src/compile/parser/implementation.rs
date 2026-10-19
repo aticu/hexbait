@@ -334,6 +334,48 @@ fn parse_type_raw(p: &mut Parser, nested: bool) {
             struct_block(p);
             NodeKind::AnonymousStructParseType
         }
+        Some(TokenKind::Identifier)
+            if p.peek().next().map(|t| t.text) == Some("flags")
+                && p.peek().nth(2).map(|t| t.kind) == Some(TokenKind::LBrace) =>
+        {
+            p.bump();
+            nested_parse_type(p);
+            p.expect(TokenKind::LBrace);
+            p.with_consuming_recovery(TokenKind::RBrace, |p| {
+                while p.at_list_item(TokenKindSet::from(TokenKind::Identifier)) {
+                    p.ensure_progress(|p| {
+                        p.node(|p| {
+                            p.with_unconsuming_recovery(TokenKind::Comma, |p| {
+                                p.expect(TokenKind::Identifier);
+                                p.expect(TokenKind::Equals);
+
+                                p.node(|p| {
+                                    if p.at_contextual_kw("bit") {
+                                        p.bump();
+                                        expr(p);
+                                        NodeKind::FlagsParseTypeBitArm
+                                    } else {
+                                        expr(p);
+                                        NodeKind::FlagsParseTypeRawArm
+                                    }
+                                });
+                            });
+
+                            if p.at(TokenKind::Comma) {
+                                p.bump();
+                            } else if !p.at_recovery_token() {
+                                p.expect_error(&["`,`", "`}`"]);
+                                p.recover();
+                            }
+
+                            NodeKind::FlagsParseTypeArm
+                        });
+                    });
+                }
+            });
+
+            NodeKind::FlagsParseType
+        }
         Some(TokenKind::Identifier) => {
             p.expect(TokenKind::Identifier);
             NodeKind::NamedParseType

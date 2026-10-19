@@ -1,11 +1,8 @@
 //! Implements the types of the hexbait language.
 
-use std::{fmt, sync::Arc};
+use std::{collections::HashMap, fmt};
 
-use crate::compile::{
-    Span,
-    ir::{EnumInfo, Symbol},
-};
+use crate::compile::{Span, ir::Symbol};
 
 /// A type in the hexbait language.
 #[derive(Clone)]
@@ -31,6 +28,7 @@ impl Ty {
             | TyKind::Int { .. }
             | TyKind::EnumLit { .. }
             | TyKind::EnumVal { .. }
+            | TyKind::FlagsVal { .. }
             | TyKind::Bytes => false,
             TyKind::Struct { struct_ty: ty } => {
                 ty.fields.iter().any(|field| field.ty.contains_err())
@@ -51,7 +49,8 @@ impl Ty {
             TyKind::Bool | TyKind::Bytes => Ty::join_primitive(branches, &branches[0].kind),
             TyKind::Int { .. } => Ty::join_int(branches),
             TyKind::EnumLit { .. } => Ty::join_enum_lit(branches),
-            TyKind::EnumVal { .. } => TyKind::Error, // TODO: eventually implement this by checking the values but not the spans
+            TyKind::EnumVal { .. } => Ty::join_enum_val(branches),
+            TyKind::FlagsVal { .. } => Ty::join_flags_val(branches),
             TyKind::Struct { .. } => Ty::join_struct(branches, span, last_branch_is_missing_else),
             TyKind::Array { .. } => Ty::join_array(branches, span, last_branch_is_missing_else),
         };
@@ -253,6 +252,60 @@ impl Ty {
             Err(kind) => kind,
         }
     }
+
+    /// Joins multiple branches into an enum value type.
+    fn join_enum_val(branches: &[Ty]) -> TyKind {
+        let mut variants = match &branches.first().unwrap().kind {
+            TyKind::EnumVal { variants } => variants.clone(),
+            _ => unreachable!(),
+        };
+
+        match Ty::join_generic(branches, |ty| {
+            if let TyKind::EnumVal {
+                variants: branch_variants,
+            } = &ty.kind
+            {
+                for name in branch_variants.keys() {
+                    if !variants.contains_key(name) {
+                        variants.remove(name);
+                    }
+                }
+                true
+            } else {
+                false
+            }
+        }) {
+            Ok(()) => TyKind::EnumVal { variants },
+            Err(kind) => kind,
+        }
+    }
+
+    /// Joins multiple branches into an flags value type.
+    fn join_flags_val(branches: &[Ty]) -> TyKind {
+        let mut flags = match &branches.first().unwrap().kind {
+            TyKind::FlagsVal { flags } => flags.clone(),
+            _ => unreachable!(),
+        };
+
+        match Ty::join_generic(branches, |ty| {
+            if let TyKind::FlagsVal {
+                flags: branch_flags,
+            } = &ty.kind
+            {
+                for name in branch_flags.keys() {
+                    if !flags.contains_key(name) {
+                        flags.remove(name);
+                    }
+                }
+                true
+            } else {
+                false
+            }
+        }) {
+            Ok(()) => TyKind::FlagsVal { flags },
+            Err(kind) => kind,
+        }
+    }
 }
 
 /// The kind of a type in the hexbait language.
@@ -285,8 +338,13 @@ pub enum TyKind {
     },
     /// An enum value.
     EnumVal {
-        /// The info about the enum variants.
-        enum_info: Arc<EnumInfo>,
+        /// The names of the variants along with their definition spans.
+        variants: HashMap<Symbol, Span>,
+    },
+    /// A flags value.
+    FlagsVal {
+        /// The names of the flags along with their definition spans.
+        flags: HashMap<Symbol, Span>,
     },
     /// A bytes value.
     Bytes,
@@ -312,6 +370,7 @@ impl TyKind {
             TyKind::Int { .. } => TyName::Int,
             TyKind::EnumLit { .. } => TyName::EnumLit,
             TyKind::EnumVal { .. } => TyName::EnumVal,
+            TyKind::FlagsVal { .. } => TyName::FlagsVal,
             TyKind::Bytes => TyName::Bytes,
             TyKind::Struct { .. } => TyName::Struct,
             TyKind::Array { item_ty } => TyName::Array(Box::new(item_ty.name())),
@@ -329,18 +388,15 @@ impl TyKind {
             | (_, TyKind::Error)
             | (TyKind::Bool, TyKind::Bool)
             | (TyKind::Int { .. }, TyKind::Int { .. })
-            | (TyKind::EnumVal { .. }, TyKind::EnumVal { .. } | TyKind::Int { .. })
-            | (TyKind::EnumVal { .. } | TyKind::Int { .. }, TyKind::EnumVal { .. })
+            | (TyKind::EnumVal { .. }, TyKind::Int { .. })
+            | (TyKind::Int { .. }, TyKind::EnumVal { .. })
+            | (TyKind::FlagsVal { .. }, TyKind::Int { .. })
+            | (TyKind::Int { .. }, TyKind::FlagsVal { .. })
             | (TyKind::Bytes, TyKind::Bytes) => None,
-            (TyKind::EnumVal { enum_info }, TyKind::EnumLit { known_name })
-            | (TyKind::EnumLit { known_name }, TyKind::EnumVal { enum_info }) => {
+            (TyKind::EnumVal { variants }, TyKind::EnumLit { known_name })
+            | (TyKind::EnumLit { known_name }, TyKind::EnumVal { variants }) => {
                 if let Some(known_name) = known_name {
-                    if enum_info
-                        .variants
-                        .iter()
-                        .find(|variant| variant.name.inner.as_str() == known_name)
-                        .is_some()
-                    {
+                    if variants.contains_key(&Symbol::from(&**known_name)) {
                         None
                     } else {
                         Some(ComparisonUnsupportedReason::EnumVariantUnknown)
@@ -352,12 +408,16 @@ impl TyKind {
             (TyKind::EnumLit { .. }, _) | (_, TyKind::EnumLit { .. }) => {
                 Some(ComparisonUnsupportedReason::EnumLitsIncomparable)
             }
+            (TyKind::EnumVal { .. }, _) | (_, TyKind::EnumVal { .. }) => {
+                Some(ComparisonUnsupportedReason::EnumValOnlyIntAndLit)
+            }
+            (TyKind::FlagsVal { .. }, _) | (_, TyKind::FlagsVal { .. }) => {
+                Some(ComparisonUnsupportedReason::FlagsValOnlyInt)
+            }
             (TyKind::Bool, _)
             | (_, TyKind::Bool)
             | (TyKind::Int { .. }, _)
             | (_, TyKind::Int { .. })
-            | (TyKind::EnumLit { .. }, _)
-            | (_, TyKind::EnumLit { .. })
             | (TyKind::Bytes, _)
             | (_, TyKind::Bytes) => Some(ComparisonUnsupportedReason::DifferentTypes),
             (TyKind::Indeterminate { .. }, _)
@@ -450,6 +510,8 @@ pub enum TyName {
     EnumLit,
     /// An enum type.
     EnumVal,
+    /// A flags type.
+    FlagsVal,
 }
 
 impl fmt::Display for TyName {
@@ -463,6 +525,7 @@ impl fmt::Display for TyName {
             TyName::Array(ty_name) => write!(f, "[{ty_name}]"),
             TyName::EnumLit => write!(f, "enum literal"),
             TyName::EnumVal => write!(f, "enum value"),
+            TyName::FlagsVal => write!(f, "flags value"),
         }
     }
 }
@@ -475,6 +538,10 @@ pub enum ComparisonUnsupportedReason {
     IncomparableType,
     /// Enum literals are only comparable against enum values.
     EnumLitsIncomparable,
+    /// Enum values can only be compared to integers and enum literals.
+    EnumValOnlyIntAndLit,
+    /// Flags values can only be compared to integers.
+    FlagsValOnlyInt,
     /// The enum variant is unknown.
     EnumVariantUnknown,
 }
@@ -489,6 +556,15 @@ impl fmt::Display for ComparisonUnsupportedReason {
             }
             ComparisonUnsupportedReason::EnumLitsIncomparable => {
                 write!(f, "enum literals can only be compared to enum values")
+            }
+            ComparisonUnsupportedReason::EnumValOnlyIntAndLit => {
+                write!(
+                    f,
+                    "enum values can only be compared to enum literals and integers"
+                )
+            }
+            ComparisonUnsupportedReason::FlagsValOnlyInt => {
+                write!(f, "flags values can only be compared to integers")
             }
             ComparisonUnsupportedReason::EnumVariantUnknown => {
                 write!(f, "enum variant is unknown")

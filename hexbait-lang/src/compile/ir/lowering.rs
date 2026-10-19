@@ -1,6 +1,6 @@
 //! Implements lowering the AST to the IR.
 
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use crate::{
     Int,
@@ -9,8 +9,8 @@ use crate::{
         ast::{self, AstNode as _},
         diagnostics::Label,
         ir::{
-            Block, ConcatArg, DeclarationKind, EnumInfo, EnumVariant, EnumVariantKind, IfBlock,
-            IfChain, ParseTypeKind, Repetition, ScopeKind, StructContentKind, StructRef,
+            Block, ConcatArg, DeclarationKind, EnumInfo, EnumVariant, EnumVariantKind, FlagsInfo,
+            IfBlock, IfChain, ParseTypeKind, Repetition, ScopeKind, StructContentKind, StructRef,
             StructRefPart,
         },
         lexer::TokenKind,
@@ -293,56 +293,14 @@ impl LoweringCtx<'_> {
                     let start = self.lower_expr(required_field!(arm => start ? self => ParseTypeKind::Error));
                     let end = arm.end().map(|end| self.lower_expr(end));
 
-                    fn extract_lit(this: &mut LoweringCtx, expr: Expr) -> Option<Int> {
-                        match expr.kind {
-                            ExprKind::Lit(lit) => match lit {
-                                Lit::Int(int) => Some(int),
-                                Lit::Bytes(_) |
-                                Lit::Bool(_) |
-                                Lit::Enum(_) => {
-                                    this.add_diagnostic(Diagnostic::error(
-                                        "expected integer literal",
-                                        Label::new("unexpected literal type", expr.span)
-                                    ));
-                                    None
-                                }
-                            }
-                            ExprKind::Offset |
-                            ExprKind::Last |
-                            ExprKind::Len |
-                            ExprKind::FieldAccess {..} |
-                            ExprKind::BinOp {..} |
-                            ExprKind::Peek {..} |
-                            ExprKind::Concat { .. } => {
-                                this.add_diagnostic(Diagnostic::error(
-                                    "expected integer literal",
-                                    Label::new("unexpected expression type", expr.span)
-                                ));
-                                None
-                            }
-                            ExprKind::Error => None,
-                            ExprKind::UnOp { op, operand } => match op {
-                                UnOp::Neg => extract_lit(this, *operand).map(|lit| -lit),
-                                UnOp::Plus => extract_lit(this, *operand),
-                                UnOp::Not => {
-                                    this.add_diagnostic(Diagnostic::error(
-                                        "expected integer literal",
-                                        Label::new("unexpected literal type", expr.span)
-                                    ));
-                                    None
-                                },
-                            }
-                        }
-                    }
-
                     let start_span = start.span;
-                    let Some(start) = extract_lit(self, start) else {
+                    let Some(start) = self.extract_int_lit(start) else {
                         return ParseTypeKind::Error;
                     };
                     let kind = match end {
                         Some(end) => {
                             let end_span = end.span;
-                            let Some(end) = extract_lit(self, end) else {
+                            let Some(end) = self.extract_int_lit(end) else {
                                 return ParseTypeKind::Error;
                             };
                             Spanned { inner: EnumVariantKind::Range { start, end }, span: start_span.join(end_span) }
@@ -359,6 +317,86 @@ impl LoweringCtx<'_> {
                 ParseTypeKind::Enum { backing_type: Box::new(backing_type), enum_info: Arc::new(EnumInfo {
                     variants,
                 })}
+            }
+            ast::ParseType::FlagsParseType(flags_parse_type) => {
+                let backing_type = self.lower_parse_type(required_field!(flags_parse_type => size ? self => ParseTypeKind::Error), &None);
+
+                let mut flags = BTreeMap::new();
+                for arm in flags_parse_type.flags_parse_type_arm() {
+                    let name = Spanned::<Symbol>::from(required_field!(arm => name ? self => ParseTypeKind::Error));
+
+                    let value = match required_field!(arm => kind ? self => ParseTypeKind::Error) {
+                        ast::FlagsParseTypeArmKind::FlagsParseTypeRawArm(raw_arm) => {
+                            let expr = self.lower_expr(required_field!(raw_arm => expr ? self => ParseTypeKind::Error));
+                            let Some(lit) = self.extract_int_lit(expr) else {
+                                return ParseTypeKind::Error;
+                            };
+
+                            let Ok(lit) = u128::try_from(lit) else {
+                                self.add_diagnostic(Diagnostic::error(
+                                    "expected flag value to fit into an unsigned 128-bit integer",
+                                    Label::new("flag value out of range", raw_arm.span())
+                                ));
+                                return ParseTypeKind::Error;
+                            };
+
+                            let bits_set = lit.count_ones();
+                            if bits_set != 1 {
+                                self.add_diagnostic(Diagnostic::error(
+                                    "expected exactly one bit to be set in flags value",
+                                    Label::new(format!("{bits_set} bits set in flags value"), raw_arm.span())
+                                ));
+                                return ParseTypeKind::Error;
+                            }
+
+                            lit
+                        }
+                        ast::FlagsParseTypeArmKind::FlagsParseTypeBitArm(bit_arm) => {
+                            let expr = self.lower_expr(required_field!(bit_arm => expr ? self => ParseTypeKind::Error));
+                            let Some(lit) = self.extract_int_lit(expr) else {
+                                return ParseTypeKind::Error;
+                            };
+
+
+                            let lit = match u128::try_from(lit) {
+                                Ok(val) if val < 128 => {
+                                    val
+                                },
+                                _ => {
+                                    self.add_diagnostic(Diagnostic::error(
+                                        "expected bit to be between 0 and 127",
+                                        Label::new("flag value out of range", bit_arm.span())
+                                    ));
+                                    return ParseTypeKind::Error;
+                                }
+                            };
+
+                            1 << lit
+                        }
+                    };
+
+                    if let Some(old_name) = flags.values().find(|old_name: &&Spanned<Symbol>| old_name.inner == name.inner) {
+                        self.add_diagnostic(
+                            Diagnostic::error(
+                                format!("flag name {} already used", name.inner.as_str()),
+                                Label::new("flag name defined multiple times", arm.span())
+                            )
+                            .with_label(Label::new("previous definition here", old_name.span))
+                        );
+                    }
+
+                    if let Some(old_name) = flags.insert(value, name) {
+                        self.add_diagnostic(
+                            Diagnostic::error(
+                                format!("flag value {value} already used"),
+                                Label::new("flag value defined multiple times", arm.span())
+                            )
+                            .with_label(Label::new("previous definition here", old_name.span))
+                        );
+                    }
+                }
+
+                ParseTypeKind::Flags { backing_type: Box::new(backing_type), flags_info: Arc::new(FlagsInfo { flags }) }
             }
         }
     }
@@ -983,6 +1021,47 @@ impl LoweringCtx<'_> {
             name: Spanned::<Symbol>::from(required_field!(let_statement => name ? self => None)),
             expr: self.lower_expr(required_field!(let_statement => expr ? self => None)),
         })
+    }
+
+    /// Extracts a literal
+    fn extract_int_lit(&mut self, expr: Expr) -> Option<Int> {
+        match expr.kind {
+            ExprKind::Lit(lit) => match lit {
+                Lit::Int(int) => Some(int),
+                Lit::Bytes(_) | Lit::Bool(_) | Lit::Enum(_) => {
+                    self.add_diagnostic(Diagnostic::error(
+                        "expected integer literal",
+                        Label::new("unexpected literal type", expr.span),
+                    ));
+                    None
+                }
+            },
+            ExprKind::Offset
+            | ExprKind::Last
+            | ExprKind::Len
+            | ExprKind::FieldAccess { .. }
+            | ExprKind::BinOp { .. }
+            | ExprKind::Peek { .. }
+            | ExprKind::Concat { .. } => {
+                self.add_diagnostic(Diagnostic::error(
+                    "expected integer literal",
+                    Label::new("unexpected expression type", expr.span),
+                ));
+                None
+            }
+            ExprKind::Error => None,
+            ExprKind::UnOp { op, operand } => match op {
+                UnOp::Neg => self.extract_int_lit(*operand).map(|lit| -lit),
+                UnOp::Plus => self.extract_int_lit(*operand),
+                UnOp::Not => {
+                    self.add_diagnostic(Diagnostic::error(
+                        "expected integer literal",
+                        Label::new("unexpected literal type", expr.span),
+                    ));
+                    None
+                }
+            },
+        }
     }
 }
 

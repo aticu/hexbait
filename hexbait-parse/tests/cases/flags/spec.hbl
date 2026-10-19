@@ -1,0 +1,19 @@
+!endian le;
+
+is_big u8;
+
+!if .is_big == 0 {
+	flags flags u8 {
+		a = bit 0,
+		b = bit 7
+	};
+} else {
+	flags flags u16 {
+		a = bit 0,
+		b = bit 7,
+		c = 0x100
+	};
+}
+
+let a_set = .flags.a;
+let b_set = .flags.b;

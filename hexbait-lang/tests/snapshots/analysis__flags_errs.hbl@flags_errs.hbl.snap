@@ -1,0 +1,72 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "a flags u8 {\n\ta = 1,\n\ta = 2,\n};\n\nb flags i8 {};\n\nc flags u8 {\n\ta = 1,\n\tb = 1\n};\n\nd flags u8 {\n\ta = 8,\n\tb = bit 3\n};\n\ne flags u8 {\n\ta = 3,\n};\n\nf flags u8 {\n\ta = bit 128\n};\n\ng flags u8 {\n\ta = 0\n};\n"
+input_file: hexbait-lang/tests/analysis-cases/flags_errs.hbl
+---
+error: flag name a already used
+  ┌─ flags_errs.hbl:3:2
+  │
+1 │ a flags u8 {
+2 │     a = 1,
+  │     - previous definition here
+3 │     a = 2,
+  │     ^^^^^^ flag name defined multiple times
+4 │ };
+
+
+error: flag value 1 already used
+   ┌─ flags_errs.hbl:10:2
+   │
+ 8 │ c flags u8 {
+ 9 │     a = 1,
+   │     - previous definition here
+10 │     b = 1
+   │     ^^^^^ flag value defined multiple times
+11 │ };
+
+
+error: flag value 8 already used
+   ┌─ flags_errs.hbl:15:2
+   │
+13 │ d flags u8 {
+14 │     a = 8,
+   │     - previous definition here
+15 │     b = bit 3
+   │     ^^^^^^^^^ flag value defined multiple times
+16 │ };
+
+
+error: expected exactly one bit to be set in flags value
+   ┌─ flags_errs.hbl:19:6
+   │
+18 │ e flags u8 {
+19 │     a = 3,
+   │         ^ 2 bits set in flags value
+20 │ };
+
+
+error: expected bit to be between 0 and 127
+   ┌─ flags_errs.hbl:23:6
+   │
+22 │ f flags u8 {
+23 │     a = bit 128
+   │         ^^^^^^^ flag value out of range
+24 │ };
+
+
+error: expected exactly one bit to be set in flags value
+   ┌─ flags_errs.hbl:27:6
+   │
+26 │ g flags u8 {
+27 │     a = 0
+   │         ^ 0 bits set in flags value
+28 │ };
+
+
+error: expected enum backing type to be a positive integer
+  ┌─ flags_errs.hbl:6:9
+  │
+5 │ 
+6 │ b flags i8 {};
+  │         ^^ unexpected type `int`
+7 │

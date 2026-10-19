@@ -12,7 +12,7 @@ use crate::{
             diagnostics::{ParseErr, Result},
             static_analysis_impossible,
         },
-        value::StructContent,
+        value::{FlagsValue, StructContent},
     },
 };
 
@@ -124,20 +124,29 @@ impl<'parent> StructContext<'parent> {
     ) -> StructRef<'ctx> {
         let mut current = StructRef::Unfinished(self);
 
+        fn into_struct_ref(value: &Value) -> StructRef<'_> {
+            match &value.kind {
+                ValueKind::Struct { content } => StructRef::Finished(content),
+                ValueKind::FlagsValue(flags_value) => StructRef::Flags {
+                    value: flags_value,
+                    provenance: value.provenance.clone(),
+                },
+                _ => static_analysis_impossible(),
+            }
+        }
+
         for part in &struct_ref.parts {
             current = match &part.inner {
                 ir::StructRefPart::Parent => match current {
-                    StructRef::Finished(_) => static_analysis_impossible(),
+                    StructRef::Finished(_) | StructRef::Flags { .. } => {
+                        static_analysis_impossible()
+                    }
                     StructRef::Unfinished(struct_context) => {
                         StructRef::Unfinished(struct_context.parent().static_analysis_expect())
                     }
                 },
-                ir::StructRefPart::Last => {
-                    StructRef::Finished(last.static_analysis_expect().kind.expect_struct())
-                }
-                ir::StructRefPart::Named(name) => {
-                    StructRef::Finished(current.field(name).kind.expect_struct())
-                }
+                ir::StructRefPart::Last => into_struct_ref(last.static_analysis_expect()),
+                ir::StructRefPart::Named(name) => into_struct_ref(current.field_ref(name)),
             }
         }
 
@@ -163,19 +172,47 @@ pub enum StructRef<'ctx> {
     Finished(&'ctx [StructContent]),
     /// A reference to a `struct` that is still being parsed.
     Unfinished(&'ctx StructContext<'ctx>),
+    /// A flags value.
+    Flags {
+        /// The raw value.
+        value: &'ctx FlagsValue,
+        /// The provenance.
+        provenance: Provenance,
+    },
 }
 
 impl<'ctx> StructRef<'ctx> {
     /// Returns the value of the given field.
-    pub fn field(&self, field: &Symbol) -> &'ctx Value {
+    pub fn field_ref(&self, field: &Symbol) -> &'ctx Value {
         let fields = match self {
             StructRef::Finished(struct_contents) => struct_contents,
             StructRef::Unfinished(struct_context) => &*struct_context.content,
+            StructRef::Flags { .. } => static_analysis_impossible(),
         };
 
         fields
             .iter()
             .find_map(|content| content.val_if_name_eq(field))
             .static_analysis_expect()
+    }
+
+    /// Returns the value of the given field.
+    pub fn field(&self, field: &Symbol) -> Value {
+        match self {
+            StructRef::Finished(_) | StructRef::Unfinished(_) => self.field_ref(field).clone(),
+            StructRef::Flags {
+                value: flags_value,
+                provenance,
+            } => Value {
+                kind: ValueKind::Boolean(
+                    flags_value
+                        .flags_info
+                        .iter(&flags_value.raw)
+                        .find(|name| &name.inner == field)
+                        .is_some(),
+                ),
+                provenance: provenance.clone(),
+            },
+        }
     }
 }
