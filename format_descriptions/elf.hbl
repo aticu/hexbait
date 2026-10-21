@@ -1,22 +1,52 @@
 ident {
     magic bytes = <7f "ELF">;
-    class u8;
-    endianness u8;
+    class enum u8 {
+        ELFCLASSNONE = 0,
+        ELFCLASS32 = 1,
+        ELFCLASS64 = 2,
+    };
+    endianness enum u8 {
+        ELFDATANONE = 0,
+        ELFDATA2LSB = 1,
+        ELFDATA2MSB = 2,
+    };
     version u8;
     pad u8;
     rest_of_ident bytes len 8;
 };
 
-!assert .ident.endianness < 3 && .ident.endianness != 0;
-
-!if .ident.endianness == 1 {
+!if .ident.endianness == enum.ELFDATA2LSB {
     !endian le;
 } else {
     !endian be;
 }
 
-type u16;
-machine u16;
+type enum u16 {
+    ET_NONE = 0,
+    ET_REL = 1,
+    ET_EXEC = 2,
+    ET_DYN = 3,
+    ET_CORE = 4,
+    ET_PROC = 0xff00..=0xffff,
+};
+machine enum u16 {
+    EM_NONE = 0,
+    EM_M32 = 1,
+    EM_SPARC = 2,
+    EM_386 = 3,
+    EM_68K = 4,
+    EM_88K = 5,
+    EM_860 = 7,
+    EM_MIPS = 8,
+    EM_MIPS_RS4_BE = 10,
+    EM_X86_64 = 62,
+    EM_AARCH64 = 183,
+    EM_CUDA = 190,
+    EM_AMDGPU = 224,
+    EM_RISCV = 243,
+    EM_BPF = 247,
+    EM_LOONGARCH = 258,
+};
 version u32;
 entrypoint u64;
 program_header_off u64;
@@ -37,8 +67,27 @@ sections [{
     !scope at $parent.string_table_start_off + .name_idx {
         name bytes while peek(u8) != 0;
     }
-    type u32;
-    flags u64;
+    type enum u32 {
+        SHT_NULL = 0,
+        SHT_PROGBITS = 1,
+        SHT_SYMTAB = 2,
+        SHT_STRTAB = 3,
+        SHT_RELA = 4,
+        SHT_HASH = 5,
+        SHT_DYNAMIC = 6,
+        SHT_NOTE = 7,
+        SHT_NOBITS = 8,
+        SHT_REL = 9,
+        SHT_SHLIB = 10,
+        SHT_DYNSYM = 11,
+        SHT_PROC = 0x70000000..=0x7fffffff,
+        SHT_USER = 0x80000000..=0xffffffff,
+    };
+    flags flags u64 {
+        SHF_WRITE = 0x1,
+        SHF_ALLOC = 0x2,
+        SHF_EXECINSTR = 0x4,
+    };
     addr u64;
     offset u64;
     size u64;

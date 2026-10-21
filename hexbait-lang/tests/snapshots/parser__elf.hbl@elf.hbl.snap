@@ -1,14 +1,14 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "ident {\n    magic bytes = <7f \"ELF\">;\n    class u8;\n    endianness u8;\n    version u8;\n    pad u8;\n    rest_of_ident bytes len 8;\n};\n\n!assert .ident.endianness < 3 && .ident.endianness != 0;\n\n!if .ident.endianness == 1 {\n    !endian le;\n} else {\n    !endian be;\n}\n\ntype u16;\nmachine u16;\nversion u32;\nentrypoint u64;\nprogram_header_off u64;\nsection_header_off u64;\nflags u32;\nheader_size u16;\nprogram_header_entry_size u16;\nprogram_header_entry_num u16;\nsection_header_entry_size u16;\nsection_header_entry_num u16;\nsection_header_string_index u16;\n\nlet string_table_start_off = peek(u64 at .section_header_off + .section_header_entry_size * .section_header_string_index + 24);\n\n!seek to .section_header_off;\nsections [{\n    name_idx u32;\n    !scope at $parent.string_table_start_off + .name_idx {\n        name bytes while peek(u8) != 0;\n    }\n    type u32;\n    flags u64;\n    addr u64;\n    offset u64;\n    size u64;\n    link u32;\n    info u32;\n    addr_align u64;\n    entry_size u64;\n\n    !scope at .offset {\n        content bytes len .size;\n    }\n}] len .section_header_entry_num;\n"
+expression: "ident {\n    magic bytes = <7f \"ELF\">;\n    class enum u8 {\n        ELFCLASSNONE = 0,\n        ELFCLASS32 = 1,\n        ELFCLASS64 = 2,\n    };\n    endianness enum u8 {\n        ELFDATANONE = 0,\n        ELFDATA2LSB = 1,\n        ELFDATA2MSB = 2,\n    };\n    version u8;\n    pad u8;\n    rest_of_ident bytes len 8;\n};\n\n!if .ident.endianness == enum.ELFDATA2LSB {\n    !endian le;\n} else {\n    !endian be;\n}\n\ntype enum u16 {\n    ET_NONE = 0,\n    ET_REL = 1,\n    ET_EXEC = 2,\n    ET_DYN = 3,\n    ET_CORE = 4,\n    ET_PROC = 0xff00..=0xffff,\n};\nmachine enum u16 {\n    EM_NONE = 0,\n    EM_M32 = 1,\n    EM_SPARC = 2,\n    EM_386 = 3,\n    EM_68K = 4,\n    EM_88K = 5,\n    EM_860 = 7,\n    EM_MIPS = 8,\n    EM_MIPS_RS4_BE = 10,\n    EM_X86_64 = 62,\n    EM_AARCH64 = 183,\n    EM_CUDA = 190,\n    EM_AMDGPU = 224,\n    EM_RISCV = 243,\n    EM_BPF = 247,\n    EM_LOONGARCH = 258,\n};\nversion u32;\nentrypoint u64;\nprogram_header_off u64;\nsection_header_off u64;\nflags u32;\nheader_size u16;\nprogram_header_entry_size u16;\nprogram_header_entry_num u16;\nsection_header_entry_size u16;\nsection_header_entry_num u16;\nsection_header_string_index u16;\n\nlet string_table_start_off = peek(u64 at .section_header_off + .section_header_entry_size * .section_header_string_index + 24);\n\n!seek to .section_header_off;\nsections [{\n    name_idx u32;\n    !scope at $parent.string_table_start_off + .name_idx {\n        name bytes while peek(u8) != 0;\n    }\n    type enum u32 {\n        SHT_NULL = 0,\n        SHT_PROGBITS = 1,\n        SHT_SYMTAB = 2,\n        SHT_STRTAB = 3,\n        SHT_RELA = 4,\n        SHT_HASH = 5,\n        SHT_DYNAMIC = 6,\n        SHT_NOTE = 7,\n        SHT_NOBITS = 8,\n        SHT_REL = 9,\n        SHT_SHLIB = 10,\n        SHT_DYNSYM = 11,\n        SHT_PROC = 0x70000000..=0x7fffffff,\n        SHT_USER = 0x80000000..=0xffffffff,\n    };\n    flags flags u64 {\n        SHF_WRITE = 0x1,\n        SHF_ALLOC = 0x2,\n        SHF_EXECINSTR = 0x4,\n    };\n    addr u64;\n    offset u64;\n    size u64;\n    link u32;\n    info u32;\n    addr_align u64;\n    entry_size u64;\n\n    !scope at .offset {\n        content bytes len .size;\n    }\n}] len .section_header_entry_num;\n"
 input_file: format_descriptions/elf.hbl
 ---
-File@0..1082
-  StructField@0..132
+File@0..2122
+  StructField@0..307
     Identifier@0..5 "ident"
     Whitespace@5..6 " "
-    AnonymousStructParseType@6..131
-      StructBlock@6..131
+    AnonymousStructParseType@6..306
+      StructBlock@6..306
         LBrace@6..7 "{"
         Whitespace@7..12 "\n    "
         StructField@12..37
@@ -27,467 +27,891 @@ File@0..1082
             RAngle@35..36 ">"
           Semicolon@36..37 ";"
         Whitespace@37..42 "\n    "
-        StructField@42..51
+        StructField@42..138
           Identifier@42..47 "class"
           Whitespace@47..48 " "
-          NamedParseType@48..50
-            Identifier@48..50 "u8"
-          Semicolon@50..51 ";"
-        Whitespace@51..56 "\n    "
-        StructField@56..70
-          Identifier@56..66 "endianness"
-          Whitespace@66..67 " "
-          NamedParseType@67..69
-            Identifier@67..69 "u8"
-          Semicolon@69..70 ";"
-        Whitespace@70..75 "\n    "
-        StructField@75..86
-          Identifier@75..82 "version"
-          Whitespace@82..83 " "
-          NamedParseType@83..85
-            Identifier@83..85 "u8"
-          Semicolon@85..86 ";"
-        Whitespace@86..91 "\n    "
-        StructField@91..98
-          Identifier@91..94 "pad"
-          Whitespace@94..95 " "
-          NamedParseType@95..97
-            Identifier@95..97 "u8"
-          Semicolon@97..98 ";"
-        Whitespace@98..103 "\n    "
-        StructField@103..129
-          Identifier@103..116 "rest_of_ident"
-          Whitespace@116..117 " "
-          BytesParseType@117..128
-            BytesKw@117..122 "bytes"
-            Whitespace@122..123 " "
-            RepeatLenDecl@123..128
-              Identifier@123..126 "len"
+          EnumParseType@48..137
+            EnumKw@48..52 "enum"
+            Whitespace@52..53 " "
+            NamedParseType@53..55
+              Identifier@53..55 "u8"
+            Whitespace@55..56 " "
+            LBrace@56..57 "{"
+            Whitespace@57..66 "\n        "
+            EnumParseTypeArm@66..83
+              Identifier@66..78 "ELFCLASSNONE"
+              Whitespace@78..79 " "
+              Equals@79..80 "="
+              Whitespace@80..81 " "
+              Atom@81..82
+                DecimalIntegerLiteral@81..82 "0"
+              Comma@82..83 ","
+            Whitespace@83..92 "\n        "
+            EnumParseTypeArm@92..107
+              Identifier@92..102 "ELFCLASS32"
+              Whitespace@102..103 " "
+              Equals@103..104 "="
+              Whitespace@104..105 " "
+              Atom@105..106
+                DecimalIntegerLiteral@105..106 "1"
+              Comma@106..107 ","
+            Whitespace@107..116 "\n        "
+            EnumParseTypeArm@116..131
+              Identifier@116..126 "ELFCLASS64"
               Whitespace@126..127 " "
-              Atom@127..128
-                DecimalIntegerLiteral@127..128 "8"
-          Semicolon@128..129 ";"
-        Whitespace@129..130 "\n"
-        RBrace@130..131 "}"
-    Semicolon@131..132 ";"
-  Whitespace@132..134 "\n\n"
-  AssertDeclaration@134..190
-    ExclamationMark@134..135 "!"
-    Identifier@135..141 "assert"
-    Whitespace@141..142 " "
-    InfixExpr@142..189
-      InfixExpr@142..163
-        FieldAccess@142..159
-          FieldAccess@142..148
-            Dot@142..143 "."
-            BareField@143..148
-              Identifier@143..148 "ident"
-          Dot@148..149 "."
-          BareField@149..159
-            Identifier@149..159 "endianness"
-        Whitespace@159..160 " "
-        Op@160..161
-          LAngle@160..161 "<"
-        Whitespace@161..162 " "
-        Atom@162..163
-          DecimalIntegerLiteral@162..163 "3"
-      Whitespace@163..164 " "
-      Op@164..166
-        Ampersand@164..165 "&"
-        Ampersand@165..166 "&"
-      Whitespace@166..167 " "
-      InfixExpr@167..189
-        FieldAccess@167..184
-          FieldAccess@167..173
-            Dot@167..168 "."
-            BareField@168..173
-              Identifier@168..173 "ident"
-          Dot@173..174 "."
-          BareField@174..184
-            Identifier@174..184 "endianness"
-        Whitespace@184..185 " "
-        Op@185..187
-          ExclamationMark@185..186 "!"
-          Equals@186..187 "="
-        Whitespace@187..188 " "
-        Atom@188..189
-          DecimalIntegerLiteral@188..189 "0"
-    Semicolon@189..190 ";"
-  Whitespace@190..192 "\n\n"
-  IfDeclaration@192..263
-    ExclamationMark@192..193 "!"
-    IfChain@193..263
-      Identifier@193..195 "if"
-      Whitespace@195..196 " "
-      InfixExpr@196..218
-        FieldAccess@196..213
-          FieldAccess@196..202
-            Dot@196..197 "."
-            BareField@197..202
-              Identifier@197..202 "ident"
-          Dot@202..203 "."
-          BareField@203..213
-            Identifier@203..213 "endianness"
-        Whitespace@213..214 " "
-        Op@214..216
-          Equals@214..215 "="
-          Equals@215..216 "="
-        Whitespace@216..217 " "
-        Atom@217..218
-          DecimalIntegerLiteral@217..218 "1"
-      Whitespace@218..219 " "
-      StructBlock@219..238
-        LBrace@219..220 "{"
-        Whitespace@220..225 "\n    "
-        EndiannessDeclaration@225..236
-          ExclamationMark@225..226 "!"
-          Identifier@226..232 "endian"
-          Whitespace@232..233 " "
-          Identifier@233..235 "le"
-          Semicolon@235..236 ";"
-        Whitespace@236..237 "\n"
-        RBrace@237..238 "}"
-      Whitespace@238..239 " "
-      Identifier@239..243 "else"
-      Whitespace@243..244 " "
-      ElseBlock@244..263
-        StructBlock@244..263
-          LBrace@244..245 "{"
-          Whitespace@245..250 "\n    "
-          EndiannessDeclaration@250..261
-            ExclamationMark@250..251 "!"
-            Identifier@251..257 "endian"
-            Whitespace@257..258 " "
-            Identifier@258..260 "be"
-            Semicolon@260..261 ";"
-          Whitespace@261..262 "\n"
-          RBrace@262..263 "}"
-  Whitespace@263..265 "\n\n"
-  StructField@265..274
-    Identifier@265..269 "type"
-    Whitespace@269..270 " "
-    NamedParseType@270..273
-      Identifier@270..273 "u16"
-    Semicolon@273..274 ";"
-  Whitespace@274..275 "\n"
-  StructField@275..287
-    Identifier@275..282 "machine"
-    Whitespace@282..283 " "
-    NamedParseType@283..286
-      Identifier@283..286 "u16"
-    Semicolon@286..287 ";"
-  Whitespace@287..288 "\n"
-  StructField@288..300
-    Identifier@288..295 "version"
-    Whitespace@295..296 " "
-    NamedParseType@296..299
-      Identifier@296..299 "u32"
-    Semicolon@299..300 ";"
-  Whitespace@300..301 "\n"
-  StructField@301..316
-    Identifier@301..311 "entrypoint"
-    Whitespace@311..312 " "
-    NamedParseType@312..315
-      Identifier@312..315 "u64"
-    Semicolon@315..316 ";"
-  Whitespace@316..317 "\n"
-  StructField@317..340
-    Identifier@317..335 "program_header_off"
-    Whitespace@335..336 " "
-    NamedParseType@336..339
-      Identifier@336..339 "u64"
-    Semicolon@339..340 ";"
-  Whitespace@340..341 "\n"
-  StructField@341..364
-    Identifier@341..359 "section_header_off"
-    Whitespace@359..360 " "
-    NamedParseType@360..363
-      Identifier@360..363 "u64"
-    Semicolon@363..364 ";"
-  Whitespace@364..365 "\n"
-  StructField@365..375
-    Identifier@365..370 "flags"
-    Whitespace@370..371 " "
-    NamedParseType@371..374
-      Identifier@371..374 "u32"
-    Semicolon@374..375 ";"
-  Whitespace@375..376 "\n"
-  StructField@376..392
-    Identifier@376..387 "header_size"
-    Whitespace@387..388 " "
-    NamedParseType@388..391
-      Identifier@388..391 "u16"
-    Semicolon@391..392 ";"
-  Whitespace@392..393 "\n"
-  StructField@393..423
-    Identifier@393..418 "program_header_entry_ ..."
-    Whitespace@418..419 " "
-    NamedParseType@419..422
-      Identifier@419..422 "u16"
-    Semicolon@422..423 ";"
-  Whitespace@423..424 "\n"
-  StructField@424..453
-    Identifier@424..448 "program_header_entry_num"
-    Whitespace@448..449 " "
-    NamedParseType@449..452
-      Identifier@449..452 "u16"
-    Semicolon@452..453 ";"
-  Whitespace@453..454 "\n"
-  StructField@454..484
-    Identifier@454..479 "section_header_entry_ ..."
-    Whitespace@479..480 " "
-    NamedParseType@480..483
-      Identifier@480..483 "u16"
-    Semicolon@483..484 ";"
-  Whitespace@484..485 "\n"
-  StructField@485..514
-    Identifier@485..509 "section_header_entry_num"
-    Whitespace@509..510 " "
-    NamedParseType@510..513
-      Identifier@510..513 "u16"
-    Semicolon@513..514 ";"
-  Whitespace@514..515 "\n"
-  StructField@515..547
-    Identifier@515..542 "section_header_string ..."
-    Whitespace@542..543 " "
-    NamedParseType@543..546
-      Identifier@543..546 "u16"
-    Semicolon@546..547 ";"
-  Whitespace@547..549 "\n\n"
-  LetStatement@549..676
-    LetKw@549..552 "let"
-    Whitespace@552..553 " "
-    Identifier@553..575 "string_table_start_off"
-    Whitespace@575..576 " "
-    Equals@576..577 "="
-    Whitespace@577..578 " "
-    PeekExpr@578..675
-      PeekKw@578..582 "peek"
-      LParen@582..583 "("
-      NamedParseType@583..586
-        Identifier@583..586 "u64"
-      Whitespace@586..587 " "
-      Identifier@587..589 "at"
-      Whitespace@589..590 " "
-      InfixExpr@590..674
-        InfixExpr@590..669
-          FieldAccess@590..609
-            Dot@590..591 "."
-            BareField@591..609
-              Identifier@591..609 "section_header_off"
-          Whitespace@609..610 " "
-          Op@610..611
-            Plus@610..611 "+"
-          Whitespace@611..612 " "
-          InfixExpr@612..669
-            FieldAccess@612..638
-              Dot@612..613 "."
-              BareField@613..638
-                Identifier@613..638 "section_header_entry_ ..."
-            Whitespace@638..639 " "
-            Op@639..640
-              Star@639..640 "*"
-            Whitespace@640..641 " "
-            FieldAccess@641..669
-              Dot@641..642 "."
-              BareField@642..669
-                Identifier@642..669 "section_header_string ..."
-        Whitespace@669..670 " "
-        Op@670..671
-          Plus@670..671 "+"
-        Whitespace@671..672 " "
-        Atom@672..674
-          DecimalIntegerLiteral@672..674 "24"
-      RParen@674..675 ")"
-    Semicolon@675..676 ";"
-  Whitespace@676..678 "\n\n"
-  SeekToDeclaration@678..707
-    ExclamationMark@678..679 "!"
-    Identifier@679..683 "seek"
-    Whitespace@683..684 " "
-    Identifier@684..686 "to"
-    Whitespace@686..687 " "
-    FieldAccess@687..706
-      Dot@687..688 "."
-      BareField@688..706
-        Identifier@688..706 "section_header_off"
-    Semicolon@706..707 ";"
-  Whitespace@707..708 "\n"
-  StructField@708..1081
-    Identifier@708..716 "sections"
-    Whitespace@716..717 " "
-    RepeatParseType@717..1080
-      LBracket@717..718 "["
-      AnonymousStructParseType@718..1049
-        StructBlock@718..1049
-          LBrace@718..719 "{"
-          Whitespace@719..724 "\n    "
-          StructField@724..737
-            Identifier@724..732 "name_idx"
-            Whitespace@732..733 " "
-            NamedParseType@733..736
-              Identifier@733..736 "u32"
-            Semicolon@736..737 ";"
-          Whitespace@737..742 "\n    "
-          ScopeAtDeclaration@742..842
-            ExclamationMark@742..743 "!"
-            Identifier@743..748 "scope"
-            Whitespace@748..749 " "
-            Identifier@749..751 "at"
-            Whitespace@751..752 " "
-            InfixExpr@752..794
-              FieldAccess@752..782
-                Metavar@752..759
-                  Dollar@752..753 "$"
-                  Identifier@753..759 "parent"
-                Dot@759..760 "."
-                BareField@760..782
-                  Identifier@760..782 "string_table_start_off"
-              Whitespace@782..783 " "
-              Op@783..784
-                Plus@783..784 "+"
-              Whitespace@784..785 " "
-              FieldAccess@785..794
-                Dot@785..786 "."
-                BareField@786..794
-                  Identifier@786..794 "name_idx"
-            Whitespace@794..795 " "
-            StructBlock@795..842
-              LBrace@795..796 "{"
-              Whitespace@796..805 "\n        "
-              StructField@805..836
-                Identifier@805..809 "name"
-                Whitespace@809..810 " "
-                BytesParseType@810..835
-                  BytesKw@810..815 "bytes"
-                  Whitespace@815..816 " "
-                  RepeatWhileDecl@816..835
-                    Identifier@816..821 "while"
-                    Whitespace@821..822 " "
-                    InfixExpr@822..835
-                      PeekExpr@822..830
-                        PeekKw@822..826 "peek"
-                        LParen@826..827 "("
-                        NamedParseType@827..829
-                          Identifier@827..829 "u8"
-                        RParen@829..830 ")"
-                      Whitespace@830..831 " "
-                      Op@831..833
-                        ExclamationMark@831..832 "!"
-                        Equals@832..833 "="
-                      Whitespace@833..834 " "
-                      Atom@834..835
-                        DecimalIntegerLiteral@834..835 "0"
-                Semicolon@835..836 ";"
-              Whitespace@836..841 "\n    "
-              RBrace@841..842 "}"
-          Whitespace@842..847 "\n    "
-          StructField@847..856
-            Identifier@847..851 "type"
-            Whitespace@851..852 " "
-            NamedParseType@852..855
-              Identifier@852..855 "u32"
-            Semicolon@855..856 ";"
-          Whitespace@856..861 "\n    "
-          StructField@861..871
-            Identifier@861..866 "flags"
-            Whitespace@866..867 " "
-            NamedParseType@867..870
-              Identifier@867..870 "u64"
-            Semicolon@870..871 ";"
-          Whitespace@871..876 "\n    "
-          StructField@876..885
-            Identifier@876..880 "addr"
-            Whitespace@880..881 " "
-            NamedParseType@881..884
-              Identifier@881..884 "u64"
-            Semicolon@884..885 ";"
-          Whitespace@885..890 "\n    "
-          StructField@890..901
-            Identifier@890..896 "offset"
-            Whitespace@896..897 " "
-            NamedParseType@897..900
-              Identifier@897..900 "u64"
-            Semicolon@900..901 ";"
-          Whitespace@901..906 "\n    "
-          StructField@906..915
-            Identifier@906..910 "size"
-            Whitespace@910..911 " "
-            NamedParseType@911..914
-              Identifier@911..914 "u64"
-            Semicolon@914..915 ";"
-          Whitespace@915..920 "\n    "
-          StructField@920..929
-            Identifier@920..924 "link"
-            Whitespace@924..925 " "
-            NamedParseType@925..928
-              Identifier@925..928 "u32"
-            Semicolon@928..929 ";"
-          Whitespace@929..934 "\n    "
-          StructField@934..943
-            Identifier@934..938 "info"
-            Whitespace@938..939 " "
-            NamedParseType@939..942
-              Identifier@939..942 "u32"
-            Semicolon@942..943 ";"
-          Whitespace@943..948 "\n    "
-          StructField@948..963
-            Identifier@948..958 "addr_align"
-            Whitespace@958..959 " "
-            NamedParseType@959..962
-              Identifier@959..962 "u64"
-            Semicolon@962..963 ";"
-          Whitespace@963..968 "\n    "
-          StructField@968..983
-            Identifier@968..978 "entry_size"
-            Whitespace@978..979 " "
-            NamedParseType@979..982
-              Identifier@979..982 "u64"
-            Semicolon@982..983 ";"
-          Whitespace@983..989 "\n\n    "
-          ScopeAtDeclaration@989..1047
-            ExclamationMark@989..990 "!"
-            Identifier@990..995 "scope"
-            Whitespace@995..996 " "
-            Identifier@996..998 "at"
-            Whitespace@998..999 " "
-            FieldAccess@999..1006
-              Dot@999..1000 "."
-              BareField@1000..1006
-                Identifier@1000..1006 "offset"
-            Whitespace@1006..1007 " "
-            StructBlock@1007..1047
-              LBrace@1007..1008 "{"
-              Whitespace@1008..1017 "\n        "
-              StructField@1017..1041
-                Identifier@1017..1024 "content"
-                Whitespace@1024..1025 " "
-                BytesParseType@1025..1040
-                  BytesKw@1025..1030 "bytes"
-                  Whitespace@1030..1031 " "
-                  RepeatLenDecl@1031..1040
-                    Identifier@1031..1034 "len"
-                    Whitespace@1034..1035 " "
-                    FieldAccess@1035..1040
-                      Dot@1035..1036 "."
-                      BareField@1036..1040
-                        Identifier@1036..1040 "size"
-                Semicolon@1040..1041 ";"
-              Whitespace@1041..1046 "\n    "
-              RBrace@1046..1047 "}"
-          Whitespace@1047..1048 "\n"
-          RBrace@1048..1049 "}"
-      RBracket@1049..1050 "]"
-      Whitespace@1050..1051 " "
-      RepeatLenDecl@1051..1080
-        Identifier@1051..1054 "len"
-        Whitespace@1054..1055 " "
-        FieldAccess@1055..1080
-          Dot@1055..1056 "."
-          BareField@1056..1080
-            Identifier@1056..1080 "section_header_entry_num"
-    Semicolon@1080..1081 ";"
-  Whitespace@1081..1082 "\n"
+              Equals@127..128 "="
+              Whitespace@128..129 " "
+              Atom@129..130
+                DecimalIntegerLiteral@129..130 "2"
+              Comma@130..131 ","
+            Whitespace@131..136 "\n    "
+            RBrace@136..137 "}"
+          Semicolon@137..138 ";"
+        Whitespace@138..143 "\n    "
+        StructField@143..245
+          Identifier@143..153 "endianness"
+          Whitespace@153..154 " "
+          EnumParseType@154..244
+            EnumKw@154..158 "enum"
+            Whitespace@158..159 " "
+            NamedParseType@159..161
+              Identifier@159..161 "u8"
+            Whitespace@161..162 " "
+            LBrace@162..163 "{"
+            Whitespace@163..172 "\n        "
+            EnumParseTypeArm@172..188
+              Identifier@172..183 "ELFDATANONE"
+              Whitespace@183..184 " "
+              Equals@184..185 "="
+              Whitespace@185..186 " "
+              Atom@186..187
+                DecimalIntegerLiteral@186..187 "0"
+              Comma@187..188 ","
+            Whitespace@188..197 "\n        "
+            EnumParseTypeArm@197..213
+              Identifier@197..208 "ELFDATA2LSB"
+              Whitespace@208..209 " "
+              Equals@209..210 "="
+              Whitespace@210..211 " "
+              Atom@211..212
+                DecimalIntegerLiteral@211..212 "1"
+              Comma@212..213 ","
+            Whitespace@213..222 "\n        "
+            EnumParseTypeArm@222..238
+              Identifier@222..233 "ELFDATA2MSB"
+              Whitespace@233..234 " "
+              Equals@234..235 "="
+              Whitespace@235..236 " "
+              Atom@236..237
+                DecimalIntegerLiteral@236..237 "2"
+              Comma@237..238 ","
+            Whitespace@238..243 "\n    "
+            RBrace@243..244 "}"
+          Semicolon@244..245 ";"
+        Whitespace@245..250 "\n    "
+        StructField@250..261
+          Identifier@250..257 "version"
+          Whitespace@257..258 " "
+          NamedParseType@258..260
+            Identifier@258..260 "u8"
+          Semicolon@260..261 ";"
+        Whitespace@261..266 "\n    "
+        StructField@266..273
+          Identifier@266..269 "pad"
+          Whitespace@269..270 " "
+          NamedParseType@270..272
+            Identifier@270..272 "u8"
+          Semicolon@272..273 ";"
+        Whitespace@273..278 "\n    "
+        StructField@278..304
+          Identifier@278..291 "rest_of_ident"
+          Whitespace@291..292 " "
+          BytesParseType@292..303
+            BytesKw@292..297 "bytes"
+            Whitespace@297..298 " "
+            RepeatLenDecl@298..303
+              Identifier@298..301 "len"
+              Whitespace@301..302 " "
+              Atom@302..303
+                DecimalIntegerLiteral@302..303 "8"
+          Semicolon@303..304 ";"
+        Whitespace@304..305 "\n"
+        RBrace@305..306 "}"
+    Semicolon@306..307 ";"
+  Whitespace@307..309 "\n\n"
+  IfDeclaration@309..395
+    ExclamationMark@309..310 "!"
+    IfChain@310..395
+      Identifier@310..312 "if"
+      Whitespace@312..313 " "
+      InfixExpr@313..350
+        FieldAccess@313..330
+          FieldAccess@313..319
+            Dot@313..314 "."
+            BareField@314..319
+              Identifier@314..319 "ident"
+          Dot@319..320 "."
+          BareField@320..330
+            Identifier@320..330 "endianness"
+        Whitespace@330..331 " "
+        Op@331..333
+          Equals@331..332 "="
+          Equals@332..333 "="
+        Whitespace@333..334 " "
+        EnumValue@334..350
+          EnumKw@334..338 "enum"
+          Dot@338..339 "."
+          Identifier@339..350 "ELFDATA2LSB"
+      Whitespace@350..351 " "
+      StructBlock@351..370
+        LBrace@351..352 "{"
+        Whitespace@352..357 "\n    "
+        EndiannessDeclaration@357..368
+          ExclamationMark@357..358 "!"
+          Identifier@358..364 "endian"
+          Whitespace@364..365 " "
+          Identifier@365..367 "le"
+          Semicolon@367..368 ";"
+        Whitespace@368..369 "\n"
+        RBrace@369..370 "}"
+      Whitespace@370..371 " "
+      Identifier@371..375 "else"
+      Whitespace@375..376 " "
+      ElseBlock@376..395
+        StructBlock@376..395
+          LBrace@376..377 "{"
+          Whitespace@377..382 "\n    "
+          EndiannessDeclaration@382..393
+            ExclamationMark@382..383 "!"
+            Identifier@383..389 "endian"
+            Whitespace@389..390 " "
+            Identifier@390..392 "be"
+            Semicolon@392..393 ";"
+          Whitespace@393..394 "\n"
+          RBrace@394..395 "}"
+  Whitespace@395..397 "\n\n"
+  StructField@397..529
+    Identifier@397..401 "type"
+    Whitespace@401..402 " "
+    EnumParseType@402..528
+      EnumKw@402..406 "enum"
+      Whitespace@406..407 " "
+      NamedParseType@407..410
+        Identifier@407..410 "u16"
+      Whitespace@410..411 " "
+      LBrace@411..412 "{"
+      Whitespace@412..417 "\n    "
+      EnumParseTypeArm@417..429
+        Identifier@417..424 "ET_NONE"
+        Whitespace@424..425 " "
+        Equals@425..426 "="
+        Whitespace@426..427 " "
+        Atom@427..428
+          DecimalIntegerLiteral@427..428 "0"
+        Comma@428..429 ","
+      Whitespace@429..434 "\n    "
+      EnumParseTypeArm@434..445
+        Identifier@434..440 "ET_REL"
+        Whitespace@440..441 " "
+        Equals@441..442 "="
+        Whitespace@442..443 " "
+        Atom@443..444
+          DecimalIntegerLiteral@443..444 "1"
+        Comma@444..445 ","
+      Whitespace@445..450 "\n    "
+      EnumParseTypeArm@450..462
+        Identifier@450..457 "ET_EXEC"
+        Whitespace@457..458 " "
+        Equals@458..459 "="
+        Whitespace@459..460 " "
+        Atom@460..461
+          DecimalIntegerLiteral@460..461 "2"
+        Comma@461..462 ","
+      Whitespace@462..467 "\n    "
+      EnumParseTypeArm@467..478
+        Identifier@467..473 "ET_DYN"
+        Whitespace@473..474 " "
+        Equals@474..475 "="
+        Whitespace@475..476 " "
+        Atom@476..477
+          DecimalIntegerLiteral@476..477 "3"
+        Comma@477..478 ","
+      Whitespace@478..483 "\n    "
+      EnumParseTypeArm@483..495
+        Identifier@483..490 "ET_CORE"
+        Whitespace@490..491 " "
+        Equals@491..492 "="
+        Whitespace@492..493 " "
+        Atom@493..494
+          DecimalIntegerLiteral@493..494 "4"
+        Comma@494..495 ","
+      Whitespace@495..500 "\n    "
+      EnumParseTypeArm@500..526
+        Identifier@500..507 "ET_PROC"
+        Whitespace@507..508 " "
+        Equals@508..509 "="
+        Whitespace@509..510 " "
+        Atom@510..516
+          HexadecimalIntegerLiteral@510..516 "0xff00"
+        Dot@516..517 "."
+        Dot@517..518 "."
+        Equals@518..519 "="
+        Atom@519..525
+          HexadecimalIntegerLiteral@519..525 "0xffff"
+        Comma@525..526 ","
+      Whitespace@526..527 "\n"
+      RBrace@527..528 "}"
+    Semicolon@528..529 ";"
+  Whitespace@529..530 "\n"
+  StructField@530..852
+    Identifier@530..537 "machine"
+    Whitespace@537..538 " "
+    EnumParseType@538..851
+      EnumKw@538..542 "enum"
+      Whitespace@542..543 " "
+      NamedParseType@543..546
+        Identifier@543..546 "u16"
+      Whitespace@546..547 " "
+      LBrace@547..548 "{"
+      Whitespace@548..553 "\n    "
+      EnumParseTypeArm@553..565
+        Identifier@553..560 "EM_NONE"
+        Whitespace@560..561 " "
+        Equals@561..562 "="
+        Whitespace@562..563 " "
+        Atom@563..564
+          DecimalIntegerLiteral@563..564 "0"
+        Comma@564..565 ","
+      Whitespace@565..570 "\n    "
+      EnumParseTypeArm@570..581
+        Identifier@570..576 "EM_M32"
+        Whitespace@576..577 " "
+        Equals@577..578 "="
+        Whitespace@578..579 " "
+        Atom@579..580
+          DecimalIntegerLiteral@579..580 "1"
+        Comma@580..581 ","
+      Whitespace@581..586 "\n    "
+      EnumParseTypeArm@586..599
+        Identifier@586..594 "EM_SPARC"
+        Whitespace@594..595 " "
+        Equals@595..596 "="
+        Whitespace@596..597 " "
+        Atom@597..598
+          DecimalIntegerLiteral@597..598 "2"
+        Comma@598..599 ","
+      Whitespace@599..604 "\n    "
+      EnumParseTypeArm@604..615
+        Identifier@604..610 "EM_386"
+        Whitespace@610..611 " "
+        Equals@611..612 "="
+        Whitespace@612..613 " "
+        Atom@613..614
+          DecimalIntegerLiteral@613..614 "3"
+        Comma@614..615 ","
+      Whitespace@615..620 "\n    "
+      EnumParseTypeArm@620..631
+        Identifier@620..626 "EM_68K"
+        Whitespace@626..627 " "
+        Equals@627..628 "="
+        Whitespace@628..629 " "
+        Atom@629..630
+          DecimalIntegerLiteral@629..630 "4"
+        Comma@630..631 ","
+      Whitespace@631..636 "\n    "
+      EnumParseTypeArm@636..647
+        Identifier@636..642 "EM_88K"
+        Whitespace@642..643 " "
+        Equals@643..644 "="
+        Whitespace@644..645 " "
+        Atom@645..646
+          DecimalIntegerLiteral@645..646 "5"
+        Comma@646..647 ","
+      Whitespace@647..652 "\n    "
+      EnumParseTypeArm@652..663
+        Identifier@652..658 "EM_860"
+        Whitespace@658..659 " "
+        Equals@659..660 "="
+        Whitespace@660..661 " "
+        Atom@661..662
+          DecimalIntegerLiteral@661..662 "7"
+        Comma@662..663 ","
+      Whitespace@663..668 "\n    "
+      EnumParseTypeArm@668..680
+        Identifier@668..675 "EM_MIPS"
+        Whitespace@675..676 " "
+        Equals@676..677 "="
+        Whitespace@677..678 " "
+        Atom@678..679
+          DecimalIntegerLiteral@678..679 "8"
+        Comma@679..680 ","
+      Whitespace@680..685 "\n    "
+      EnumParseTypeArm@685..705
+        Identifier@685..699 "EM_MIPS_RS4_BE"
+        Whitespace@699..700 " "
+        Equals@700..701 "="
+        Whitespace@701..702 " "
+        Atom@702..704
+          DecimalIntegerLiteral@702..704 "10"
+        Comma@704..705 ","
+      Whitespace@705..710 "\n    "
+      EnumParseTypeArm@710..725
+        Identifier@710..719 "EM_X86_64"
+        Whitespace@719..720 " "
+        Equals@720..721 "="
+        Whitespace@721..722 " "
+        Atom@722..724
+          DecimalIntegerLiteral@722..724 "62"
+        Comma@724..725 ","
+      Whitespace@725..730 "\n    "
+      EnumParseTypeArm@730..747
+        Identifier@730..740 "EM_AARCH64"
+        Whitespace@740..741 " "
+        Equals@741..742 "="
+        Whitespace@742..743 " "
+        Atom@743..746
+          DecimalIntegerLiteral@743..746 "183"
+        Comma@746..747 ","
+      Whitespace@747..752 "\n    "
+      EnumParseTypeArm@752..766
+        Identifier@752..759 "EM_CUDA"
+        Whitespace@759..760 " "
+        Equals@760..761 "="
+        Whitespace@761..762 " "
+        Atom@762..765
+          DecimalIntegerLiteral@762..765 "190"
+        Comma@765..766 ","
+      Whitespace@766..771 "\n    "
+      EnumParseTypeArm@771..787
+        Identifier@771..780 "EM_AMDGPU"
+        Whitespace@780..781 " "
+        Equals@781..782 "="
+        Whitespace@782..783 " "
+        Atom@783..786
+          DecimalIntegerLiteral@783..786 "224"
+        Comma@786..787 ","
+      Whitespace@787..792 "\n    "
+      EnumParseTypeArm@792..807
+        Identifier@792..800 "EM_RISCV"
+        Whitespace@800..801 " "
+        Equals@801..802 "="
+        Whitespace@802..803 " "
+        Atom@803..806
+          DecimalIntegerLiteral@803..806 "243"
+        Comma@806..807 ","
+      Whitespace@807..812 "\n    "
+      EnumParseTypeArm@812..825
+        Identifier@812..818 "EM_BPF"
+        Whitespace@818..819 " "
+        Equals@819..820 "="
+        Whitespace@820..821 " "
+        Atom@821..824
+          DecimalIntegerLiteral@821..824 "247"
+        Comma@824..825 ","
+      Whitespace@825..830 "\n    "
+      EnumParseTypeArm@830..849
+        Identifier@830..842 "EM_LOONGARCH"
+        Whitespace@842..843 " "
+        Equals@843..844 "="
+        Whitespace@844..845 " "
+        Atom@845..848
+          DecimalIntegerLiteral@845..848 "258"
+        Comma@848..849 ","
+      Whitespace@849..850 "\n"
+      RBrace@850..851 "}"
+    Semicolon@851..852 ";"
+  Whitespace@852..853 "\n"
+  StructField@853..865
+    Identifier@853..860 "version"
+    Whitespace@860..861 " "
+    NamedParseType@861..864
+      Identifier@861..864 "u32"
+    Semicolon@864..865 ";"
+  Whitespace@865..866 "\n"
+  StructField@866..881
+    Identifier@866..876 "entrypoint"
+    Whitespace@876..877 " "
+    NamedParseType@877..880
+      Identifier@877..880 "u64"
+    Semicolon@880..881 ";"
+  Whitespace@881..882 "\n"
+  StructField@882..905
+    Identifier@882..900 "program_header_off"
+    Whitespace@900..901 " "
+    NamedParseType@901..904
+      Identifier@901..904 "u64"
+    Semicolon@904..905 ";"
+  Whitespace@905..906 "\n"
+  StructField@906..929
+    Identifier@906..924 "section_header_off"
+    Whitespace@924..925 " "
+    NamedParseType@925..928
+      Identifier@925..928 "u64"
+    Semicolon@928..929 ";"
+  Whitespace@929..930 "\n"
+  StructField@930..940
+    Identifier@930..935 "flags"
+    Whitespace@935..936 " "
+    NamedParseType@936..939
+      Identifier@936..939 "u32"
+    Semicolon@939..940 ";"
+  Whitespace@940..941 "\n"
+  StructField@941..957
+    Identifier@941..952 "header_size"
+    Whitespace@952..953 " "
+    NamedParseType@953..956
+      Identifier@953..956 "u16"
+    Semicolon@956..957 ";"
+  Whitespace@957..958 "\n"
+  StructField@958..988
+    Identifier@958..983 "program_header_entry_ ..."
+    Whitespace@983..984 " "
+    NamedParseType@984..987
+      Identifier@984..987 "u16"
+    Semicolon@987..988 ";"
+  Whitespace@988..989 "\n"
+  StructField@989..1018
+    Identifier@989..1013 "program_header_entry_num"
+    Whitespace@1013..1014 " "
+    NamedParseType@1014..1017
+      Identifier@1014..1017 "u16"
+    Semicolon@1017..1018 ";"
+  Whitespace@1018..1019 "\n"
+  StructField@1019..1049
+    Identifier@1019..1044 "section_header_entry_ ..."
+    Whitespace@1044..1045 " "
+    NamedParseType@1045..1048
+      Identifier@1045..1048 "u16"
+    Semicolon@1048..1049 ";"
+  Whitespace@1049..1050 "\n"
+  StructField@1050..1079
+    Identifier@1050..1074 "section_header_entry_num"
+    Whitespace@1074..1075 " "
+    NamedParseType@1075..1078
+      Identifier@1075..1078 "u16"
+    Semicolon@1078..1079 ";"
+  Whitespace@1079..1080 "\n"
+  StructField@1080..1112
+    Identifier@1080..1107 "section_header_string ..."
+    Whitespace@1107..1108 " "
+    NamedParseType@1108..1111
+      Identifier@1108..1111 "u16"
+    Semicolon@1111..1112 ";"
+  Whitespace@1112..1114 "\n\n"
+  LetStatement@1114..1241
+    LetKw@1114..1117 "let"
+    Whitespace@1117..1118 " "
+    Identifier@1118..1140 "string_table_start_off"
+    Whitespace@1140..1141 " "
+    Equals@1141..1142 "="
+    Whitespace@1142..1143 " "
+    PeekExpr@1143..1240
+      PeekKw@1143..1147 "peek"
+      LParen@1147..1148 "("
+      NamedParseType@1148..1151
+        Identifier@1148..1151 "u64"
+      Whitespace@1151..1152 " "
+      Identifier@1152..1154 "at"
+      Whitespace@1154..1155 " "
+      InfixExpr@1155..1239
+        InfixExpr@1155..1234
+          FieldAccess@1155..1174
+            Dot@1155..1156 "."
+            BareField@1156..1174
+              Identifier@1156..1174 "section_header_off"
+          Whitespace@1174..1175 " "
+          Op@1175..1176
+            Plus@1175..1176 "+"
+          Whitespace@1176..1177 " "
+          InfixExpr@1177..1234
+            FieldAccess@1177..1203
+              Dot@1177..1178 "."
+              BareField@1178..1203
+                Identifier@1178..1203 "section_header_entry_ ..."
+            Whitespace@1203..1204 " "
+            Op@1204..1205
+              Star@1204..1205 "*"
+            Whitespace@1205..1206 " "
+            FieldAccess@1206..1234
+              Dot@1206..1207 "."
+              BareField@1207..1234
+                Identifier@1207..1234 "section_header_string ..."
+        Whitespace@1234..1235 " "
+        Op@1235..1236
+          Plus@1235..1236 "+"
+        Whitespace@1236..1237 " "
+        Atom@1237..1239
+          DecimalIntegerLiteral@1237..1239 "24"
+      RParen@1239..1240 ")"
+    Semicolon@1240..1241 ";"
+  Whitespace@1241..1243 "\n\n"
+  SeekToDeclaration@1243..1272
+    ExclamationMark@1243..1244 "!"
+    Identifier@1244..1248 "seek"
+    Whitespace@1248..1249 " "
+    Identifier@1249..1251 "to"
+    Whitespace@1251..1252 " "
+    FieldAccess@1252..1271
+      Dot@1252..1253 "."
+      BareField@1253..1271
+        Identifier@1253..1271 "section_header_off"
+    Semicolon@1271..1272 ";"
+  Whitespace@1272..1273 "\n"
+  StructField@1273..2121
+    Identifier@1273..1281 "sections"
+    Whitespace@1281..1282 " "
+    RepeatParseType@1282..2120
+      LBracket@1282..1283 "["
+      AnonymousStructParseType@1283..2089
+        StructBlock@1283..2089
+          LBrace@1283..1284 "{"
+          Whitespace@1284..1289 "\n    "
+          StructField@1289..1302
+            Identifier@1289..1297 "name_idx"
+            Whitespace@1297..1298 " "
+            NamedParseType@1298..1301
+              Identifier@1298..1301 "u32"
+            Semicolon@1301..1302 ";"
+          Whitespace@1302..1307 "\n    "
+          ScopeAtDeclaration@1307..1407
+            ExclamationMark@1307..1308 "!"
+            Identifier@1308..1313 "scope"
+            Whitespace@1313..1314 " "
+            Identifier@1314..1316 "at"
+            Whitespace@1316..1317 " "
+            InfixExpr@1317..1359
+              FieldAccess@1317..1347
+                Metavar@1317..1324
+                  Dollar@1317..1318 "$"
+                  Identifier@1318..1324 "parent"
+                Dot@1324..1325 "."
+                BareField@1325..1347
+                  Identifier@1325..1347 "string_table_start_off"
+              Whitespace@1347..1348 " "
+              Op@1348..1349
+                Plus@1348..1349 "+"
+              Whitespace@1349..1350 " "
+              FieldAccess@1350..1359
+                Dot@1350..1351 "."
+                BareField@1351..1359
+                  Identifier@1351..1359 "name_idx"
+            Whitespace@1359..1360 " "
+            StructBlock@1360..1407
+              LBrace@1360..1361 "{"
+              Whitespace@1361..1370 "\n        "
+              StructField@1370..1401
+                Identifier@1370..1374 "name"
+                Whitespace@1374..1375 " "
+                BytesParseType@1375..1400
+                  BytesKw@1375..1380 "bytes"
+                  Whitespace@1380..1381 " "
+                  RepeatWhileDecl@1381..1400
+                    Identifier@1381..1386 "while"
+                    Whitespace@1386..1387 " "
+                    InfixExpr@1387..1400
+                      PeekExpr@1387..1395
+                        PeekKw@1387..1391 "peek"
+                        LParen@1391..1392 "("
+                        NamedParseType@1392..1394
+                          Identifier@1392..1394 "u8"
+                        RParen@1394..1395 ")"
+                      Whitespace@1395..1396 " "
+                      Op@1396..1398
+                        ExclamationMark@1396..1397 "!"
+                        Equals@1397..1398 "="
+                      Whitespace@1398..1399 " "
+                      Atom@1399..1400
+                        DecimalIntegerLiteral@1399..1400 "0"
+                Semicolon@1400..1401 ";"
+              Whitespace@1401..1406 "\n    "
+              RBrace@1406..1407 "}"
+          Whitespace@1407..1412 "\n    "
+          StructField@1412..1803
+            Identifier@1412..1416 "type"
+            Whitespace@1416..1417 " "
+            EnumParseType@1417..1802
+              EnumKw@1417..1421 "enum"
+              Whitespace@1421..1422 " "
+              NamedParseType@1422..1425
+                Identifier@1422..1425 "u32"
+              Whitespace@1425..1426 " "
+              LBrace@1426..1427 "{"
+              Whitespace@1427..1436 "\n        "
+              EnumParseTypeArm@1436..1449
+                Identifier@1436..1444 "SHT_NULL"
+                Whitespace@1444..1445 " "
+                Equals@1445..1446 "="
+                Whitespace@1446..1447 " "
+                Atom@1447..1448
+                  DecimalIntegerLiteral@1447..1448 "0"
+                Comma@1448..1449 ","
+              Whitespace@1449..1458 "\n        "
+              EnumParseTypeArm@1458..1475
+                Identifier@1458..1470 "SHT_PROGBITS"
+                Whitespace@1470..1471 " "
+                Equals@1471..1472 "="
+                Whitespace@1472..1473 " "
+                Atom@1473..1474
+                  DecimalIntegerLiteral@1473..1474 "1"
+                Comma@1474..1475 ","
+              Whitespace@1475..1484 "\n        "
+              EnumParseTypeArm@1484..1499
+                Identifier@1484..1494 "SHT_SYMTAB"
+                Whitespace@1494..1495 " "
+                Equals@1495..1496 "="
+                Whitespace@1496..1497 " "
+                Atom@1497..1498
+                  DecimalIntegerLiteral@1497..1498 "2"
+                Comma@1498..1499 ","
+              Whitespace@1499..1508 "\n        "
+              EnumParseTypeArm@1508..1523
+                Identifier@1508..1518 "SHT_STRTAB"
+                Whitespace@1518..1519 " "
+                Equals@1519..1520 "="
+                Whitespace@1520..1521 " "
+                Atom@1521..1522
+                  DecimalIntegerLiteral@1521..1522 "3"
+                Comma@1522..1523 ","
+              Whitespace@1523..1532 "\n        "
+              EnumParseTypeArm@1532..1545
+                Identifier@1532..1540 "SHT_RELA"
+                Whitespace@1540..1541 " "
+                Equals@1541..1542 "="
+                Whitespace@1542..1543 " "
+                Atom@1543..1544
+                  DecimalIntegerLiteral@1543..1544 "4"
+                Comma@1544..1545 ","
+              Whitespace@1545..1554 "\n        "
+              EnumParseTypeArm@1554..1567
+                Identifier@1554..1562 "SHT_HASH"
+                Whitespace@1562..1563 " "
+                Equals@1563..1564 "="
+                Whitespace@1564..1565 " "
+                Atom@1565..1566
+                  DecimalIntegerLiteral@1565..1566 "5"
+                Comma@1566..1567 ","
+              Whitespace@1567..1576 "\n        "
+              EnumParseTypeArm@1576..1592
+                Identifier@1576..1587 "SHT_DYNAMIC"
+                Whitespace@1587..1588 " "
+                Equals@1588..1589 "="
+                Whitespace@1589..1590 " "
+                Atom@1590..1591
+                  DecimalIntegerLiteral@1590..1591 "6"
+                Comma@1591..1592 ","
+              Whitespace@1592..1601 "\n        "
+              EnumParseTypeArm@1601..1614
+                Identifier@1601..1609 "SHT_NOTE"
+                Whitespace@1609..1610 " "
+                Equals@1610..1611 "="
+                Whitespace@1611..1612 " "
+                Atom@1612..1613
+                  DecimalIntegerLiteral@1612..1613 "7"
+                Comma@1613..1614 ","
+              Whitespace@1614..1623 "\n        "
+              EnumParseTypeArm@1623..1638
+                Identifier@1623..1633 "SHT_NOBITS"
+                Whitespace@1633..1634 " "
+                Equals@1634..1635 "="
+                Whitespace@1635..1636 " "
+                Atom@1636..1637
+                  DecimalIntegerLiteral@1636..1637 "8"
+                Comma@1637..1638 ","
+              Whitespace@1638..1647 "\n        "
+              EnumParseTypeArm@1647..1659
+                Identifier@1647..1654 "SHT_REL"
+                Whitespace@1654..1655 " "
+                Equals@1655..1656 "="
+                Whitespace@1656..1657 " "
+                Atom@1657..1658
+                  DecimalIntegerLiteral@1657..1658 "9"
+                Comma@1658..1659 ","
+              Whitespace@1659..1668 "\n        "
+              EnumParseTypeArm@1668..1683
+                Identifier@1668..1677 "SHT_SHLIB"
+                Whitespace@1677..1678 " "
+                Equals@1678..1679 "="
+                Whitespace@1679..1680 " "
+                Atom@1680..1682
+                  DecimalIntegerLiteral@1680..1682 "10"
+                Comma@1682..1683 ","
+              Whitespace@1683..1692 "\n        "
+              EnumParseTypeArm@1692..1708
+                Identifier@1692..1702 "SHT_DYNSYM"
+                Whitespace@1702..1703 " "
+                Equals@1703..1704 "="
+                Whitespace@1704..1705 " "
+                Atom@1705..1707
+                  DecimalIntegerLiteral@1705..1707 "11"
+                Comma@1707..1708 ","
+              Whitespace@1708..1717 "\n        "
+              EnumParseTypeArm@1717..1752
+                Identifier@1717..1725 "SHT_PROC"
+                Whitespace@1725..1726 " "
+                Equals@1726..1727 "="
+                Whitespace@1727..1728 " "
+                Atom@1728..1738
+                  HexadecimalIntegerLiteral@1728..1738 "0x70000000"
+                Dot@1738..1739 "."
+                Dot@1739..1740 "."
+                Equals@1740..1741 "="
+                Atom@1741..1751
+                  HexadecimalIntegerLiteral@1741..1751 "0x7fffffff"
+                Comma@1751..1752 ","
+              Whitespace@1752..1761 "\n        "
+              EnumParseTypeArm@1761..1796
+                Identifier@1761..1769 "SHT_USER"
+                Whitespace@1769..1770 " "
+                Equals@1770..1771 "="
+                Whitespace@1771..1772 " "
+                Atom@1772..1782
+                  HexadecimalIntegerLiteral@1772..1782 "0x80000000"
+                Dot@1782..1783 "."
+                Dot@1783..1784 "."
+                Equals@1784..1785 "="
+                Atom@1785..1795
+                  HexadecimalIntegerLiteral@1785..1795 "0xffffffff"
+                Comma@1795..1796 ","
+              Whitespace@1796..1801 "\n    "
+              RBrace@1801..1802 "}"
+            Semicolon@1802..1803 ";"
+          Whitespace@1803..1808 "\n    "
+          StructField@1808..1911
+            Identifier@1808..1813 "flags"
+            Whitespace@1813..1814 " "
+            FlagsParseType@1814..1910
+              Identifier@1814..1819 "flags"
+              Whitespace@1819..1820 " "
+              NamedParseType@1820..1823
+                Identifier@1820..1823 "u64"
+              Whitespace@1823..1824 " "
+              LBrace@1824..1825 "{"
+              Whitespace@1825..1834 "\n        "
+              FlagsParseTypeArm@1834..1850
+                Identifier@1834..1843 "SHF_WRITE"
+                Whitespace@1843..1844 " "
+                Equals@1844..1845 "="
+                Whitespace@1845..1846 " "
+                FlagsParseTypeRawArm@1846..1849
+                  Atom@1846..1849
+                    HexadecimalIntegerLiteral@1846..1849 "0x1"
+                Comma@1849..1850 ","
+              Whitespace@1850..1859 "\n        "
+              FlagsParseTypeArm@1859..1875
+                Identifier@1859..1868 "SHF_ALLOC"
+                Whitespace@1868..1869 " "
+                Equals@1869..1870 "="
+                Whitespace@1870..1871 " "
+                FlagsParseTypeRawArm@1871..1874
+                  Atom@1871..1874
+                    HexadecimalIntegerLiteral@1871..1874 "0x2"
+                Comma@1874..1875 ","
+              Whitespace@1875..1884 "\n        "
+              FlagsParseTypeArm@1884..1904
+                Identifier@1884..1897 "SHF_EXECINSTR"
+                Whitespace@1897..1898 " "
+                Equals@1898..1899 "="
+                Whitespace@1899..1900 " "
+                FlagsParseTypeRawArm@1900..1903
+                  Atom@1900..1903
+                    HexadecimalIntegerLiteral@1900..1903 "0x4"
+                Comma@1903..1904 ","
+              Whitespace@1904..1909 "\n    "
+              RBrace@1909..1910 "}"
+            Semicolon@1910..1911 ";"
+          Whitespace@1911..1916 "\n    "
+          StructField@1916..1925
+            Identifier@1916..1920 "addr"
+            Whitespace@1920..1921 " "
+            NamedParseType@1921..1924
+              Identifier@1921..1924 "u64"
+            Semicolon@1924..1925 ";"
+          Whitespace@1925..1930 "\n    "
+          StructField@1930..1941
+            Identifier@1930..1936 "offset"
+            Whitespace@1936..1937 " "
+            NamedParseType@1937..1940
+              Identifier@1937..1940 "u64"
+            Semicolon@1940..1941 ";"
+          Whitespace@1941..1946 "\n    "
+          StructField@1946..1955
+            Identifier@1946..1950 "size"
+            Whitespace@1950..1951 " "
+            NamedParseType@1951..1954
+              Identifier@1951..1954 "u64"
+            Semicolon@1954..1955 ";"
+          Whitespace@1955..1960 "\n    "
+          StructField@1960..1969
+            Identifier@1960..1964 "link"
+            Whitespace@1964..1965 " "
+            NamedParseType@1965..1968
+              Identifier@1965..1968 "u32"
+            Semicolon@1968..1969 ";"
+          Whitespace@1969..1974 "\n    "
+          StructField@1974..1983
+            Identifier@1974..1978 "info"
+            Whitespace@1978..1979 " "
+            NamedParseType@1979..1982
+              Identifier@1979..1982 "u32"
+            Semicolon@1982..1983 ";"
+          Whitespace@1983..1988 "\n    "
+          StructField@1988..2003
+            Identifier@1988..1998 "addr_align"
+            Whitespace@1998..1999 " "
+            NamedParseType@1999..2002
+              Identifier@1999..2002 "u64"
+            Semicolon@2002..2003 ";"
+          Whitespace@2003..2008 "\n    "
+          StructField@2008..2023
+            Identifier@2008..2018 "entry_size"
+            Whitespace@2018..2019 " "
+            NamedParseType@2019..2022
+              Identifier@2019..2022 "u64"
+            Semicolon@2022..2023 ";"
+          Whitespace@2023..2029 "\n\n    "
+          ScopeAtDeclaration@2029..2087
+            ExclamationMark@2029..2030 "!"
+            Identifier@2030..2035 "scope"
+            Whitespace@2035..2036 " "
+            Identifier@2036..2038 "at"
+            Whitespace@2038..2039 " "
+            FieldAccess@2039..2046
+              Dot@2039..2040 "."
+              BareField@2040..2046
+                Identifier@2040..2046 "offset"
+            Whitespace@2046..2047 " "
+            StructBlock@2047..2087
+              LBrace@2047..2048 "{"
+              Whitespace@2048..2057 "\n        "
+              StructField@2057..2081
+                Identifier@2057..2064 "content"
+                Whitespace@2064..2065 " "
+                BytesParseType@2065..2080
+                  BytesKw@2065..2070 "bytes"
+                  Whitespace@2070..2071 " "
+                  RepeatLenDecl@2071..2080
+                    Identifier@2071..2074 "len"
+                    Whitespace@2074..2075 " "
+                    FieldAccess@2075..2080
+                      Dot@2075..2076 "."
+                      BareField@2076..2080
+                        Identifier@2076..2080 "size"
+                Semicolon@2080..2081 ";"
+              Whitespace@2081..2086 "\n    "
+              RBrace@2086..2087 "}"
+          Whitespace@2087..2088 "\n"
+          RBrace@2088..2089 "}"
+      RBracket@2089..2090 "]"
+      Whitespace@2090..2091 " "
+      RepeatLenDecl@2091..2120
+        Identifier@2091..2094 "len"
+        Whitespace@2094..2095 " "
+        FieldAccess@2095..2120
+          Dot@2095..2096 "."
+          BareField@2096..2120
+            Identifier@2096..2120 "section_header_entry_num"
+    Semicolon@2120..2121 ";"
+  Whitespace@2121..2122 "\n"
 
 --- diagnostics ---
 no diagnostics
