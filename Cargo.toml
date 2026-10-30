@@ -8,6 +8,9 @@ members = [
     "hexbait-parse",
 ]
 
+[workspace.package]
+version = "0.0.1"
+
 [profile.dev]
 opt-level = 3
 debug = true

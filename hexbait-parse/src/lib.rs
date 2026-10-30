@@ -1,5 +1,7 @@
 //! The library to the CLI frontend of the hexbait language.
 
+#![forbid(unsafe_code)]
+
 use std::str::FromStr as _;
 
 use hexbait_lang::eval::{

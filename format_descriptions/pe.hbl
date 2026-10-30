@@ -20,7 +20,10 @@ pe_header {
 };
 
 optional_header {
-    magic bytes = <0b 01>;
+    magic enum u16 {
+        PE32 = 0x10b,
+        PE32plus = 0x20b,
+    };
     major_linker_version u8;
     minor_linker_version u8;
     size_of_code u32;
@@ -28,7 +31,9 @@ optional_header {
     size_of_uninitialized_data u32;
     addr_of_entry_point u32;
     base_of_code u32;
-    base_of_data u32;
+    !if .magic == enum.PE32 {
+        base_of_data u32;
+    }
 };
 
 let size_of_pe_header = 24;
@@ -36,7 +41,7 @@ let size_of_pe_header = 24;
 
 sections [{
     !scope at $offset {
-        section_name bytes while peek(u8) != 0 && $len < 8;
+        section_name bytes while $len < 8 && peek(u8) != 0;
     }
     !seek by 8;
 

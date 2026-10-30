@@ -92,6 +92,9 @@ struct HexbaitApp {
 
 impl eframe::App for HexbaitApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
+        // force dark theme for now, because hexbait is not optimized for light themes
+        ui.ctx().set_theme(egui::Theme::Dark);
+
         let start = std::time::Instant::now();
 
         Panel::top("menubar").show(ui, |ui| {

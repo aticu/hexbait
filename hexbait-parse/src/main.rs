@@ -4,14 +4,17 @@
 
 #![forbid(unsafe_code)]
 
-use std::path::PathBuf;
+use std::{
+    io::{self, Write as _},
+    path::PathBuf,
+};
 
 use clap::Parser;
 use hexbait_builtin_parsers::built_in_format_descriptions;
 use hexbait_common::{Input, RelativeOffset};
 use hexbait_lang::{
     compile::{CompileResult, compile_file},
-    eval::{View, eval_ir},
+    eval::{DiagnosticLevel, View, eval_ir},
 };
 use hexbait_parse::result_to_json;
 
@@ -30,9 +33,12 @@ struct Config {
     /// A custom parser to use
     #[arg(short, long)]
     custom: Option<PathBuf>,
-    /// Whether to show more detailed output
+    /// Show more detailed output
     #[arg(short, long)]
     detailed: bool,
+    /// Fail for parse errors
+    #[arg(short, long)]
+    fail_for_errors: bool,
 }
 
 /// The entry point for the application.
@@ -42,14 +48,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut builtin = built_in_format_descriptions();
 
     if config.list {
+        let mut as_str = String::new();
         for name in builtin.keys() {
-            println!("{name}");
+            as_str.push_str(name);
+            as_str.push('\n');
         }
-        println!();
-        println!(
+        as_str.push('\n');
+        as_str.push_str(
             "if the `--custom` (or `-c`) argument is used, the format definition at the supplied path will be used instead"
         );
-        std::process::exit(0);
+
+        return match writeln!(io::stdout().lock(), "{as_str}") {
+            Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Ok(()),
+            result => Ok(result?),
+        };
     }
 
     let parser = match (config.custom, config.parse_as) {
@@ -92,7 +104,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = eval_ir(&parser, view, RelativeOffset::ZERO);
     let as_json = result_to_json(&result, config.detailed);
 
-    println!("{as_json}");
+    match writeln!(io::stdout().lock(), "{as_json}") {
+        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => (),
+        result => result?,
+    };
+
+    if config.fail_for_errors
+        && result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.level == DiagnosticLevel::Fail)
+    {
+        std::process::exit(1);
+    }
 
     Ok(())
 }

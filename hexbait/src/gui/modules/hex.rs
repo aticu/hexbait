@@ -162,8 +162,6 @@ fn handle_scrolling(
             } else {
                 scroll_state.hex_scroll_offset += scroll_delta;
             }
-            scroll_state.hex_scroll_offset =
-                (scroll_state.hex_scroll_offset).saturating_add(scroll_delta);
         }
     }
 

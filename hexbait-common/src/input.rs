@@ -83,6 +83,11 @@ impl Input {
                         nix::fcntl::PosixFadviseAdvice::POSIX_FADV_WILLNEED,
                     );
                 }
+                #[cfg(windows)]
+                {
+                    // TODO: not implemented yet
+                    let _ = (offset, len, file);
+                }
             }
             InputType::Bytes(_) => (),
         }
@@ -248,7 +253,7 @@ fn read_exact(file: &File, mut pos: u64, mut buf: &mut [u8]) -> io::Result<()> {
     // NOTE: Using seek_read would be a problem for multi-threaded use of the file if it were possible to use the `File` directly.
     // However since `Input` is private internally, this is not a problem, since `read_seek` itself is atomic.
     #[cfg(windows)]
-    let read_at = std::os::window::fs::FileExt::seek_read;
+    let read_at = std::os::windows::fs::FileExt::seek_read;
 
     while !buf.is_empty() {
         match read_at(file, buf, pos) {

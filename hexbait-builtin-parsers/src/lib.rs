@@ -1,5 +1,7 @@
 //! Provides the built-in format descriptions.
 
+#![forbid(unsafe_code)]
+
 use std::collections::BTreeMap;
 
 use hexbait_lang::compile::{CompileResult, compile_file, ir::File};

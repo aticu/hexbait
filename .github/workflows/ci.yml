@@ -1,0 +1,64 @@
+# Runs on every push to main and on every pull request.
+# Linux runs the same checks as scripts/check_commit.sh (fmt, clippy, tests).
+# Windows and macOS only check that everything still compiles there.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel an older run of the same branch when a newer commit arrives.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: fmt, clippy, test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: ./scripts/check_commit.sh
+
+  build:
+    name: build and smoke test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            exe: ""
+            format: elf
+          - os: windows-latest
+            exe: .exe
+            format: pe
+          - os: macos-latest
+            exe: ""
+            format: "" # no Mach-O description yet
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --workspace --locked
+      # The GUI can't be tested headless, but hexbait-parse shares the file
+      # reading code and compiles every built-in format description at startup,
+      # so this catches platform-specific I/O and line-ending problems.
+      - name: Smoke test hexbait-parse
+        run: |
+          parser="target/debug/hexbait-parse${{ matrix.exe }}"
+          "$parser" --list
+          if [ -n "${{ matrix.format }}" ]; then
+            "$parser" -p ${{ matrix.format }} --fail-for-errors "$parser" > /dev/null
+          fi

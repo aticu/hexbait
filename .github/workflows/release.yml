@@ -1,0 +1,107 @@
+# Builds release binaries when a version tag is pushed, e.g.:
+#
+#   git tag v0.0.1
+#   git push origin v0.0.1
+#
+# The result is a *draft* GitHub release with one archive per platform.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Built on the oldest supported Ubuntu so the binary also runs on
+          # distributions with an older glibc.
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-22.04
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          # Intel Macs, cross-compiled on the Apple Silicon runner.
+          - target: x86_64-apple-darwin
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # Guards against tagging v0.0.2 while Cargo.toml still says 0.0.1,
+      # which would make `hexbait --version` lie.
+      - name: Check that the tag matches the crate version
+        run: |
+          pkgid="$(cargo pkgid -p hexbait)"
+          crate_version="${pkgid##*[#@]}"
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [ "$crate_version" != "$tag_version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match hexbait version $crate_version"
+            exit 1
+          fi
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }} -p hexbait -p hexbait-parse
+
+      - name: Package
+        run: |
+          name="hexbait-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          mkdir "$name"
+          bin_dir="target/${{ matrix.target }}/release"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp "$bin_dir/hexbait.exe" "$bin_dir/hexbait-parse.exe" "$name/"
+          else
+            cp "$bin_dir/hexbait" "$bin_dir/hexbait-parse" "$name/"
+          fi
+          cp README.md LICENSE "$name/"
+          mkdir dist
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z a "dist/$name.zip" "$name" > /dev/null
+          else
+            tar czf "dist/$name.tar.gz" "$name"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/*
+
+  release:
+    name: create draft release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --prerelease \
+            --generate-notes \
+            --title "hexbait $GITHUB_REF_NAME"
