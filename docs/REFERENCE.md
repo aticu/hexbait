@@ -7,7 +7,7 @@ This is a [reference](https://diataxis.fr/reference/) for using hexbait.
 The main content area is split into two parts:
 
 - To the left are the zoombars.
-  They represent nested zoomed in views of the selection of their left-most neighbor.
+  They represent nested zoomed in views of the selection of their left neighbor.
   The color scheme of the zoombars is described in the section on [statistical colors](#statistical-colors).
 - To the right of that is the content view.
   The content view changes based on the zoom-level.

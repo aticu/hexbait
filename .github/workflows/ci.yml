@@ -1,6 +1,5 @@
 # Runs on every push to main and on every pull request.
 # Linux runs the same checks as scripts/check_commit.sh (fmt, clippy, tests).
-# Windows and macOS only check that everything still compiles there.
 name: CI
 
 on:

@@ -15,7 +15,7 @@ You won't run it, only look at it, so it works the same on every operating syste
 
 Your window will probably have a different size than the one in the screenshots.
 The shapes on the overview map then look different, but the colors are the same.
-If you have a screen with a very high resolution your window may look different than in the screenshot below.
+If you have a screen with a very high resolution, your window may look different than in the screenshots.
 In this case you can make the hexbait window smaller to follow along with the tutorial.
 Larger screens can fit more pixels, so hexbait can show more detailed information on them without zooming in as much.
 
