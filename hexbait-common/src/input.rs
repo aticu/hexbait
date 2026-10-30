@@ -74,7 +74,7 @@ impl Input {
     pub fn signal_planned_read(&self, offset: AbsoluteOffset, len: Len) {
         match &*self.0 {
             InputType::File { file, .. } => {
-                #[cfg(unix)]
+                #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))]
                 {
                     let _ = nix::fcntl::posix_fadvise(
                         file,
@@ -83,9 +83,13 @@ impl Input {
                         nix::fcntl::PosixFadviseAdvice::POSIX_FADV_WILLNEED,
                     );
                 }
-                #[cfg(windows)]
+                #[cfg(not(any(
+                    target_os = "linux",
+                    target_os = "android",
+                    target_os = "freebsd"
+                )))]
                 {
-                    // TODO: not implemented yet
+                    // TODO: not implemented yet for this platform
                     let _ = (offset, len, file);
                 }
             }
