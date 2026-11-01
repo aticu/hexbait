@@ -91,6 +91,10 @@ pub enum NodeKind {
     LetStatement,
     /// A block of struct contents.
     StructBlock,
+    /// A chain of one or more if statements.
+    IfChain,
+    /// A scope for the parser.
+    Scope,
 
     // Parse types
     /// A parse type that is a single identifier.
@@ -131,12 +135,18 @@ pub enum NodeKind {
     RepeatWhileDecl,
 
     // Conditional parsing
-    /// A chain of one or more if statements.
-    IfChain,
     /// An `else` block or an `else if` chain continuation.
     ElsePart,
     /// An `else` block.
     ElseBlock,
+
+    // Scope definitions
+    /// The kind of a scope.
+    ScopeKind,
+    /// The scope parses at a given location in the current scope.
+    ScopeAt,
+    /// The scope parses in a given bytes value.
+    ScopeIn,
 
     // Declarations
     /// A declaration of endianness like `!endian le`.
@@ -147,10 +157,6 @@ pub enum NodeKind {
     SeekToDeclaration,
     /// A declaration to seek by a specified amount like `!seek by +64`.
     SeekByDeclaration,
-    /// A declaration that parsing should continue in another scope that starts at a given offset.
-    ScopeAtDeclaration,
-    /// A declaration that parsing should continue in another scope that is defined by parsed bytes.
-    ScopeInDeclaration,
     /// A declaration asserting that an expression is true like `!assert size > 4`.
     AssertDeclaration,
     /// A declaration warns if the expression is true like `!warn if size > 4: "expected small size"`.

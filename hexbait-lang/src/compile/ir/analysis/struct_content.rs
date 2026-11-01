@@ -4,8 +4,8 @@ use crate::compile::{
     Diagnostic, Span,
     diagnostics::Label,
     ir::{
-        Block, IfChain, LetStatement, Spanned, StructContent, StructContentKind, StructField,
-        Symbol,
+        Block, IfChain, LetStatement, Scope, ScopeKind, Spanned, StructContent, StructContentKind,
+        StructField, Symbol,
         analysis::{
             AnalysisCtx, EndiannessState, Env,
             expr::ExtraExprCtx,
@@ -27,6 +27,9 @@ impl Env<'_> {
             }
             StructContentKind::IfChain(if_chain) => {
                 self.check_if_chain(ctx, if_chain, content.span);
+            }
+            StructContentKind::Scope(scope) => {
+                self.check_scope(ctx, scope);
             }
             StructContentKind::Error => {
                 assert!(ctx.diagnostics.contains_error_in(content.span));
@@ -191,5 +194,33 @@ impl Env<'_> {
                 unset_is_missing_else,
             },
         };
+    }
+
+    /// Checks the given scope.
+    fn check_scope(&mut self, ctx: &mut AnalysisCtx, scope: &Scope) {
+        match &scope.kind {
+            ScopeKind::At { start, end } => {
+                self.check_int(ctx, start, "expected scope start to be an integer");
+
+                if let Some(end) = end {
+                    self.check_int(ctx, end, "expected scope end to be an integer");
+                }
+            }
+            ScopeKind::In { bytes } => {
+                let bytes_ty = self.check_expr(ctx, bytes, &ExtraExprCtx::none());
+
+                if !matches!(&bytes_ty.kind, TyKind::Bytes) {
+                    ctx.ty_err(
+                        "expected bytes type as argument to `scope in`",
+                        &bytes_ty,
+                        bytes.span,
+                    );
+                }
+            }
+        }
+
+        for content in &scope.block.content {
+            self.check_struct_content(ctx, content);
+        }
     }
 }

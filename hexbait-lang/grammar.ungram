@@ -26,6 +26,7 @@ StructContent =
 | Struct
 | LetStatement
 | IfChain
+| Scope
 
 // The block body of a `struct`.
 StructBlock =
@@ -37,8 +38,6 @@ Declaration =
 | AlignDeclaration
 | SeekByDeclaration
 | SeekToDeclaration
-| ScopeAtDeclaration
-| ScopeInDeclaration
 | AssertDeclaration
 | WarnIfDeclaration
 | RecoveryDeclaration
@@ -61,18 +60,24 @@ SeekByDeclaration =
 SeekToDeclaration =
   '!' 'seek' 'to' amount:Expr ';'
 
-// Declares a new scope in the parser.
-// The scope starts at the offset `start` in the current scope and optionally ends at the offset `end` in the current scope.
-// The parser continues parsing in the sub-scope at the offset `0` (which corresponds to `start` in the current scope).
+// Opens a new scope in the parser.
+// The exact semantics of the scope depend on the scope kind, but within the scope the parser will start at offset 0 within the scope.
 // Reading past the end of the scope from within it will result in an error.
-ScopeAtDeclaration =
-  '!' 'scope' 'at' start:Expr ('until' end:Expr)? StructBlock
+Scope =
+  'scope' ScopeKind StructBlock
 
-// Declares a new scope in the parser.
+// The different kinds of scopes.
+ScopeKind =
+  ScopeAt
+| ScopeIn
+
+// The scope starts at the offset `start` in the current scope and optionally ends at the offset `end` in the current scope.
+ScopeAt =
+  'at' start:Expr ('until' end:Expr)?
+
 // The parser continues parsing in the value of the bytes expression as a sub-scope at the offset `0`.
-// Reading past the end of the scope from within it will result in an error.
-ScopeInDeclaration =
-  '!' 'scope' 'in' bytes:Expr StructBlock
+ScopeIn =
+  'in' bytes:Expr
 
 // If the `condition` is true, `then_block` is parsed.
 // Otherwise the optional `else` part is parsed (if present).

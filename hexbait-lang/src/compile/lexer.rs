@@ -162,6 +162,9 @@ pub enum TokenKind {
     /// The `if` keyword.
     #[token("if")]
     IfKw,
+    /// The `scope` keyword.
+    #[token("scope")]
+    ScopeKw,
     /// The `true` keyword.
     #[token("true")]
     TrueKw,
@@ -223,6 +226,7 @@ impl TokenKind {
             TokenKind::ConcatKw => "`concat`",
             TokenKind::SwitchKw => "`switch`",
             TokenKind::IfKw => "`if`",
+            TokenKind::ScopeKw => "`scope`",
             TokenKind::TrueKw => "`true`",
             TokenKind::FalseKw => "`false`",
             TokenKind::Error => "an unrecognized token",
@@ -276,6 +280,7 @@ impl TokenKind {
             | TokenKind::PeekKw
             | TokenKind::ConcatKw
             | TokenKind::SwitchKw
+            | TokenKind::ScopeKw
             | TokenKind::IfKw
             | TokenKind::TrueKw
             | TokenKind::FalseKw

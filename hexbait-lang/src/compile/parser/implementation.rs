@@ -44,6 +44,7 @@ fn struct_content(p: &mut Parser) {
         TokenKind::LetKw => r#let(p),
         TokenKind::ExclamationMark => decl(p),
         TokenKind::IfKw => if_chain(p),
+        TokenKind::ScopeKw => scope(p),
         _ => struct_field(p),
     }
 }
@@ -119,6 +120,42 @@ fn if_chain(p: &mut Parser) {
     });
 }
 
+/// Parses a `scope`.
+fn scope(p: &mut Parser) {
+    p.node(|p| {
+        p.with_unconsuming_recovery(TokenKind::LBrace, |p| {
+            p.expect(TokenKind::ScopeKw);
+
+            p.node(|p| match p.peek_contextual_kw() {
+                Some("at") => {
+                    p.bump();
+
+                    expr(p);
+                    if p.at_contextual_kw("until") {
+                        p.bump();
+                        expr(p);
+                    }
+                    NodeKind::ScopeAt
+                }
+                Some("in") => {
+                    p.bump();
+
+                    expr(p);
+                    NodeKind::ScopeIn
+                }
+                _ => {
+                    p.expect_error(&["`at`", "`in`"]);
+                    p.recover();
+                    NodeKind::Error
+                }
+            });
+        });
+        struct_block(p);
+
+        NodeKind::Scope
+    });
+}
+
 /// Parses a declaration.
 fn decl(p: &mut Parser) {
     p.node(|p| {
@@ -162,38 +199,6 @@ fn decl(p: &mut Parser) {
                     NodeKind::Error
                 }
             }),
-            Some("scope") => {
-                p.bump();
-                let kind = match p.peek_contextual_kw() {
-                    Some("at") => {
-                        p.bump();
-                        Some(NodeKind::ScopeAtDeclaration)
-                    }
-                    Some("in") => {
-                        p.bump();
-                        Some(NodeKind::ScopeInDeclaration)
-                    }
-                    _ => {
-                        p.expect_error(&["`at`", "`in`"]);
-                        None
-                    }
-                };
-
-                p.with_unconsuming_recovery(TokenKind::LBrace, |p| match kind {
-                    Some(kind) => {
-                        expr(p);
-
-                        if kind == NodeKind::ScopeAtDeclaration && p.at_contextual_kw("until") {
-                            p.bump();
-                            expr(p);
-                        }
-                    }
-                    None => p.recover(),
-                });
-                struct_block(p);
-
-                kind.unwrap_or(NodeKind::Error)
-            }
             Some("align") => {
                 p.with_consuming_recovery(TokenKind::Semicolon, |p| {
                     p.bump();
@@ -250,7 +255,6 @@ fn decl(p: &mut Parser) {
                 p.expect_error(&[
                     "`endian`",
                     "`seek`",
-                    "`scope`",
                     "`align`",
                     "`assert`",
                     "`warn`",

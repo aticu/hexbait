@@ -2,7 +2,7 @@
 
 !recover at 2;
 
-!scope at 2 {
+scope at 2 {
     inner {
         val u32;
     };

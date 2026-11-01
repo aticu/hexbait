@@ -1,6 +1,6 @@
 !endian le;
 
-!scope at $offset until 16384 {
+scope at $offset until 16384 {
 	checksum bytes len 32;
 	fs_uuid bytes len 16;
 	logical_address u64;
@@ -20,7 +20,7 @@
 			data_offset u32;
 			data_size u32;
 
-			!scope at 0x65 + .data_offset until 0x65 + .data_offset + .data_size {
+			scope at 0x65 + .data_offset until 0x65 + .data_offset + .data_size {
 				data switch .item_ty {
 					0x01 => {
 						generation u64;

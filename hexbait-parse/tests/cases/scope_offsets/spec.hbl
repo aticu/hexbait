@@ -1,6 +1,6 @@
 !endian le;
 
-!scope at 3 {
+scope at 3 {
   a u8;
   !assert $offset == 1;
   !seek to 4;

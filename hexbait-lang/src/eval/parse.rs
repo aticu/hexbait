@@ -4,10 +4,11 @@ use std::fmt;
 
 use crate::{
     compile::ir::{
-        Block, Expr, File, IfChain, LetStatement, StructContent, StructContentKind, StructField,
+        Block, Expr, File, IfChain, LetStatement, Scope, ScopeKind, StructContent,
+        StructContentKind, StructField,
     },
     eval::{
-        ValueKind,
+        Provenance, ValueKind,
         parse::{
             cursor::Cursor,
             diagnostics::{Diagnostics, Result},
@@ -164,6 +165,64 @@ impl ParseContext {
         Ok(())
     }
 
+    /// Evaluates the given `scope`.
+    fn eval_scope(
+        &mut self,
+        scope: &Scope,
+        cursor: &mut Cursor,
+        struct_ctx: &mut StructContext,
+    ) -> Result<()> {
+        let (view, span) = match &scope.kind {
+            ScopeKind::At { start, end } => {
+                let span = start.span;
+                let start_expr = self.eval_expr(start, cursor, struct_ctx, Default::default())?;
+
+                let start = self.probe_seek(
+                    start_expr.kind.expect_int(),
+                    &start_expr.provenance,
+                    span,
+                    cursor,
+                    "for start of new scope",
+                )?;
+
+                let end = if let Some(end) = end {
+                    let end_expr = self.eval_expr(end, cursor, struct_ctx, Default::default())?;
+
+                    self.probe_seek(
+                        end_expr.kind.expect_int(),
+                        &end_expr.provenance,
+                        span,
+                        cursor,
+                        "for end of new scope",
+                    )?
+                } else {
+                    cursor.view().end_offset()
+                };
+
+                (cursor.view().subview(start..end), span)
+            }
+            ScopeKind::In { bytes } => {
+                let bytes_expr = self.eval_expr(bytes, cursor, struct_ctx, Default::default())?;
+
+                (
+                    View::from_bytes(bytes_expr.kind.expect_bytes_take()),
+                    bytes.span,
+                )
+            }
+        };
+
+        let mut subcursor = cursor
+            .child_with_view_and_offset(view, RelativeOffset::ZERO)
+            .map_err(|err| {
+                self.diagnostics
+                    .seek_err(err, &Provenance::empty(), span, "for scope")
+            })?;
+
+        self.eval_block(&scope.block, &mut subcursor, struct_ctx)?;
+
+        Ok(())
+    }
+
     /// Evaluates the given block.
     fn eval_block(
         &mut self,
@@ -206,6 +265,7 @@ impl ParseContext {
             StructContentKind::IfChain(if_chain) => {
                 Ok(self.eval_if_chain(if_chain, cursor, struct_ctx)?)
             }
+            StructContentKind::Scope(scope) => Ok(self.eval_scope(scope, cursor, struct_ctx)?),
             StructContentKind::Error => static_analysis_impossible(),
         }
     }

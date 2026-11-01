@@ -10,8 +10,8 @@ use crate::{
         diagnostics::Label,
         ir::{
             Block, ConcatArg, DeclarationKind, EnumInfo, EnumVariant, EnumVariantKind, FlagsInfo,
-            IfBlock, IfChain, ParseTypeKind, Repetition, ScopeKind, StructContentKind, StructRef,
-            StructRefPart,
+            IfBlock, IfChain, ParseTypeKind, Repetition, Scope, ScopeKind, StructContentKind,
+            StructRef, StructRefPart,
         },
         lexer::TokenKind,
         span::Span,
@@ -133,6 +133,9 @@ impl LoweringCtx<'_> {
             ast::StructContent::IfChain(if_chain) => self
                 .lower_if_chain(if_chain)
                 .map(StructContentKind::IfChain),
+            ast::StructContent::Scope(scope) => {
+                self.lower_scope(scope).map(StructContentKind::Scope)
+            }
         }
         .unwrap_or(StructContentKind::Error);
 
@@ -824,12 +827,6 @@ impl LoweringCtx<'_> {
             }
             ast::Declaration::SeekByDeclaration(seek_by) => self.lower_seek_by_declaration(seek_by),
             ast::Declaration::SeekToDeclaration(seek_to) => self.lower_seek_to_declaration(seek_to),
-            ast::Declaration::ScopeAtDeclaration(scope_at) => {
-                self.lower_scope_at_declaration(scope_at)
-            }
-            ast::Declaration::ScopeInDeclaration(scope_in) => {
-                self.lower_scope_in_declaration(scope_in)
-            }
             ast::Declaration::AssertDeclaration(assert) => self.lower_assert_declaration(assert),
             ast::Declaration::WarnIfDeclaration(warn_if) => self.lower_warn_if_declaration(warn_if),
             ast::Declaration::RecoveryDeclaration(recovery) => {
@@ -902,36 +899,25 @@ impl LoweringCtx<'_> {
         })
     }
 
-    /// Lowers the given AST `scope at` declaration to IR.
-    fn lower_scope_at_declaration(
-        &mut self,
-        scope_at: ast::ScopeAtDeclaration,
-    ) -> Option<Declaration> {
-        let start = self.lower_expr(required_field!(scope_at => start ? self => None));
-        let end = scope_at.end().map(|expr| self.lower_expr(expr));
+    /// Lowers the given AST `scope` to IR.
+    fn lower_scope(&mut self, scope: ast::Scope) -> Option<Scope> {
+        let kind = match required_field!(scope => scope_kind ? self => None) {
+            ast::ScopeKind::ScopeAt(scope_at) => {
+                let start = self.lower_expr(required_field!(scope_at => start ? self => None));
+                let end = scope_at.end().map(|end| self.lower_expr(end));
 
-        Some(Declaration {
-            kind: DeclarationKind::Scope {
-                kind: ScopeKind::At { start, end },
-                block: self.lower_block(required_field!(scope_at => struct_block ? self => None)),
-            },
-            span: scope_at.span(),
-        })
-    }
+                ScopeKind::At { start, end }
+            }
+            ast::ScopeKind::ScopeIn(scope_in) => {
+                let bytes = self.lower_expr(required_field!(scope_in => bytes ? self => None));
 
-    /// Lowers the given AST `scope in` declaration to IR.
-    fn lower_scope_in_declaration(
-        &mut self,
-        scope_in: ast::ScopeInDeclaration,
-    ) -> Option<Declaration> {
-        let bytes = self.lower_expr(required_field!(scope_in => bytes ? self => None));
+                ScopeKind::In { bytes }
+            }
+        };
 
-        Some(Declaration {
-            kind: DeclarationKind::Scope {
-                kind: ScopeKind::In { bytes },
-                block: self.lower_block(required_field!(scope_in => struct_block ? self => None)),
-            },
-            span: scope_in.span(),
+        Some(Scope {
+            kind,
+            block: self.lower_block(required_field!(scope => struct_block ? self => None)),
         })
     }
 

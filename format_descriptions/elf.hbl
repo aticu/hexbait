@@ -64,7 +64,7 @@ let string_table_start_off = peek(u64 at .section_header_off + .section_header_e
 !seek to .section_header_off;
 sections [{
     name_idx u32;
-    !scope at $parent.string_table_start_off + .name_idx {
+    scope at $parent.string_table_start_off + .name_idx {
         name bytes while peek(u8) != 0;
     }
     type enum u32 {
@@ -96,7 +96,7 @@ sections [{
     addr_align u64;
     entry_size u64;
 
-    !scope at .offset {
+    scope at .offset {
         content bytes len .size;
     }
 }] len .section_header_entry_num;

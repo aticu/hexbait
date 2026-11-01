@@ -1,4 +1,4 @@
 !endian le;
 
-!scope xyz;
+scope xyz;
 a u8;

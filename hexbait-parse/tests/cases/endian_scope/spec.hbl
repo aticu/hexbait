@@ -13,7 +13,7 @@ inner {
 d u16;
 
 !endian be;
-!scope at $offset {
+scope at $offset {
   !endian le;
   e_le i16;
 }

@@ -6,7 +6,7 @@ use crate::compile::{
     Diagnostic,
     diagnostics::Label,
     ir::{
-        Block, Declaration, DeclarationKind, Expr, ExprKind, Lit, ScopeKind,
+        Declaration, DeclarationKind, Expr, ExprKind, Lit,
         analysis::{AnalysisCtx, EndiannessState, Env, expr::ExtraExprCtx, ty::TyKind},
     },
 };
@@ -19,7 +19,6 @@ impl Env<'_> {
             DeclarationKind::Align(expr) => self.check_align_decl(ctx, expr),
             DeclarationKind::SeekBy(expr) => self.check_seek_by_decl(ctx, expr),
             DeclarationKind::SeekTo(expr) => self.check_seek_to_decl(ctx, expr),
-            DeclarationKind::Scope { kind, block } => self.check_scope_decl(ctx, kind, block),
             DeclarationKind::Assert { condition, message } => {
                 self.check_assert_warn_decl(ctx, condition, message, "assert")
             }
@@ -84,34 +83,6 @@ impl Env<'_> {
     /// Checks the given `seek to` declaration.
     fn check_seek_to_decl(&mut self, ctx: &mut AnalysisCtx, expr: &Expr) {
         self.check_int(ctx, expr, "expected argument to `seek to` to be an integer");
-    }
-
-    /// Checks the given scope declaration.
-    fn check_scope_decl(&mut self, ctx: &mut AnalysisCtx, kind: &ScopeKind, block: &Block) {
-        match kind {
-            ScopeKind::At { start, end } => {
-                self.check_int(ctx, start, "expected scope start to be an integer");
-
-                if let Some(end) = end {
-                    self.check_int(ctx, end, "expected scope end to be an integer");
-                }
-            }
-            ScopeKind::In { bytes } => {
-                let bytes_ty = self.check_expr(ctx, bytes, &ExtraExprCtx::none());
-
-                if !matches!(&bytes_ty.kind, TyKind::Bytes) {
-                    ctx.ty_err(
-                        "expected bytes type as argument to `scope in`",
-                        &bytes_ty,
-                        bytes.span,
-                    );
-                }
-            }
-        }
-
-        for content in &block.content {
-            self.check_struct_content(ctx, content);
-        }
     }
 
     /// Checks the given assert or warning declaration.

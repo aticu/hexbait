@@ -105,6 +105,8 @@ pub enum StructContentKind {
     LetStatement(LetStatement),
     /// An `if` chain.
     IfChain(IfChain),
+    /// A `scope`.
+    Scope(Scope),
     /// A `struct` content that contained an error during parsing.
     Error,
 }
@@ -175,13 +177,6 @@ pub enum DeclarationKind {
     SeekBy(Expr),
     /// Seeks to a specified position.
     SeekTo(Expr),
-    /// Parses the contained fields in a separate scope.
-    Scope {
-        /// The kind of the scope.
-        kind: ScopeKind,
-        /// The content block of the scope.
-        block: Block,
-    },
     /// Asserts that the given expression is true.
     Assert {
         /// The condition that needs to hold.
@@ -220,6 +215,15 @@ pub struct IfBlock {
     /// The expression that determines if the block is executed.
     pub condition: Expr,
     /// The block that is executed if the condition is `true`.
+    pub block: Block,
+}
+
+/// Parses the contained fields in a separate scope.
+#[derive(Debug)]
+pub struct Scope {
+    /// The kind of the scope.
+    pub kind: ScopeKind,
+    /// The content block of the scope.
     pub block: Block,
 }
 

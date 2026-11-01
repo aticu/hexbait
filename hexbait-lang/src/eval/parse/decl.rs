@@ -6,10 +6,10 @@ use crate::{
     Int,
     compile::{
         Span,
-        ir::{Declaration, DeclarationKind, ScopeKind},
+        ir::{Declaration, DeclarationKind},
     },
     eval::{
-        BytesValue, Diagnostic, DiagnosticLevel, Provenance, View,
+        BytesValue, Diagnostic, DiagnosticLevel, Provenance,
         parse::{
             ParseContext, StaticAnalysisImpossible as _,
             cursor::Cursor,
@@ -22,7 +22,7 @@ use crate::{
 
 impl ParseContext {
     /// Determines if a seek to the given offset is possible.
-    fn probe_seek(
+    pub fn probe_seek(
         &mut self,
         new_offset: &Int,
         provenance: &Provenance,
@@ -121,58 +121,6 @@ impl ParseContext {
                     expr.span,
                     "during seek",
                 )?;
-            }
-            DeclarationKind::Scope { kind, block } => {
-                let (view, span) = match kind {
-                    ScopeKind::At { start, end } => {
-                        let span = start.span;
-                        let start_expr =
-                            self.eval_expr(start, cursor, struct_ctx, Default::default())?;
-
-                        let start = self.probe_seek(
-                            start_expr.kind.expect_int(),
-                            &start_expr.provenance,
-                            span,
-                            cursor,
-                            "for start of new scope",
-                        )?;
-
-                        let end = if let Some(end) = end {
-                            let end_expr =
-                                self.eval_expr(end, cursor, struct_ctx, Default::default())?;
-
-                            self.probe_seek(
-                                end_expr.kind.expect_int(),
-                                &end_expr.provenance,
-                                span,
-                                cursor,
-                                "for end of new scope",
-                            )?
-                        } else {
-                            cursor.view().end_offset()
-                        };
-
-                        (cursor.view().subview(start..end), span)
-                    }
-                    ScopeKind::In { bytes } => {
-                        let bytes_expr =
-                            self.eval_expr(bytes, cursor, struct_ctx, Default::default())?;
-
-                        (
-                            View::from_bytes(bytes_expr.kind.expect_bytes_take()),
-                            bytes.span,
-                        )
-                    }
-                };
-
-                let mut subcursor = cursor
-                    .child_with_view_and_offset(view, RelativeOffset::ZERO)
-                    .map_err(|err| {
-                        self.diagnostics
-                            .seek_err(err, &Provenance::empty(), span, "for scope")
-                    })?;
-
-                self.eval_block(block, &mut subcursor, struct_ctx)?;
             }
             DeclarationKind::Assert { condition, message } => {
                 let condition_value =
