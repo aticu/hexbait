@@ -2,7 +2,7 @@ a u8;
 b switch .a {
 	0 => {
 		c u8;
-		!if .c == 0 {
+		if .c == 0 {
 			d u8;
 		}
 	},

@@ -174,9 +174,6 @@ impl ParseContext {
 
                 self.eval_block(block, &mut subcursor, struct_ctx)?;
             }
-            DeclarationKind::If(if_chain) => {
-                self.eval_if_chain(if_chain, cursor, struct_ctx)?;
-            }
             DeclarationKind::Assert { condition, message } => {
                 let condition_value =
                     self.eval_expr(condition, cursor, struct_ctx, Default::default())?;

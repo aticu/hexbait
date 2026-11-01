@@ -130,6 +130,9 @@ impl LoweringCtx<'_> {
             ast::StructContent::LetStatement(let_statement) => self
                 .lower_let_statement(let_statement)
                 .map(StructContentKind::LetStatement),
+            ast::StructContent::IfChain(if_chain) => self
+                .lower_if_chain(if_chain)
+                .map(StructContentKind::IfChain),
         }
         .unwrap_or(StructContentKind::Error);
 
@@ -827,7 +830,6 @@ impl LoweringCtx<'_> {
             ast::Declaration::ScopeInDeclaration(scope_in) => {
                 self.lower_scope_in_declaration(scope_in)
             }
-            ast::Declaration::IfDeclaration(if_decl) => self.lower_if_declaration(if_decl),
             ast::Declaration::AssertDeclaration(assert) => self.lower_assert_declaration(assert),
             ast::Declaration::WarnIfDeclaration(warn_if) => self.lower_warn_if_declaration(warn_if),
             ast::Declaration::RecoveryDeclaration(recovery) => {
@@ -930,16 +932,6 @@ impl LoweringCtx<'_> {
                 block: self.lower_block(required_field!(scope_in => struct_block ? self => None)),
             },
             span: scope_in.span(),
-        })
-    }
-
-    /// Lowers the given AST `if` declaration to IR.
-    fn lower_if_declaration(&mut self, if_decl: ast::IfDeclaration) -> Option<Declaration> {
-        Some(Declaration {
-            kind: DeclarationKind::If(
-                self.lower_if_chain(required_field!(if_decl => if_chain ? self => None))?,
-            ),
-            span: if_decl.span(),
         })
     }
 

@@ -1,6 +1,6 @@
 cond u8;
 
-!if .cond == 0 {
+if .cond == 0 {
 	x u8;
 }
 

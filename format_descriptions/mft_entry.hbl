@@ -143,7 +143,7 @@ let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .heade
                                 class_identifier u32;
 
                                 // some $STANDARD_INFORMATION attributes are 48 bytes and some 72 bytes
-                                !if $parent.data_size > 48 {
+                                if $parent.data_size > 48 {
                                     owner_identifier u32;
                                     security_descriptor_identifier u32;
                                     quota_charged u64;
@@ -214,7 +214,7 @@ let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .heade
                     allocated_data_size u64;
                     data_size u64;
                     valid_data_size u64;
-                    !if .compression_unit_size > 0 {
+                    if .compression_unit_size > 0 {
                         total_allocated_size u64;
                     }
 

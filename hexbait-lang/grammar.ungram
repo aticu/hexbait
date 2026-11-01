@@ -25,6 +25,7 @@ StructContent =
 | StructField
 | Struct
 | LetStatement
+| IfChain
 
 // The block body of a `struct`.
 StructBlock =
@@ -38,7 +39,6 @@ Declaration =
 | SeekToDeclaration
 | ScopeAtDeclaration
 | ScopeInDeclaration
-| IfDeclaration
 | AssertDeclaration
 | WarnIfDeclaration
 | RecoveryDeclaration
@@ -73,10 +73,6 @@ ScopeAtDeclaration =
 // Reading past the end of the scope from within it will result in an error.
 ScopeInDeclaration =
   '!' 'scope' 'in' bytes:Expr StructBlock
-
-// Parses the contained fields only if a condition is true.
-IfDeclaration = 
-  '!' IfChain
 
 // If the `condition` is true, `then_block` is parsed.
 // Otherwise the optional `else` part is parsed (if present).

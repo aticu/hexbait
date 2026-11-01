@@ -203,6 +203,9 @@ impl ParseContext {
             StructContentKind::LetStatement(let_statement) => {
                 Ok(self.eval_let_statement(let_statement, cursor, struct_ctx)?)
             }
+            StructContentKind::IfChain(if_chain) => {
+                Ok(self.eval_if_chain(if_chain, cursor, struct_ctx)?)
+            }
             StructContentKind::Error => static_analysis_impossible(),
         }
     }

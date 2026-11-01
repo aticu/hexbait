@@ -15,7 +15,7 @@ ident {
     rest_of_ident bytes len 8;
 };
 
-!if .ident.endianness == enum.ELFDATA2LSB {
+if .ident.endianness == enum.ELFDATA2LSB {
     !endian le;
 } else {
     !endian be;

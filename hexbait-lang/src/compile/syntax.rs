@@ -151,8 +151,6 @@ pub enum NodeKind {
     ScopeAtDeclaration,
     /// A declaration that parsing should continue in another scope that is defined by parsed bytes.
     ScopeInDeclaration,
-    /// A declaration to parse contained fields only if a condition is true.
-    IfDeclaration,
     /// A declaration asserting that an expression is true like `!assert size > 4`.
     AssertDeclaration,
     /// A declaration warns if the expression is true like `!warn if size > 4: "expected small size"`.

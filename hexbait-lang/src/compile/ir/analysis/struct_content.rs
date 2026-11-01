@@ -1,14 +1,15 @@
 //! Implements analysis of struct contents.
 
 use crate::compile::{
-    Diagnostic,
+    Diagnostic, Span,
     diagnostics::Label,
     ir::{
-        LetStatement, Spanned, StructContent, StructContentKind, StructField, Symbol,
+        Block, IfChain, LetStatement, Spanned, StructContent, StructContentKind, StructField,
+        Symbol,
         analysis::{
-            AnalysisCtx, Env,
+            AnalysisCtx, EndiannessState, Env,
             expr::ExtraExprCtx,
-            ty::{Availability, FieldTy, Ty},
+            ty::{Availability, FieldTy, Ty, TyKind},
         },
     },
 };
@@ -23,6 +24,9 @@ impl Env<'_> {
             }
             StructContentKind::LetStatement(let_statement) => {
                 self.check_let_statement(ctx, let_statement);
+            }
+            StructContentKind::IfChain(if_chain) => {
+                self.check_if_chain(ctx, if_chain, content.span);
             }
             StructContentKind::Error => {
                 assert!(ctx.diagnostics.contains_error_in(content.span));
@@ -75,5 +79,117 @@ impl Env<'_> {
 
         let ty = self.check_expr(ctx, expr, &ExtraExprCtx::none());
         self.add_field(ctx, name, ty);
+    }
+
+    /// Checks the given `if` chain.
+    fn check_if_chain(&mut self, ctx: &mut AnalysisCtx, if_chain: &IfChain, span: Span) {
+        let mut branches = Vec::new();
+        let mut undefined_endianness_branch = None;
+        let mut defined_endianness_branch = None;
+        let mut unset_is_missing_else = false;
+
+        let mut check_block = |ctx: &mut AnalysisCtx, block: &Block| {
+            let mut env_clone = self.create_branch_clone();
+
+            for content in &block.content {
+                env_clone.check_struct_content(ctx, content);
+            }
+
+            branches.push(Ty {
+                kind: TyKind::Struct {
+                    struct_ty: env_clone.values,
+                },
+                span: block.span,
+            });
+
+            match env_clone.endianness_state {
+                EndiannessState::Undefined => {
+                    undefined_endianness_branch.get_or_insert(block.span);
+                }
+                EndiannessState::Set => {
+                    defined_endianness_branch.get_or_insert(block.span);
+                }
+                EndiannessState::PartiallySet {
+                    set_branch_span,
+                    unset_branch_span,
+                    unset_is_missing_else: missing_else,
+                } => {
+                    defined_endianness_branch.get_or_insert(set_branch_span);
+                    undefined_endianness_branch.get_or_insert(unset_branch_span);
+                    unset_is_missing_else |= missing_else;
+                }
+            }
+        };
+
+        for branch in &if_chain.if_blocks {
+            let condition_ty = self.check_expr(ctx, &branch.condition, &ExtraExprCtx::none());
+
+            if !matches!(&condition_ty.kind, TyKind::Bool) {
+                ctx.ty_err(
+                    "expected `if` condition to be of type boolean",
+                    &condition_ty,
+                    branch.condition.span,
+                );
+            }
+
+            check_block(ctx, &branch.block);
+        }
+
+        if let Some(else_block) = &if_chain.else_block {
+            check_block(ctx, else_block);
+        } else {
+            let span = if_chain.if_blocks.last().unwrap().condition.span;
+            branches.push(Ty {
+                kind: TyKind::Struct {
+                    struct_ty: self.values.clone(),
+                },
+                span,
+            });
+            match self.endianness_state {
+                EndiannessState::Undefined => {
+                    if undefined_endianness_branch.is_none() {
+                        unset_is_missing_else = true;
+                    }
+                    undefined_endianness_branch.get_or_insert(span);
+                }
+                EndiannessState::Set => {
+                    defined_endianness_branch.get_or_insert(span);
+                }
+                EndiannessState::PartiallySet {
+                    set_branch_span,
+                    unset_branch_span,
+                    unset_is_missing_else: missing_else,
+                } => {
+                    defined_endianness_branch.get_or_insert(set_branch_span);
+                    undefined_endianness_branch.get_or_insert(unset_branch_span);
+                    unset_is_missing_else |= missing_else;
+                }
+            }
+        }
+
+        let struct_ty = match Ty::join(&branches, span, if_chain.else_block.is_none()).kind {
+            TyKind::Error => return,
+            TyKind::Struct { struct_ty } => struct_ty,
+            TyKind::Indeterminate { .. }
+            | TyKind::Bool
+            | TyKind::Int { .. }
+            | TyKind::EnumLit { .. }
+            | TyKind::EnumVal { .. }
+            | TyKind::FlagsVal { .. }
+            | TyKind::Bytes
+            | TyKind::Array { .. } => unreachable!(),
+        };
+
+        self.values = struct_ty;
+        self.endianness_state = match (defined_endianness_branch, undefined_endianness_branch) {
+            (None, None) => unreachable!(),
+            (None, Some(_)) => EndiannessState::Undefined,
+            (Some(_), None) => EndiannessState::Set,
+            (Some(set_branch), Some(unset_branch)) => EndiannessState::PartiallySet {
+                set_branch_span: set_branch,
+                unset_branch_span: unset_branch,
+                unset_is_missing_else,
+            },
+        };
     }
 }

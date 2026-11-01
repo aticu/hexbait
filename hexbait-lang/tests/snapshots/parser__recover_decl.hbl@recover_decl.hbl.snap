@@ -1,6 +1,6 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: result
+expression: "!endian le;\n\n!foo bar;\na u8;\n"
 input_file: hexbait-lang/tests/parser-cases/recover_decl.hbl
 ---
 File@0..29
@@ -28,7 +28,7 @@ File@0..29
   Whitespace@28..29 "\n"
 
 --- diagnostics ---
-error: expected `endian`, `seek`, `scope`, `if`, `align`, `assert`, `warn` or `recover`
+error: expected `endian`, `seek`, `scope`, `align`, `assert`, `warn` or `recover`
   ┌─ recover_decl.hbl:3:2
   │
 2 │ 

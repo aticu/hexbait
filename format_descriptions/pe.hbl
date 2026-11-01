@@ -31,7 +31,7 @@ optional_header {
     size_of_uninitialized_data u32;
     addr_of_entry_point u32;
     base_of_code u32;
-    !if .magic == enum.PE32 {
+    if .magic == enum.PE32 {
         base_of_data u32;
     }
 };

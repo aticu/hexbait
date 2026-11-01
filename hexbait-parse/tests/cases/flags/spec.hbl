@@ -2,7 +2,7 @@
 
 is_big u8;
 
-!if .is_big == 0 {
+if .is_big == 0 {
 	flags flags u8 {
 		a = bit 0,
 		b = bit 7

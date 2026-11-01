@@ -43,6 +43,7 @@ fn struct_content(p: &mut Parser) {
         TokenKind::StructKw => r#struct(p),
         TokenKind::LetKw => r#let(p),
         TokenKind::ExclamationMark => decl(p),
+        TokenKind::IfKw => if_chain(p),
         _ => struct_field(p),
     }
 }
@@ -92,11 +93,8 @@ fn r#let(p: &mut Parser) {
 /// Parses an `if` chain.
 fn if_chain(p: &mut Parser) {
     p.node(|p| {
-        if p.peek_contextual_kw() != Some("if") {
-            unreachable!("if chain is only parsed when it starts with `if`");
-        }
         p.with_unconsuming_recovery(TokenKind::LBrace, |p| {
-            p.bump();
+            p.expect(TokenKind::IfKw);
             expr(p);
         });
 
@@ -107,7 +105,7 @@ fn if_chain(p: &mut Parser) {
         if else_is_next_token {
             p.bump();
 
-            if p.at_contextual_kw("if") {
+            if p.at(TokenKind::IfKw) {
                 if_chain(p);
             } else {
                 p.node(|p| {
@@ -196,10 +194,6 @@ fn decl(p: &mut Parser) {
 
                 kind.unwrap_or(NodeKind::Error)
             }
-            Some("if") => {
-                if_chain(p);
-                NodeKind::IfDeclaration
-            }
             Some("align") => {
                 p.with_consuming_recovery(TokenKind::Semicolon, |p| {
                     p.bump();
@@ -223,7 +217,7 @@ fn decl(p: &mut Parser) {
             Some("warn") => {
                 p.with_consuming_recovery(TokenKind::Semicolon, |p| {
                     p.bump();
-                    if p.at_contextual_kw("if") {
+                    if p.at(TokenKind::IfKw) {
                         p.bump();
                     } else {
                         p.expect_error(&["`if`"]);
@@ -257,7 +251,6 @@ fn decl(p: &mut Parser) {
                     "`endian`",
                     "`seek`",
                     "`scope`",
-                    "`if`",
                     "`align`",
                     "`assert`",
                     "`warn`",

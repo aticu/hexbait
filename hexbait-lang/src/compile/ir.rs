@@ -103,6 +103,8 @@ pub enum StructContentKind {
     Declaration(Declaration),
     /// A `let` statement.
     LetStatement(LetStatement),
+    /// An `if` chain.
+    IfChain(IfChain),
     /// A `struct` content that contained an error during parsing.
     Error,
 }
@@ -180,7 +182,6 @@ pub enum DeclarationKind {
         /// The content block of the scope.
         block: Block,
     },
-    If(IfChain),
     /// Asserts that the given expression is true.
     Assert {
         /// The condition that needs to hold.
