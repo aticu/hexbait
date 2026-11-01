@@ -1,217 +1,209 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\nlet;\nlet a;\nlet b =;\nc {\n\tlet d = \n};\ne u8;\nlet f = .;\nlet g = .a.;\nlet h = .a.$;\nlet i = concat(. .a);\nlet j = .\n"
+expression: "let;\nlet a;\nlet b =;\nc {\n\tlet d = \n};\ne u8;\nlet f = .;\nlet g = .a.;\nlet h = .a.$;\nlet i = concat(. .a);\nlet j = .\n"
 input_file: hexbait-lang/tests/parser-cases/basic_recovery.hbl
 ---
-File@0..127
-  EndiannessDeclaration@0..11
-    ExclamationMark@0..1 "!"
-    Identifier@1..7 "endian"
-    Whitespace@7..8 " "
-    Identifier@8..10 "le"
+File@0..114
+  LetStatement@0..4
+    LetKw@0..3 "let"
+    Atom@3..3
+    Semicolon@3..4 ";"
+  Whitespace@4..5 "\n"
+  LetStatement@5..11
+    LetKw@5..8 "let"
+    Whitespace@8..9 " "
+    Identifier@9..10 "a"
+    Atom@10..10
     Semicolon@10..11 ";"
-  Whitespace@11..13 "\n\n"
-  LetStatement@13..17
-    LetKw@13..16 "let"
-    Atom@16..16
-    Semicolon@16..17 ";"
-  Whitespace@17..18 "\n"
-  LetStatement@18..24
-    LetKw@18..21 "let"
-    Whitespace@21..22 " "
-    Identifier@22..23 "a"
-    Atom@23..23
-    Semicolon@23..24 ";"
-  Whitespace@24..25 "\n"
-  LetStatement@25..33
-    LetKw@25..28 "let"
-    Whitespace@28..29 " "
-    Identifier@29..30 "b"
-    Whitespace@30..31 " "
-    Equals@31..32 "="
-    Atom@32..32
-    Semicolon@32..33 ";"
-  Whitespace@33..34 "\n"
-  StructField@34..50
-    Identifier@34..35 "c"
-    Whitespace@35..36 " "
-    AnonymousStructParseType@36..49
-      StructBlock@36..49
-        LBrace@36..37 "{"
-        Whitespace@37..39 "\n\t"
-        LetStatement@39..48
-          LetKw@39..42 "let"
-          Whitespace@42..43 " "
-          Identifier@43..44 "d"
-          Whitespace@44..45 " "
-          Equals@45..46 "="
-          Whitespace@46..48 " \n"
-          Atom@48..48
-        RBrace@48..49 "}"
-    Semicolon@49..50 ";"
-  Whitespace@50..51 "\n"
-  StructField@51..56
-    Identifier@51..52 "e"
-    Whitespace@52..53 " "
-    NamedParseType@53..55
-      Identifier@53..55 "u8"
-    Semicolon@55..56 ";"
-  Whitespace@56..57 "\n"
-  LetStatement@57..67
-    LetKw@57..60 "let"
+  Whitespace@11..12 "\n"
+  LetStatement@12..20
+    LetKw@12..15 "let"
+    Whitespace@15..16 " "
+    Identifier@16..17 "b"
+    Whitespace@17..18 " "
+    Equals@18..19 "="
+    Atom@19..19
+    Semicolon@19..20 ";"
+  Whitespace@20..21 "\n"
+  StructField@21..37
+    Identifier@21..22 "c"
+    Whitespace@22..23 " "
+    AnonymousStructParseType@23..36
+      StructBlock@23..36
+        LBrace@23..24 "{"
+        Whitespace@24..26 "\n\t"
+        LetStatement@26..35
+          LetKw@26..29 "let"
+          Whitespace@29..30 " "
+          Identifier@30..31 "d"
+          Whitespace@31..32 " "
+          Equals@32..33 "="
+          Whitespace@33..35 " \n"
+          Atom@35..35
+        RBrace@35..36 "}"
+    Semicolon@36..37 ";"
+  Whitespace@37..38 "\n"
+  StructField@38..43
+    Identifier@38..39 "e"
+    Whitespace@39..40 " "
+    NamedParseType@40..42
+      Identifier@40..42 "u8"
+    Semicolon@42..43 ";"
+  Whitespace@43..44 "\n"
+  LetStatement@44..54
+    LetKw@44..47 "let"
+    Whitespace@47..48 " "
+    Identifier@48..49 "f"
+    Whitespace@49..50 " "
+    Equals@50..51 "="
+    Whitespace@51..52 " "
+    FieldAccess@52..53
+      Dot@52..53 "."
+      BareField@53..53
+    Semicolon@53..54 ";"
+  Whitespace@54..55 "\n"
+  LetStatement@55..67
+    LetKw@55..58 "let"
+    Whitespace@58..59 " "
+    Identifier@59..60 "g"
     Whitespace@60..61 " "
-    Identifier@61..62 "f"
+    Equals@61..62 "="
     Whitespace@62..63 " "
-    Equals@63..64 "="
-    Whitespace@64..65 " "
-    FieldAccess@65..66
+    FieldAccess@63..66
+      FieldAccess@63..65
+        Dot@63..64 "."
+        BareField@64..65
+          Identifier@64..65 "a"
       Dot@65..66 "."
       BareField@66..66
     Semicolon@66..67 ";"
   Whitespace@67..68 "\n"
-  LetStatement@68..80
+  LetStatement@68..81
     LetKw@68..71 "let"
     Whitespace@71..72 " "
-    Identifier@72..73 "g"
+    Identifier@72..73 "h"
     Whitespace@73..74 " "
     Equals@74..75 "="
     Whitespace@75..76 " "
-    FieldAccess@76..79
+    FieldAccess@76..80
       FieldAccess@76..78
         Dot@76..77 "."
         BareField@77..78
           Identifier@77..78 "a"
       Dot@78..79 "."
-      BareField@79..79
-    Semicolon@79..80 ";"
-  Whitespace@80..81 "\n"
-  LetStatement@81..94
-    LetKw@81..84 "let"
-    Whitespace@84..85 " "
-    Identifier@85..86 "h"
-    Whitespace@86..87 " "
-    Equals@87..88 "="
-    Whitespace@88..89 " "
-    FieldAccess@89..93
-      FieldAccess@89..91
-        Dot@89..90 "."
-        BareField@90..91
-          Identifier@90..91 "a"
-      Dot@91..92 "."
-      MetaField@92..93
-        Dollar@92..93 "$"
-    Semicolon@93..94 ";"
-  Whitespace@94..95 "\n"
-  LetStatement@95..116
-    LetKw@95..98 "let"
-    Whitespace@98..99 " "
-    Identifier@99..100 "i"
-    Whitespace@100..101 " "
-    Equals@101..102 "="
-    Whitespace@102..103 " "
-    ConcatExpr@103..115
-      ConcatKw@103..109 "concat"
-      LParen@109..110 "("
-      ConcatArgDirect@110..114
-        FieldAccess@110..114
-          FieldAccess@110..112
-            Dot@110..111 "."
-            Whitespace@111..112 " "
-            BareField@112..112
-          Dot@112..113 "."
-          BareField@113..114
-            Identifier@113..114 "a"
-      RParen@114..115 ")"
-    Semicolon@115..116 ";"
-  Whitespace@116..117 "\n"
-  LetStatement@117..127
-    LetKw@117..120 "let"
-    Whitespace@120..121 " "
-    Identifier@121..122 "j"
-    Whitespace@122..123 " "
-    Equals@123..124 "="
-    Whitespace@124..125 " "
-    FieldAccess@125..127
-      Dot@125..126 "."
-      Whitespace@126..127 "\n"
-      BareField@127..127
+      MetaField@79..80
+        Dollar@79..80 "$"
+    Semicolon@80..81 ";"
+  Whitespace@81..82 "\n"
+  LetStatement@82..103
+    LetKw@82..85 "let"
+    Whitespace@85..86 " "
+    Identifier@86..87 "i"
+    Whitespace@87..88 " "
+    Equals@88..89 "="
+    Whitespace@89..90 " "
+    ConcatExpr@90..102
+      ConcatKw@90..96 "concat"
+      LParen@96..97 "("
+      ConcatArgDirect@97..101
+        FieldAccess@97..101
+          FieldAccess@97..99
+            Dot@97..98 "."
+            Whitespace@98..99 " "
+            BareField@99..99
+          Dot@99..100 "."
+          BareField@100..101
+            Identifier@100..101 "a"
+      RParen@101..102 ")"
+    Semicolon@102..103 ";"
+  Whitespace@103..104 "\n"
+  LetStatement@104..114
+    LetKw@104..107 "let"
+    Whitespace@107..108 " "
+    Identifier@108..109 "j"
+    Whitespace@109..110 " "
+    Equals@110..111 "="
+    Whitespace@111..112 " "
+    FieldAccess@112..114
+      Dot@112..113 "."
+      Whitespace@113..114 "\n"
+      BareField@114..114
 
 --- diagnostics ---
 error: expected identifier
-  ┌─ basic_recovery.hbl:3:4
+  ┌─ basic_recovery.hbl:1:4
   │
-2 │ 
-3 │ let;
+1 │ let;
   │    ^ found unexpected token `;`
-4 │ let a;
+2 │ let a;
 
 
 error: expected `=`
-  ┌─ basic_recovery.hbl:4:6
+  ┌─ basic_recovery.hbl:2:6
   │
-3 │ let;
-4 │ let a;
+1 │ let;
+2 │ let a;
   │      ^ found unexpected token `;`
-5 │ let b =;
+3 │ let b =;
 
 
 error: expected identifier, literal, `.`, `peek`, `concat`, `$`, `<` or `(`
-  ┌─ basic_recovery.hbl:5:8
+  ┌─ basic_recovery.hbl:3:8
   │
-4 │ let a;
-5 │ let b =;
+2 │ let a;
+3 │ let b =;
   │        ^ found unexpected token `;`
-6 │ c {
+4 │ c {
 
 
 error: expected identifier, literal, `.`, `peek`, `concat`, `$`, `<` or `(`
-  ┌─ basic_recovery.hbl:8:1
+  ┌─ basic_recovery.hbl:6:1
   │
-7 │     let d = 
-8 │ };
+5 │     let d = 
+6 │ };
   │ ^ found unexpected token `}`
-9 │ e u8;
+7 │ e u8;
 
 
 error: expected identifier
-   ┌─ basic_recovery.hbl:10:10
-   │
- 9 │ e u8;
-10 │ let f = .;
-   │          ^ found unexpected token `;`
-11 │ let g = .a.;
+  ┌─ basic_recovery.hbl:8:10
+  │
+7 │ e u8;
+8 │ let f = .;
+  │          ^ found unexpected token `;`
+9 │ let g = .a.;
 
 
 error: expected identifier
-   ┌─ basic_recovery.hbl:11:12
-   │
-10 │ let f = .;
-11 │ let g = .a.;
-   │            ^ found unexpected token `;`
-12 │ let h = .a.$;
+  ┌─ basic_recovery.hbl:9:12
+  │
+8 │ let f = .;
+9 │ let g = .a.;
+  │            ^ found unexpected token `;`
+10 │ let h = .a.$;
 
 
 error: expected identifier
-   ┌─ basic_recovery.hbl:12:13
+   ┌─ basic_recovery.hbl:10:13
    │
-11 │ let g = .a.;
-12 │ let h = .a.$;
+ 9 │ let g = .a.;
+10 │ let h = .a.$;
    │             ^ found unexpected token `;`
-13 │ let i = concat(. .a);
+11 │ let i = concat(. .a);
 
 
 error: expected identifier
-   ┌─ basic_recovery.hbl:13:18
+   ┌─ basic_recovery.hbl:11:18
    │
-12 │ let h = .a.$;
-13 │ let i = concat(. .a);
+10 │ let h = .a.$;
+11 │ let i = concat(. .a);
    │                  ^ found unexpected token `.`
-14 │ let j = .
+12 │ let j = .
 
 
 error: expected identifier
-   ┌─ basic_recovery.hbl:15:1
+   ┌─ basic_recovery.hbl:13:1
    │
-14 │ let j = .
-15 │ 
+12 │ let j = .
+13 │ 
    │ ^ found unexpected token end of file

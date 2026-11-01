@@ -843,11 +843,11 @@ impl LoweringCtx<'_> {
         let token = required_field!(endianness_declaration => kind ? self => None);
 
         let endianness = match token.text() {
-            "le" => Endianness::Little,
-            "be" => Endianness::Big,
+            r#""little""# => Endianness::Little,
+            r#""big""# => Endianness::Big,
             _ => {
                 self.add_diagnostic(Diagnostic::error(
-                    "expected `be` or `le`",
+                    "expected `big` or `little`",
                     Label::new("unexpected endianness value", endianness_declaration.span()),
                 ));
                 return None;

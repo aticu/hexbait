@@ -1,5 +1,3 @@
-!endian le;
-
 n u8;
 items [{
   let up_n = $parent.n;

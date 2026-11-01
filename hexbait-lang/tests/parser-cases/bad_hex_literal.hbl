@@ -1,4 +1,2 @@
-!endian le;
-
 a bytes = <zz>;
 b bytes = <abc>;

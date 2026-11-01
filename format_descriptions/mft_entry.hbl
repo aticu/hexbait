@@ -1,7 +1,7 @@
-!endian le;
+!endian("little");
 
 // assume an entry size of 1024 without knowing anything
-!recover at 1024;
+!recover(at: 1024);
 
 header {
     magic bytes = "FILE";
@@ -22,20 +22,20 @@ header {
     base_record_file_reference u64;
     first_attribute_identifier u16;
 
-    !seek to 44;
+    !seek(to: 44);
     entry_index u32;
 };
 
-!assert .header.first_attribute < .header.used_entry_size;
-!assert .header.used_entry_size <= .header.total_entry_size;
-!assert .header.total_entry_size % 512 == 0;
-!assert .header.num_fixup_values == (.header.total_entry_size / 512) + 1;
+!assert(.header.first_attribute < .header.used_entry_size);
+!assert(.header.used_entry_size <= .header.total_entry_size);
+!assert(.header.total_entry_size % 512 == 0);
+!assert(.header.num_fixup_values == (.header.total_entry_size / 512) + 1);
 
 // entry sizes larger than 4096 are very uncommon
-!warn if .header.total_entry_size > 4096: "uncommon header size";
+!warn_if(.header.total_entry_size > 4096, message: "uncommon header size");
 
 // now that we know the actual entry size, we can recover more precisely
-!recover at .header.total_entry_size;
+!recover(at: .header.total_entry_size);
 
 let fixup_value = peek(bytes len 2 at .header.fixup_value_offset);
 let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .header.fixup_value_offset + 2);
@@ -43,34 +43,34 @@ let fixup_values = peek([bytes len 2] len .header.num_fixup_values - 1 at .heade
 // check that the fixup values are correct
 scope at 0 until .header.total_entry_size {
     _chunks [{
-        !seek by 510;
+        !seek(by: 510);
         fixup_bytes bytes len 2;
 
-        !warn if .fixup_bytes != $parent.fixup_value: "fixup value mismatch";
+        !warn_if(.fixup_bytes != $parent.fixup_value, message: "fixup value mismatch");
     }] len .header.total_entry_size / 512;
 }
 
 // assemble the entry with applied fixup values
 // this is a hack that hard-codes an entry length of 1024, but works with the currently implemented features
-!assert .header.total_entry_size == 1024;
+!assert(.header.total_entry_size == 1024);
 scope at 0 until .header.total_entry_size {
     _first_chunk bytes len 510;
     let _first_fixup = peek(bytes len 2 at .header.fixup_value_offset + 2);
-    !seek by 2;
+    !seek(by: 2);
     _second_chunk bytes len 510;
     let _second_fixup = peek(bytes len 2 at .header.fixup_value_offset + 4);
     let _parse_buf = concat(._first_chunk, ._first_fixup, ._second_chunk, ._second_fixup);
 }
 
 scope in ._parse_buf {
-    !seek to .header.first_attribute;
+    !seek(to: .header.first_attribute);
     attributes [{
         // attributes are 8 byte aligned
-        !align 8;
+        !align(8);
 
         // parse the size first, so the scope and recovery can be defined
         let _size = peek(u32 at $offset + 4);
-        !recover at $offset + ._size;
+        !recover(at: $offset + ._size);
 
         scope at $offset until $offset + ._size {
             type enum u32 {
@@ -218,7 +218,7 @@ scope in ._parse_buf {
                         total_allocated_size u64;
                     }
 
-                    !seek to .data_runs_offset;
+                    !seek(to: .data_runs_offset);
                     data_runs [{
                         _counts_byte u8;
 
@@ -231,6 +231,6 @@ scope in ._parse_buf {
                 },
             };
         }
-        !seek by .size;
+        !seek(by: .size);
     }] while peek(bytes len 4) != <ff ff ff ff>;
 }

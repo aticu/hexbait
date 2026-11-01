@@ -1,2 +1,2 @@
-!assert 0 == 0: 25;
-!assert 0 == 0: <ff>;
+!assert(0 == 0, message: 25);
+!assert(0 == 0, message: <ff>);

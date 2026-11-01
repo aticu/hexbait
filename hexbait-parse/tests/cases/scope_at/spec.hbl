@@ -1,9 +1,9 @@
-!endian le;
+!endian("little");
 
 scope at 2 until 6 {
   x u16;
   y u16;
-  !assert $offset == 4;
+  !assert($offset == 4);
 }
 
 z u8;

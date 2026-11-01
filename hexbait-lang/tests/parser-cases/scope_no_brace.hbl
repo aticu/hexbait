@@ -1,4 +1,2 @@
-!endian le;
-
 scope xyz;
 a u8;

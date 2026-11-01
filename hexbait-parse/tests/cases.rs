@@ -15,6 +15,7 @@ fn cases() {
     insta::glob!("cases/**/spec.hbl", |spec_path| {
         let dir = spec_path.parent().unwrap();
         let spec = std::fs::read_to_string(spec_path).unwrap();
+        let spec_name = spec_path.to_string_lossy();
 
         let mut tests_run = 0;
         for entry in std::fs::read_dir(dir).unwrap() {
@@ -32,7 +33,7 @@ fn cases() {
             let debug_info = format!("\n=== Spec ===\n{spec}\n\n=== Hex ===\n{hex_text}");
             insta::assert_snapshot!(
                 name.clone(),
-                render(&name, &spec, &input, spec_path),
+                render(&spec_name, &spec, &input, spec_path),
                 &debug_info
             );
 

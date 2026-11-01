@@ -1,8 +1,8 @@
-!endian le;
+!endian("little");
 
 head u8;
 body {
-  !recover at 6;
+  !recover(at: 6);
   tag u8 = 0xaa;
   skipped u16;
 };

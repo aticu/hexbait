@@ -1,59 +1,51 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\na bytes = <zz>;\nb bytes = <abc>;\n"
+expression: "a bytes = <zz>;\nb bytes = <abc>;\n"
 input_file: hexbait-lang/tests/parser-cases/bad_hex_literal.hbl
 ---
-File@0..46
-  EndiannessDeclaration@0..11
-    ExclamationMark@0..1 "!"
-    Identifier@1..7 "endian"
+File@0..33
+  StructField@0..15
+    Identifier@0..1 "a"
+    Whitespace@1..2 " "
+    BytesParseType@2..7
+      BytesKw@2..7 "bytes"
     Whitespace@7..8 " "
-    Identifier@8..10 "le"
-    Semicolon@10..11 ";"
-  Whitespace@11..13 "\n\n"
-  StructField@13..28
-    Identifier@13..14 "a"
-    Whitespace@14..15 " "
-    BytesParseType@15..20
-      BytesKw@15..20 "bytes"
-    Whitespace@20..21 " "
-    Equals@21..22 "="
-    Whitespace@22..23 " "
-    ByteConcat@23..27
-      LAngle@23..24 "<"
-      Identifier@24..26 "zz"
-      RAngle@26..27 ">"
-    Semicolon@27..28 ";"
-  Whitespace@28..29 "\n"
-  StructField@29..45
-    Identifier@29..30 "b"
-    Whitespace@30..31 " "
-    BytesParseType@31..36
-      BytesKw@31..36 "bytes"
-    Whitespace@36..37 " "
-    Equals@37..38 "="
-    Whitespace@38..39 " "
-    ByteConcat@39..44
-      LAngle@39..40 "<"
-      Identifier@40..43 "abc"
-      RAngle@43..44 ">"
-    Semicolon@44..45 ";"
-  Whitespace@45..46 "\n"
+    Equals@8..9 "="
+    Whitespace@9..10 " "
+    ByteConcat@10..14
+      LAngle@10..11 "<"
+      Identifier@11..13 "zz"
+      RAngle@13..14 ">"
+    Semicolon@14..15 ";"
+  Whitespace@15..16 "\n"
+  StructField@16..32
+    Identifier@16..17 "b"
+    Whitespace@17..18 " "
+    BytesParseType@18..23
+      BytesKw@18..23 "bytes"
+    Whitespace@23..24 " "
+    Equals@24..25 "="
+    Whitespace@25..26 " "
+    ByteConcat@26..31
+      LAngle@26..27 "<"
+      Identifier@27..30 "abc"
+      RAngle@30..31 ">"
+    Semicolon@31..32 ";"
+  Whitespace@32..33 "\n"
 
 --- diagnostics ---
 error: expected two hexdecimal digits
-  ┌─ bad_hex_literal.hbl:3:12
+  ┌─ bad_hex_literal.hbl:1:12
   │
-2 │ 
-3 │ a bytes = <zz>;
+1 │ a bytes = <zz>;
   │            ^^ found invalid hexadecimal literal
-4 │ b bytes = <abc>;
+2 │ b bytes = <abc>;
 
 
 error: expected hex byte liteal to be of length two
-  ┌─ bad_hex_literal.hbl:4:12
+  ┌─ bad_hex_literal.hbl:2:12
   │
-3 │ a bytes = <zz>;
-4 │ b bytes = <abc>;
+1 │ a bytes = <zz>;
+2 │ b bytes = <abc>;
   │            ^^^ unexpected byte literal size
-5 │
+3 │

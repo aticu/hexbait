@@ -1,35 +1,27 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\na u8 = $foo;\n"
+expression: "a u8 = $foo;\n"
 input_file: hexbait-lang/tests/parser-cases/unknown_metavar.hbl
 ---
-File@0..26
-  EndiannessDeclaration@0..11
-    ExclamationMark@0..1 "!"
-    Identifier@1..7 "endian"
-    Whitespace@7..8 " "
-    Identifier@8..10 "le"
-    Semicolon@10..11 ";"
-  Whitespace@11..13 "\n\n"
-  StructField@13..25
-    Identifier@13..14 "a"
-    Whitespace@14..15 " "
-    NamedParseType@15..17
-      Identifier@15..17 "u8"
-    Whitespace@17..18 " "
-    Equals@18..19 "="
-    Whitespace@19..20 " "
-    Metavar@20..24
-      Dollar@20..21 "$"
-      Identifier@21..24 "foo"
-    Semicolon@24..25 ";"
-  Whitespace@25..26 "\n"
+File@0..13
+  StructField@0..12
+    Identifier@0..1 "a"
+    Whitespace@1..2 " "
+    NamedParseType@2..4
+      Identifier@2..4 "u8"
+    Whitespace@4..5 " "
+    Equals@5..6 "="
+    Whitespace@6..7 " "
+    Metavar@7..11
+      Dollar@7..8 "$"
+      Identifier@8..11 "foo"
+    Semicolon@11..12 ";"
+  Whitespace@12..13 "\n"
 
 --- diagnostics ---
 error: metavariable `$foo` is unknown
-  ┌─ unknown_metavar.hbl:3:8
+  ┌─ unknown_metavar.hbl:1:8
   │
-2 │ 
-3 │ a u8 = $foo;
+1 │ a u8 = $foo;
   │        ^^^^ unknown metavariable
-4 │
+2 │

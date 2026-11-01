@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 is_big u8;
 

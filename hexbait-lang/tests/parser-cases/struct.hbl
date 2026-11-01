@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 x {
 	len u32;

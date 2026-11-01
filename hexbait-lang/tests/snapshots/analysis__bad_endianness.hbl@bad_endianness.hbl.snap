@@ -1,11 +1,11 @@
 ---
 source: hexbait-lang/tests/analysis.rs
-expression: "!endian ge;\n\na u8;\n"
+expression: "!endian(\"bittle\");\n\na u8;\n"
 input_file: hexbait-lang/tests/analysis-cases/bad_endianness.hbl
 ---
-error: expected `be` or `le`
+error: expected `big` or `little`
   ┌─ bad_endianness.hbl:1:1
   │
-1 │ !endian ge;
-  │ ^^^^^^^^^^^ unexpected endianness value
+1 │ !endian("bittle");
+  │ ^^^^^^^^^^^^^^^^^^ unexpected endianness value
 2 │

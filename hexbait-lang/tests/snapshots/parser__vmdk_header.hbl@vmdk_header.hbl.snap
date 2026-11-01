@@ -1,162 +1,163 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\nsignature bytes = \"KDMV\";\nversion u32;\nflags u32;\nmaximum_data_number_of_sectors u64;\ngrain_number_of_sectors u64;\ndescriptor_sector_number u64;\ndescriptor_number_of_sectors u64;\nnumber_of_grains_table_entries u32;\nsecondary_grain_directory_sector_number u64;\ngrain_directory_sector_number u64;\nmetadata_number_of_sectors u64;\nis_dirty u8;\neol1 bytes = \"\\n\";\nnon_eol bytes len 1;\neol2 bytes = \"\\r\\n\";\ncompression_method u16;\npadding bytes len 433;\n"
+expression: "!endian(\"little\");\n\nsignature bytes = \"KDMV\";\nversion u32;\nflags u32;\nmaximum_data_number_of_sectors u64;\ngrain_number_of_sectors u64;\ndescriptor_sector_number u64;\ndescriptor_number_of_sectors u64;\nnumber_of_grains_table_entries u32;\nsecondary_grain_directory_sector_number u64;\ngrain_directory_sector_number u64;\nmetadata_number_of_sectors u64;\nis_dirty u8;\neol1 bytes = \"\\n\";\nnon_eol bytes len 1;\neol2 bytes = \"\\r\\n\";\ncompression_method u16;\npadding bytes len 433;\n"
 input_file: format_descriptions/vmdk_header.hbl
 ---
-File@0..461
-  EndiannessDeclaration@0..11
+File@0..468
+  EndiannessDeclaration@0..18
     ExclamationMark@0..1 "!"
     Identifier@1..7 "endian"
-    Whitespace@7..8 " "
-    Identifier@8..10 "le"
-    Semicolon@10..11 ";"
-  Whitespace@11..13 "\n\n"
-  StructField@13..38
-    Identifier@13..22 "signature"
-    Whitespace@22..23 " "
-    BytesParseType@23..28
-      BytesKw@23..28 "bytes"
-    Whitespace@28..29 " "
-    Equals@29..30 "="
-    Whitespace@30..31 " "
-    Atom@31..37
-      StringLiteral@31..37 "\"KDMV\""
-    Semicolon@37..38 ";"
-  Whitespace@38..39 "\n"
-  StructField@39..51
-    Identifier@39..46 "version"
-    Whitespace@46..47 " "
-    NamedParseType@47..50
-      Identifier@47..50 "u32"
-    Semicolon@50..51 ";"
-  Whitespace@51..52 "\n"
-  StructField@52..62
-    Identifier@52..57 "flags"
-    Whitespace@57..58 " "
-    NamedParseType@58..61
-      Identifier@58..61 "u32"
-    Semicolon@61..62 ";"
-  Whitespace@62..63 "\n"
-  StructField@63..98
-    Identifier@63..93 "maximum_data_number_o ..."
-    Whitespace@93..94 " "
-    NamedParseType@94..97
-      Identifier@94..97 "u64"
-    Semicolon@97..98 ";"
-  Whitespace@98..99 "\n"
-  StructField@99..127
-    Identifier@99..122 "grain_number_of_sectors"
-    Whitespace@122..123 " "
-    NamedParseType@123..126
-      Identifier@123..126 "u64"
-    Semicolon@126..127 ";"
-  Whitespace@127..128 "\n"
-  StructField@128..157
-    Identifier@128..152 "descriptor_sector_number"
-    Whitespace@152..153 " "
-    NamedParseType@153..156
-      Identifier@153..156 "u64"
-    Semicolon@156..157 ";"
-  Whitespace@157..158 "\n"
-  StructField@158..191
-    Identifier@158..186 "descriptor_number_of_ ..."
-    Whitespace@186..187 " "
-    NamedParseType@187..190
-      Identifier@187..190 "u64"
-    Semicolon@190..191 ";"
-  Whitespace@191..192 "\n"
-  StructField@192..227
-    Identifier@192..222 "number_of_grains_tabl ..."
-    Whitespace@222..223 " "
-    NamedParseType@223..226
-      Identifier@223..226 "u32"
-    Semicolon@226..227 ";"
-  Whitespace@227..228 "\n"
-  StructField@228..272
-    Identifier@228..267 "secondary_grain_direc ..."
-    Whitespace@267..268 " "
-    NamedParseType@268..271
-      Identifier@268..271 "u64"
-    Semicolon@271..272 ";"
-  Whitespace@272..273 "\n"
-  StructField@273..307
-    Identifier@273..302 "grain_directory_secto ..."
-    Whitespace@302..303 " "
-    NamedParseType@303..306
-      Identifier@303..306 "u64"
-    Semicolon@306..307 ";"
-  Whitespace@307..308 "\n"
-  StructField@308..339
-    Identifier@308..334 "metadata_number_of_se ..."
-    Whitespace@334..335 " "
-    NamedParseType@335..338
-      Identifier@335..338 "u64"
-    Semicolon@338..339 ";"
-  Whitespace@339..340 "\n"
-  StructField@340..352
-    Identifier@340..348 "is_dirty"
-    Whitespace@348..349 " "
-    NamedParseType@349..351
-      Identifier@349..351 "u8"
-    Semicolon@351..352 ";"
-  Whitespace@352..353 "\n"
-  StructField@353..371
-    Identifier@353..357 "eol1"
-    Whitespace@357..358 " "
-    BytesParseType@358..363
-      BytesKw@358..363 "bytes"
-    Whitespace@363..364 " "
-    Equals@364..365 "="
-    Whitespace@365..366 " "
-    Atom@366..370
-      StringLiteral@366..370 "\"\\n\""
-    Semicolon@370..371 ";"
-  Whitespace@371..372 "\n"
-  StructField@372..392
-    Identifier@372..379 "non_eol"
-    Whitespace@379..380 " "
-    BytesParseType@380..391
-      BytesKw@380..385 "bytes"
-      Whitespace@385..386 " "
-      RepeatLenDecl@386..391
-        Identifier@386..389 "len"
-        Whitespace@389..390 " "
-        Atom@390..391
-          DecimalIntegerLiteral@390..391 "1"
-    Semicolon@391..392 ";"
-  Whitespace@392..393 "\n"
-  StructField@393..413
-    Identifier@393..397 "eol2"
-    Whitespace@397..398 " "
-    BytesParseType@398..403
-      BytesKw@398..403 "bytes"
-    Whitespace@403..404 " "
-    Equals@404..405 "="
-    Whitespace@405..406 " "
-    Atom@406..412
-      StringLiteral@406..412 "\"\\r\\n\""
-    Semicolon@412..413 ";"
-  Whitespace@413..414 "\n"
-  StructField@414..437
-    Identifier@414..432 "compression_method"
-    Whitespace@432..433 " "
-    NamedParseType@433..436
-      Identifier@433..436 "u16"
-    Semicolon@436..437 ";"
-  Whitespace@437..438 "\n"
-  StructField@438..460
-    Identifier@438..445 "padding"
-    Whitespace@445..446 " "
-    BytesParseType@446..459
-      BytesKw@446..451 "bytes"
-      Whitespace@451..452 " "
-      RepeatLenDecl@452..459
-        Identifier@452..455 "len"
-        Whitespace@455..456 " "
-        Atom@456..459
-          DecimalIntegerLiteral@456..459 "433"
-    Semicolon@459..460 ";"
-  Whitespace@460..461 "\n"
+    LParen@7..8 "("
+    StringLiteral@8..16 "\"little\""
+    RParen@16..17 ")"
+    Semicolon@17..18 ";"
+  Whitespace@18..20 "\n\n"
+  StructField@20..45
+    Identifier@20..29 "signature"
+    Whitespace@29..30 " "
+    BytesParseType@30..35
+      BytesKw@30..35 "bytes"
+    Whitespace@35..36 " "
+    Equals@36..37 "="
+    Whitespace@37..38 " "
+    Atom@38..44
+      StringLiteral@38..44 "\"KDMV\""
+    Semicolon@44..45 ";"
+  Whitespace@45..46 "\n"
+  StructField@46..58
+    Identifier@46..53 "version"
+    Whitespace@53..54 " "
+    NamedParseType@54..57
+      Identifier@54..57 "u32"
+    Semicolon@57..58 ";"
+  Whitespace@58..59 "\n"
+  StructField@59..69
+    Identifier@59..64 "flags"
+    Whitespace@64..65 " "
+    NamedParseType@65..68
+      Identifier@65..68 "u32"
+    Semicolon@68..69 ";"
+  Whitespace@69..70 "\n"
+  StructField@70..105
+    Identifier@70..100 "maximum_data_number_o ..."
+    Whitespace@100..101 " "
+    NamedParseType@101..104
+      Identifier@101..104 "u64"
+    Semicolon@104..105 ";"
+  Whitespace@105..106 "\n"
+  StructField@106..134
+    Identifier@106..129 "grain_number_of_sectors"
+    Whitespace@129..130 " "
+    NamedParseType@130..133
+      Identifier@130..133 "u64"
+    Semicolon@133..134 ";"
+  Whitespace@134..135 "\n"
+  StructField@135..164
+    Identifier@135..159 "descriptor_sector_number"
+    Whitespace@159..160 " "
+    NamedParseType@160..163
+      Identifier@160..163 "u64"
+    Semicolon@163..164 ";"
+  Whitespace@164..165 "\n"
+  StructField@165..198
+    Identifier@165..193 "descriptor_number_of_ ..."
+    Whitespace@193..194 " "
+    NamedParseType@194..197
+      Identifier@194..197 "u64"
+    Semicolon@197..198 ";"
+  Whitespace@198..199 "\n"
+  StructField@199..234
+    Identifier@199..229 "number_of_grains_tabl ..."
+    Whitespace@229..230 " "
+    NamedParseType@230..233
+      Identifier@230..233 "u32"
+    Semicolon@233..234 ";"
+  Whitespace@234..235 "\n"
+  StructField@235..279
+    Identifier@235..274 "secondary_grain_direc ..."
+    Whitespace@274..275 " "
+    NamedParseType@275..278
+      Identifier@275..278 "u64"
+    Semicolon@278..279 ";"
+  Whitespace@279..280 "\n"
+  StructField@280..314
+    Identifier@280..309 "grain_directory_secto ..."
+    Whitespace@309..310 " "
+    NamedParseType@310..313
+      Identifier@310..313 "u64"
+    Semicolon@313..314 ";"
+  Whitespace@314..315 "\n"
+  StructField@315..346
+    Identifier@315..341 "metadata_number_of_se ..."
+    Whitespace@341..342 " "
+    NamedParseType@342..345
+      Identifier@342..345 "u64"
+    Semicolon@345..346 ";"
+  Whitespace@346..347 "\n"
+  StructField@347..359
+    Identifier@347..355 "is_dirty"
+    Whitespace@355..356 " "
+    NamedParseType@356..358
+      Identifier@356..358 "u8"
+    Semicolon@358..359 ";"
+  Whitespace@359..360 "\n"
+  StructField@360..378
+    Identifier@360..364 "eol1"
+    Whitespace@364..365 " "
+    BytesParseType@365..370
+      BytesKw@365..370 "bytes"
+    Whitespace@370..371 " "
+    Equals@371..372 "="
+    Whitespace@372..373 " "
+    Atom@373..377
+      StringLiteral@373..377 "\"\\n\""
+    Semicolon@377..378 ";"
+  Whitespace@378..379 "\n"
+  StructField@379..399
+    Identifier@379..386 "non_eol"
+    Whitespace@386..387 " "
+    BytesParseType@387..398
+      BytesKw@387..392 "bytes"
+      Whitespace@392..393 " "
+      RepeatLenDecl@393..398
+        Identifier@393..396 "len"
+        Whitespace@396..397 " "
+        Atom@397..398
+          DecimalIntegerLiteral@397..398 "1"
+    Semicolon@398..399 ";"
+  Whitespace@399..400 "\n"
+  StructField@400..420
+    Identifier@400..404 "eol2"
+    Whitespace@404..405 " "
+    BytesParseType@405..410
+      BytesKw@405..410 "bytes"
+    Whitespace@410..411 " "
+    Equals@411..412 "="
+    Whitespace@412..413 " "
+    Atom@413..419
+      StringLiteral@413..419 "\"\\r\\n\""
+    Semicolon@419..420 ";"
+  Whitespace@420..421 "\n"
+  StructField@421..444
+    Identifier@421..439 "compression_method"
+    Whitespace@439..440 " "
+    NamedParseType@440..443
+      Identifier@440..443 "u16"
+    Semicolon@443..444 ";"
+  Whitespace@444..445 "\n"
+  StructField@445..467
+    Identifier@445..452 "padding"
+    Whitespace@452..453 " "
+    BytesParseType@453..466
+      BytesKw@453..458 "bytes"
+      Whitespace@458..459 " "
+      RepeatLenDecl@459..466
+        Identifier@459..462 "len"
+        Whitespace@462..463 " "
+        Atom@463..466
+          DecimalIntegerLiteral@463..466 "433"
+    Semicolon@466..467 ";"
+  Whitespace@467..468 "\n"
 
 --- diagnostics ---
 no diagnostics

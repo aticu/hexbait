@@ -43,22 +43,45 @@ Declaration =
 | RecoveryDeclaration
 
 // Declare the endianness that is used for parsing multi-byte values.
-// Valid kinds are `le` for little endian and `be` for big endian.
+// Valid kinds are `"little"` for little endian and `"big"` for big endian.
 EndiannessDeclaration =
-  '!' 'endian' kind:'ident' ';'
+  '!' 'endian' '(' kind:'str_lit' ')' ';'
 
 // Moves the parsing offset forward until it is aligned with the given alignment.
 // The alignment must be a power of two.
 AlignDeclaration =
-  '!' 'align' amount:Expr ';'
+  '!' 'align' '(' amount:Expr ')' ';'
 
 // Moves the offset forward by the given amount.
 SeekByDeclaration =
-  '!' 'seek' 'by' amount:Expr ';'
+  '!' 'seek' '(' 'by' ':' amount:Expr ')' ';'
 
 // Moves the offset to the given offset.
 SeekToDeclaration =
-  '!' 'seek' 'to' amount:Expr ';'
+  '!' 'seek' '(' 'to' ':' amount:Expr ')' ';'
+
+// Asserts that the expression evaluates to true.
+// If this is not the case, an error is raised with the optional `message` as an error message.
+AssertDeclaration =
+  '!' 'assert' '(' Expr (',' 'message' ':' message:Expr)? ')' ';'
+
+// Displays a warning if the expression evaluates to true.
+// `message` is used as a warning message if present.
+WarnIfDeclaration =
+  '!' 'warn_if' '(' Expr ',' 'message' ':' message:Expr ')' ';'
+
+// Instructs the parser where to recover in case an error is encountered.
+// If an error is encountered the unparsed fields of the current `struct` are skipped and the parser will continue at the given offset as if the `struct` finished parsing.
+// The offset is relative to the current scope. If it's meant to be relative to the start of the current struct use something like `let _start = $offset; ...; !recover at offset + _start;`.
+RecoveryDeclaration =
+  '!' 'recover' '(' 'at' ':' Expr ')' ';'
+
+// Describes a field in a struct.
+// The parse type specifies how the field is parsed.
+// The optional expected value is checked against the parsed value if present.
+// If the values differ an error is raised.
+StructField =
+  name:'ident' ParseType ( '=' expected:Expr )? ';'
 
 // Opens a new scope in the parser.
 // The exact semantics of the scope depend on the scope kind, but within the scope the parser will start at offset 0 within the scope.
@@ -92,31 +115,6 @@ ElsePart =
 // The `else` block is parsed only if all `if` conditions before it evaluated to false.
 ElseBlock =
   StructBlock
-
-// Asserts that the expression evaluates to true.
-// If this is not the case, an error is raised with the optional `message` as an error message.
-// WARNING: Error messages are currently not displayed.
-AssertDeclaration =
-  '!' 'assert' Expr (':' message:Expr)? ';'
-
-// Displays a warning if the expression evaluates to true.
-// `message` is used as a warning message if present.
-// WARNING: Warnings are currently not displayed.
-WarnIfDeclaration =
-  '!' 'warn' 'if' Expr (':' message:Expr)? ';'
-
-// Instructs the parser where to recover in case an error is encountered.
-// If an error is encountered the unparsed fields of the current `struct` are skipped and the parser will continue at the given offset as if the `struct` finished parsing.
-// The offset is relative to the current scope. If it's meant to be relative to the start of the current struct use something like `let _start = $offset; ...; !recover at offset + _start;`.
-RecoveryDeclaration =
-  '!' 'recover' 'at' Expr ';'
-
-// Describes a field in a struct.
-// The parse type specifies how the field is parsed.
-// The optional expected value is checked against the parsed value if present.
-// If the values differ an error is raised.
-StructField =
-  name:'ident' ParseType ( '=' expected:Expr )? ';'
 
 // Describes how a value can be parsed.
 ParseType =

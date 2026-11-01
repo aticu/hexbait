@@ -10,4 +10,4 @@ b switch .a {
 	}
 };
 
-!seek by .b.c;
+!seek(by: .b.c);

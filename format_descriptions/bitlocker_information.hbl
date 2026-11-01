@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 signature bytes = "-FVE-FS-";
 size u16;

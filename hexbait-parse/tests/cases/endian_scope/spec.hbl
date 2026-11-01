@@ -1,20 +1,20 @@
-!endian le;
+!endian("little");
 a u16;
 
-!endian be;
+!endian("big");
 b u16;
 
 inner {
-  !endian le;
+  !endian("little");
   c u16;
 };
 
 // parse little endian, because structs don't encapsulate endianness
 d u16;
 
-!endian be;
+!endian("big");
 scope at $offset {
-  !endian le;
+  !endian("little");
   e_le i16;
 }
 

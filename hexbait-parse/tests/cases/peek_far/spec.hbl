@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 a u8;
 let _far = peek(u32 at 8);

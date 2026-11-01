@@ -1,10 +1,9 @@
-!endian le;
+!endian("little");
 
 a u8;
-!warn if .a > 0;
-!warn if .a > 0 : "a is positive";
-!warn if false : "never fires";
+!warn_if(.a > 0, message: "a is positive");
+!warn_if(false, message: "never fires");
 items [{
   v u8;
-  !warn if .v == 0;
+  !warn_if(.v == 0, message: "v == 0");
 }] len 3;

@@ -1,12 +1,12 @@
-!endian le;
+!endian("little");
 
 mz_header {
     magic bytes = "MZ";
-    !seek to 60;
+    !seek(to: 60);
     new_exe_header u32;
 };
 
-!seek to .mz_header.new_exe_header;
+!seek(to: .mz_header.new_exe_header);
 
 pe_header {
     magic bytes = <"PE" 00 00>;
@@ -37,13 +37,13 @@ optional_header {
 };
 
 let size_of_pe_header = 24;
-!seek to .mz_header.new_exe_header + .pe_header.size_of_optional_header + .size_of_pe_header;
+!seek(to: .mz_header.new_exe_header + .pe_header.size_of_optional_header + .size_of_pe_header);
 
 sections [{
     scope at $offset {
         section_name bytes while $len < 8 && peek(u8) != 0;
     }
-    !seek by 8;
+    !seek(by: 8);
 
     virtual_size u32;
     virtual_address u32;

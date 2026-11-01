@@ -1,5 +1,3 @@
-!endian le;
-
 condition u8;
 x switch .condition {
 	0 => {
@@ -10,4 +8,4 @@ x switch .condition {
 	},
 };
 
-!seek by .x.x;
+!seek(by: .x.x);

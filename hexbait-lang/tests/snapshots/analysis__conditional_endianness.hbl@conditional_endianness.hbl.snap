@@ -1,6 +1,6 @@
 ---
 source: hexbait-lang/tests/analysis.rs
-expression: "x u8;\n\nif .x == 0 {\n\t!endian le;\n}\n\ny u16;\n"
+expression: "x u8;\n\nif .x == 0 {\n\t!endian(\"little\");\n}\n\ny u16;\n"
 input_file: hexbait-lang/tests/analysis-cases/conditional_endianness.hbl
 ---
 error: attempt to parse a multi-byte integer before endianness is set
@@ -10,7 +10,7 @@ error: attempt to parse a multi-byte integer before endianness is set
 3 │   if .x == 0 {
   │      ------- endianness is not set if this is `false`
   │ ╭────────────'
-4 │ │     !endian le;
+4 │ │     !endian("little");
 5 │ │ }
   │ ╰─' endianness is set in this branch
 6 │   

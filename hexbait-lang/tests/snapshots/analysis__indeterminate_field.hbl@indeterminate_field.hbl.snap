@@ -1,21 +1,21 @@
 ---
 source: hexbait-lang/tests/analysis.rs
-expression: "!endian le;\n\ncondition u8;\nx switch condition {\n\t0 => {\n\t\tx u8;\n\t},\n\t_ => {\n\t\tx bytes len 1;\n\t},\n};\n\n!seek by .x.x;\n"
+expression: "condition u8;\nx switch .condition {\n\t0 => {\n\t\tx u8;\n\t},\n\t_ => {\n\t\tx bytes len 1;\n\t},\n};\n\n!seek(by: .x.x);\n"
 input_file: hexbait-lang/tests/analysis-cases/indeterminate_field.hbl
 ---
 error: type differs between braches
-   ┌─ indeterminate_field.hbl:13:10
+   ┌─ indeterminate_field.hbl:11:11
    │
- 5 │     0 => {
- 6 │         x u8;
+ 3 │     0 => {
+ 4 │         x u8;
    │           -- first branch here
- 7 │     },
- 8 │     _ => {
- 9 │         x bytes len 1;
+ 5 │     },
+ 6 │     _ => {
+ 7 │         x bytes len 1;
    │           ----------- second branch here
-10 │     },
-11 │ };
-12 │ 
-13 │ !seek by .x.x;
-   │          ^^^^ undetermined type
-14 │
+ 8 │     },
+ 9 │ };
+10 │ 
+11 │ !seek(by: .x.x);
+   │           ^^^^ undetermined type
+12 │

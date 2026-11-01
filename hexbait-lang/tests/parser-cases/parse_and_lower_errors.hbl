@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 a switch 1 {
     0 => u8,

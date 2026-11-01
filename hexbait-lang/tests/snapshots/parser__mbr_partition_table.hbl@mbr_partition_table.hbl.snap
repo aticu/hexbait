@@ -1,94 +1,97 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: result
+expression: "!endian(\"little\");\n\ndisk_signature u32;\n\n!seek(by: 2);\n\npartition_records [{\n    boot_indicator u8;\n    starting_chs u24;\n    os_type u8;\n    ending_chs u24;\n    starting_lba u32;\n    size_in_lba u32;\n}] len 4;\n"
 input_file: format_descriptions/mbr_partition_table.hbl
 ---
-File@0..202
-  EndiannessDeclaration@0..11
+File@0..211
+  EndiannessDeclaration@0..18
     ExclamationMark@0..1 "!"
     Identifier@1..7 "endian"
-    Whitespace@7..8 " "
-    Identifier@8..10 "le"
-    Semicolon@10..11 ";"
-  Whitespace@11..13 "\n\n"
-  StructField@13..32
-    Identifier@13..27 "disk_signature"
-    Whitespace@27..28 " "
-    NamedParseType@28..31
-      Identifier@28..31 "u32"
-    Semicolon@31..32 ";"
-  Whitespace@32..34 "\n\n"
-  SeekByDeclaration@34..45
-    ExclamationMark@34..35 "!"
-    Identifier@35..39 "seek"
-    Whitespace@39..40 " "
-    Identifier@40..42 "by"
-    Whitespace@42..43 " "
-    Atom@43..44
-      DecimalIntegerLiteral@43..44 "2"
-    Semicolon@44..45 ";"
-  Whitespace@45..47 "\n\n"
-  StructField@47..201
-    Identifier@47..64 "partition_records"
-    Whitespace@64..65 " "
-    RepeatParseType@65..200
-      LBracket@65..66 "["
-      AnonymousStructParseType@66..193
-        StructBlock@66..193
-          LBrace@66..67 "{"
-          Whitespace@67..72 "\n    "
-          StructField@72..90
-            Identifier@72..86 "boot_indicator"
-            Whitespace@86..87 " "
-            NamedParseType@87..89
-              Identifier@87..89 "u8"
-            Semicolon@89..90 ";"
-          Whitespace@90..95 "\n    "
-          StructField@95..112
-            Identifier@95..107 "starting_chs"
-            Whitespace@107..108 " "
-            NamedParseType@108..111
-              Identifier@108..111 "u24"
-            Semicolon@111..112 ";"
-          Whitespace@112..117 "\n    "
-          StructField@117..128
-            Identifier@117..124 "os_type"
-            Whitespace@124..125 " "
-            NamedParseType@125..127
-              Identifier@125..127 "u8"
-            Semicolon@127..128 ";"
-          Whitespace@128..133 "\n    "
-          StructField@133..148
-            Identifier@133..143 "ending_chs"
-            Whitespace@143..144 " "
-            NamedParseType@144..147
-              Identifier@144..147 "u24"
-            Semicolon@147..148 ";"
-          Whitespace@148..153 "\n    "
-          StructField@153..170
-            Identifier@153..165 "starting_lba"
-            Whitespace@165..166 " "
-            NamedParseType@166..169
-              Identifier@166..169 "u32"
-            Semicolon@169..170 ";"
-          Whitespace@170..175 "\n    "
-          StructField@175..191
-            Identifier@175..186 "size_in_lba"
-            Whitespace@186..187 " "
-            NamedParseType@187..190
-              Identifier@187..190 "u32"
-            Semicolon@190..191 ";"
-          Whitespace@191..192 "\n"
-          RBrace@192..193 "}"
-      RBracket@193..194 "]"
-      Whitespace@194..195 " "
-      RepeatLenDecl@195..200
-        Identifier@195..198 "len"
-        Whitespace@198..199 " "
-        Atom@199..200
-          DecimalIntegerLiteral@199..200 "4"
-    Semicolon@200..201 ";"
-  Whitespace@201..202 "\n"
+    LParen@7..8 "("
+    StringLiteral@8..16 "\"little\""
+    RParen@16..17 ")"
+    Semicolon@17..18 ";"
+  Whitespace@18..20 "\n\n"
+  StructField@20..39
+    Identifier@20..34 "disk_signature"
+    Whitespace@34..35 " "
+    NamedParseType@35..38
+      Identifier@35..38 "u32"
+    Semicolon@38..39 ";"
+  Whitespace@39..41 "\n\n"
+  SeekByDeclaration@41..54
+    ExclamationMark@41..42 "!"
+    Identifier@42..46 "seek"
+    LParen@46..47 "("
+    Identifier@47..49 "by"
+    Colon@49..50 ":"
+    Whitespace@50..51 " "
+    Atom@51..52
+      DecimalIntegerLiteral@51..52 "2"
+    RParen@52..53 ")"
+    Semicolon@53..54 ";"
+  Whitespace@54..56 "\n\n"
+  StructField@56..210
+    Identifier@56..73 "partition_records"
+    Whitespace@73..74 " "
+    RepeatParseType@74..209
+      LBracket@74..75 "["
+      AnonymousStructParseType@75..202
+        StructBlock@75..202
+          LBrace@75..76 "{"
+          Whitespace@76..81 "\n    "
+          StructField@81..99
+            Identifier@81..95 "boot_indicator"
+            Whitespace@95..96 " "
+            NamedParseType@96..98
+              Identifier@96..98 "u8"
+            Semicolon@98..99 ";"
+          Whitespace@99..104 "\n    "
+          StructField@104..121
+            Identifier@104..116 "starting_chs"
+            Whitespace@116..117 " "
+            NamedParseType@117..120
+              Identifier@117..120 "u24"
+            Semicolon@120..121 ";"
+          Whitespace@121..126 "\n    "
+          StructField@126..137
+            Identifier@126..133 "os_type"
+            Whitespace@133..134 " "
+            NamedParseType@134..136
+              Identifier@134..136 "u8"
+            Semicolon@136..137 ";"
+          Whitespace@137..142 "\n    "
+          StructField@142..157
+            Identifier@142..152 "ending_chs"
+            Whitespace@152..153 " "
+            NamedParseType@153..156
+              Identifier@153..156 "u24"
+            Semicolon@156..157 ";"
+          Whitespace@157..162 "\n    "
+          StructField@162..179
+            Identifier@162..174 "starting_lba"
+            Whitespace@174..175 " "
+            NamedParseType@175..178
+              Identifier@175..178 "u32"
+            Semicolon@178..179 ";"
+          Whitespace@179..184 "\n    "
+          StructField@184..200
+            Identifier@184..195 "size_in_lba"
+            Whitespace@195..196 " "
+            NamedParseType@196..199
+              Identifier@196..199 "u32"
+            Semicolon@199..200 ";"
+          Whitespace@200..201 "\n"
+          RBrace@201..202 "}"
+      RBracket@202..203 "]"
+      Whitespace@203..204 " "
+      RepeatLenDecl@204..209
+        Identifier@204..207 "len"
+        Whitespace@207..208 " "
+        Atom@208..209
+          DecimalIntegerLiteral@208..209 "4"
+    Semicolon@209..210 ";"
+  Whitespace@210..211 "\n"
 
 --- diagnostics ---
 no diagnostics

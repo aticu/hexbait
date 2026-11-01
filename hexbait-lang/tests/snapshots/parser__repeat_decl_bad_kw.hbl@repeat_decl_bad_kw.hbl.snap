@@ -1,43 +1,35 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: result
+expression: "a [u8] foo;\nb u8;\n"
 input_file: hexbait-lang/tests/parser-cases/repeat_decl_bad_kw.hbl
 ---
-File@0..31
-  EndiannessDeclaration@0..11
-    ExclamationMark@0..1 "!"
-    Identifier@1..7 "endian"
-    Whitespace@7..8 " "
-    Identifier@8..10 "le"
+File@0..18
+  StructField@0..11
+    Identifier@0..1 "a"
+    Whitespace@1..2 " "
+    RepeatParseType@2..10
+      LBracket@2..3 "["
+      NamedParseType@3..5
+        Identifier@3..5 "u8"
+      RBracket@5..6 "]"
+      Whitespace@6..7 " "
+      Error@7..10
+        Error@7..10
+          Identifier@7..10 "foo"
     Semicolon@10..11 ";"
-  Whitespace@11..13 "\n\n"
-  StructField@13..24
-    Identifier@13..14 "a"
-    Whitespace@14..15 " "
-    RepeatParseType@15..23
-      LBracket@15..16 "["
-      NamedParseType@16..18
-        Identifier@16..18 "u8"
-      RBracket@18..19 "]"
-      Whitespace@19..20 " "
-      Error@20..23
-        Error@20..23
-          Identifier@20..23 "foo"
-    Semicolon@23..24 ";"
-  Whitespace@24..25 "\n"
-  StructField@25..30
-    Identifier@25..26 "b"
-    Whitespace@26..27 " "
-    NamedParseType@27..29
-      Identifier@27..29 "u8"
-    Semicolon@29..30 ";"
-  Whitespace@30..31 "\n"
+  Whitespace@11..12 "\n"
+  StructField@12..17
+    Identifier@12..13 "b"
+    Whitespace@13..14 " "
+    NamedParseType@14..16
+      Identifier@14..16 "u8"
+    Semicolon@16..17 ";"
+  Whitespace@17..18 "\n"
 
 --- diagnostics ---
 error: expected `len` or `while`
-  ┌─ repeat_decl_bad_kw.hbl:3:8
+  ┌─ repeat_decl_bad_kw.hbl:1:8
   │
-2 │ 
-3 │ a [u8] foo;
+1 │ a [u8] foo;
   │        ^^^ found unexpected token identifier
-4 │ b u8;
+2 │ b u8;

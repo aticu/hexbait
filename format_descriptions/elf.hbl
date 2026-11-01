@@ -16,9 +16,9 @@ ident {
 };
 
 if .ident.endianness == enum.ELFDATA2LSB {
-    !endian le;
+    !endian("little");
 } else {
-    !endian be;
+    !endian("big");
 }
 
 type enum u16 {
@@ -61,7 +61,7 @@ section_header_string_index u16;
 
 let string_table_start_off = peek(u64 at .section_header_off + .section_header_entry_size * .section_header_string_index + 24);
 
-!seek to .section_header_off;
+!seek(to: .section_header_off);
 sections [{
     name_idx u32;
     scope at $parent.string_table_start_off + .name_idx {

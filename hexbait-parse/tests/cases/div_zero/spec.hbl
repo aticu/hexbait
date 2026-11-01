@@ -1,5 +1,5 @@
 div {
-	!recover at 0;
+	!recover(at: 0);
 	let x = 1 / 0;
 };
 mod {

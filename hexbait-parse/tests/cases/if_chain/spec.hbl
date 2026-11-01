@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 k u8;
 if .k == 1 {

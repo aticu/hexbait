@@ -165,44 +165,53 @@ fn decl(p: &mut Parser) {
             Some("endian") => {
                 p.with_consuming_recovery(TokenKind::Semicolon, |p| {
                     p.bump();
-                    match p.peek_contextual_kw() {
-                        Some("le") | Some("be") => p.bump(),
-                        // let lowering deal with the error
-                        Some(_) => p.bump(),
-                        _ => p.expect_error(&["`le`", "`be`"]),
-                    }
+
+                    p.expect(TokenKind::LParen);
+                    p.with_consuming_recovery(TokenKind::RParen, |p| {
+                        p.expect(TokenKind::StringLiteral);
+                    });
                 });
 
                 NodeKind::EndiannessDeclaration
             }
             Some("seek") => p.with_consuming_recovery(TokenKind::Semicolon, |p| {
                 p.bump();
-                let kind = match p.peek_contextual_kw() {
-                    Some("by") => {
-                        p.bump();
-                        Some(NodeKind::SeekByDeclaration)
-                    }
-                    Some("to") => {
-                        p.bump();
-                        Some(NodeKind::SeekToDeclaration)
-                    }
-                    _ => {
-                        p.expect_error(&["`by`", "`to`"]);
-                        None
-                    }
-                };
 
-                if let Some(kind) = kind {
-                    expr(p);
-                    kind
-                } else {
-                    NodeKind::Error
-                }
+                p.expect(TokenKind::LParen);
+                p.with_consuming_recovery(TokenKind::RParen, |p| {
+                    let kind = match p.peek_contextual_kw() {
+                        Some("by") => {
+                            p.bump();
+                            p.expect(TokenKind::Colon);
+                            Some(NodeKind::SeekByDeclaration)
+                        }
+                        Some("to") => {
+                            p.bump();
+                            p.expect(TokenKind::Colon);
+                            Some(NodeKind::SeekToDeclaration)
+                        }
+                        _ => {
+                            p.expect_error(&["`by`", "`to`"]);
+                            None
+                        }
+                    };
+
+                    if let Some(kind) = kind {
+                        expr(p);
+                        kind
+                    } else {
+                        NodeKind::Error
+                    }
+                })
             }),
             Some("align") => {
                 p.with_consuming_recovery(TokenKind::Semicolon, |p| {
                     p.bump();
-                    expr(p);
+
+                    p.expect(TokenKind::LParen);
+                    p.with_consuming_recovery(TokenKind::RParen, |p| {
+                        expr(p);
+                    })
                 });
 
                 NodeKind::AlignDeclaration
@@ -210,29 +219,44 @@ fn decl(p: &mut Parser) {
             Some("assert") => {
                 p.with_consuming_recovery(TokenKind::Semicolon, |p| {
                     p.bump();
-                    expr(p);
-                    if p.at(TokenKind::Colon) {
-                        p.expect(TokenKind::Colon);
+
+                    p.expect(TokenKind::LParen);
+                    p.with_consuming_recovery(TokenKind::RParen, |p| {
                         expr(p);
-                    }
+
+                        if p.at(TokenKind::Comma) {
+                            p.expect(TokenKind::Comma);
+
+                            if p.at_contextual_kw("message") {
+                                p.bump();
+                            } else {
+                                p.expect_error(&["`message`"]);
+                            }
+                            p.expect(TokenKind::Colon);
+                            expr(p);
+                        }
+                    });
                 });
 
                 NodeKind::AssertDeclaration
             }
-            Some("warn") => {
+            Some("warn_if") => {
                 p.with_consuming_recovery(TokenKind::Semicolon, |p| {
                     p.bump();
-                    if p.at(TokenKind::IfKw) {
-                        p.bump();
-                    } else {
-                        p.expect_error(&["`if`"]);
-                    }
 
-                    expr(p);
-                    if p.at(TokenKind::Colon) {
+                    p.expect(TokenKind::LParen);
+                    p.with_consuming_recovery(TokenKind::RParen, |p| {
+                        expr(p);
+                        p.expect(TokenKind::Comma);
+
+                        if p.at_contextual_kw("message") {
+                            p.bump();
+                        } else {
+                            p.expect_error(&["`message`"]);
+                        }
                         p.expect(TokenKind::Colon);
                         expr(p);
-                    }
+                    });
                 });
 
                 NodeKind::WarnIfDeclaration
@@ -240,13 +264,18 @@ fn decl(p: &mut Parser) {
             Some("recover") => {
                 p.with_consuming_recovery(TokenKind::Semicolon, |p| {
                     p.bump();
-                    if p.at_contextual_kw("at") {
-                        p.bump();
-                    } else {
-                        p.expect_error(&["`at`"]);
-                    }
 
-                    expr(p);
+                    p.expect(TokenKind::LParen);
+                    p.with_consuming_recovery(TokenKind::RParen, |p| {
+                        if p.at_contextual_kw("at") {
+                            p.bump();
+                        } else {
+                            p.expect_error(&["`at`"]);
+                        }
+                        p.expect(TokenKind::Colon);
+
+                        expr(p);
+                    });
                 });
 
                 NodeKind::RecoveryDeclaration
@@ -257,7 +286,7 @@ fn decl(p: &mut Parser) {
                     "`seek`",
                     "`align`",
                     "`assert`",
-                    "`warn`",
+                    "`warn_if`",
                     "`recover`",
                 ]);
                 p.with_consuming_recovery(TokenKind::Semicolon, |p| {

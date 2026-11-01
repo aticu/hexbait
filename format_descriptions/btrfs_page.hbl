@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 scope at $offset until 16384 {
 	checksum bytes len 32;

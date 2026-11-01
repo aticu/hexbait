@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 w u8;
 x u(.w * 8);

@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 kind u8;
 payload switch .kind {

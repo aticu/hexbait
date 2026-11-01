@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 let _size = 4;
 a u8;

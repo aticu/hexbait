@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 partition_type_guid bytes len 16;
 unique_partition_guid bytes len 16;

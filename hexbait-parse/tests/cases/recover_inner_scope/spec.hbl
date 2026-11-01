@@ -1,6 +1,6 @@
-!endian le;
+!endian("little");
 
-!recover at 2;
+!recover(at: 2);
 
 scope at 2 {
     inner {

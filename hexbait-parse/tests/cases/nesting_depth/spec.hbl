@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 n u8;
 outer [{

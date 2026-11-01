@@ -1,6 +1,6 @@
 ---
 source: hexbait-parse/tests/cases.rs
-expression: "\n=== Spec ===\n!endian le;\n\na u8;\n!warn if a > 0;\n!warn if a > 0 : \"a is positive\";\n!warn if false : \"never fires\";\nitems [{\n  v u8;\n  !warn if v == 0;\n}] len 3;\n\n\n=== Hex ===\n01 00 01 00\n"
+expression: "\n=== Spec ===\n!endian(\"little\");\n\na u8;\n!warn_if(.a > 0, message: \"a is positive\");\n!warn_if(false, message: \"never fires\");\nitems [{\n  v u8;\n  !warn_if(.v == 0, message: \"v == 0\");\n}] len 3;\n\n\n=== Hex ===\n01 00 01 00\n"
 input_file: hexbait-parse/tests/cases/warn/spec.hbl
 ---
 {
@@ -10,8 +10,7 @@ input_file: hexbait-parse/tests/cases/warn/spec.hbl
         "value": 1,
         "provenance": "0..=0"
       },
-      "_warning0": "warning triggered",
-      "_warning1": "warning triggered: a is positive",
+      "_warning0": "warning triggered: a is positive",
       "items": {
         "value": [
           {
@@ -20,7 +19,7 @@ input_file: hexbait-parse/tests/cases/warn/spec.hbl
                 "value": 0,
                 "provenance": "1..=1"
               },
-              "_warning2": "warning triggered"
+              "_warning1": "warning triggered: v == 0"
             },
             "provenance": "1..=1"
           },
@@ -39,7 +38,7 @@ input_file: hexbait-parse/tests/cases/warn/spec.hbl
                 "value": 0,
                 "provenance": "3..=3"
               },
-              "_warning3": "warning triggered"
+              "_warning2": "warning triggered: v == 0"
             },
             "provenance": "3..=3"
           }
@@ -52,19 +51,15 @@ input_file: hexbait-parse/tests/cases/warn/spec.hbl
   "errors": [],
   "warnings": [
     {
-      "message": "warning triggered",
-      "provenance": "0..=0"
-    },
-    {
       "message": "warning triggered: a is positive",
       "provenance": "0..=0"
     },
     {
-      "message": "warning triggered",
+      "message": "warning triggered: v == 0",
       "provenance": "1..=1"
     },
     {
-      "message": "warning triggered",
+      "message": "warning triggered: v == 0",
       "provenance": "3..=3"
     }
   ]

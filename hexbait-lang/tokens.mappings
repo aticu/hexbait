@@ -1,2 +1,2 @@
 ident => Identifier
-endian => Identifier
+str_lit => StringLiteral

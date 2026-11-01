@@ -1,44 +1,36 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\nlet x = 1 ** 2;\n"
+expression: "let x = 1 ** 2;\n"
 input_file: hexbait-lang/tests/parser-cases/double_asterisk.hbl
 ---
-File@0..29
-  EndiannessDeclaration@0..11
-    ExclamationMark@0..1 "!"
-    Identifier@1..7 "endian"
+File@0..16
+  LetStatement@0..15
+    LetKw@0..3 "let"
+    Whitespace@3..4 " "
+    Identifier@4..5 "x"
+    Whitespace@5..6 " "
+    Equals@6..7 "="
     Whitespace@7..8 " "
-    Identifier@8..10 "le"
-    Semicolon@10..11 ";"
-  Whitespace@11..13 "\n\n"
-  LetStatement@13..28
-    LetKw@13..16 "let"
-    Whitespace@16..17 " "
-    Identifier@17..18 "x"
-    Whitespace@18..19 " "
-    Equals@19..20 "="
-    Whitespace@20..21 " "
-    InfixExpr@21..27
-      InfixExpr@21..24
-        Atom@21..22
-          DecimalIntegerLiteral@21..22 "1"
-        Whitespace@22..23 " "
-        Op@23..24
-          Star@23..24 "*"
-        Atom@24..24
-      Op@24..25
-        Star@24..25 "*"
-      Whitespace@25..26 " "
-      Atom@26..27
-        DecimalIntegerLiteral@26..27 "2"
-    Semicolon@27..28 ";"
-  Whitespace@28..29 "\n"
+    InfixExpr@8..14
+      InfixExpr@8..11
+        Atom@8..9
+          DecimalIntegerLiteral@8..9 "1"
+        Whitespace@9..10 " "
+        Op@10..11
+          Star@10..11 "*"
+        Atom@11..11
+      Op@11..12
+        Star@11..12 "*"
+      Whitespace@12..13 " "
+      Atom@13..14
+        DecimalIntegerLiteral@13..14 "2"
+    Semicolon@14..15 ";"
+  Whitespace@15..16 "\n"
 
 --- diagnostics ---
 error: expected identifier, literal, `.`, `peek`, `concat`, `$`, `<` or `(`
-  ┌─ double_asterisk.hbl:3:12
+  ┌─ double_asterisk.hbl:1:12
   │
-2 │ 
-3 │ let x = 1 ** 2;
+1 │ let x = 1 ** 2;
   │            ^ found unexpected token `*`
-4 │
+2 │

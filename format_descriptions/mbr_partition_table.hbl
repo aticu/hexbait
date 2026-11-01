@@ -1,8 +1,8 @@
-!endian le;
+!endian("little");
 
 disk_signature u32;
 
-!seek by 2;
+!seek(by: 2);
 
 partition_records [{
     boot_indicator u8;

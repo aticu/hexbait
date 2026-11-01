@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 a u16;
 b u16;

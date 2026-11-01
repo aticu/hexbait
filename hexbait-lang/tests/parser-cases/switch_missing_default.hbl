@@ -1,5 +1,3 @@
-!endian le;
-
 a switch 1 {
     0 => u8,
 };

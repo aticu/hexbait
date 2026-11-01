@@ -1,110 +1,111 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\nsignature bytes = \"metadata\";\nunknown u16;\nnumber_of_entries u16;\nunknown2 bytes len 20;\n\nentries [{\n    metadata_item_identifier bytes len 16;\n    metadata_item_offset u32;\n    metadata_item_size u32;\n    unknown u64;\n}] len .number_of_entries;\n"
+expression: "!endian(\"little\");\n\nsignature bytes = \"metadata\";\nunknown u16;\nnumber_of_entries u16;\nunknown2 bytes len 20;\n\nentries [{\n    metadata_item_identifier bytes len 16;\n    metadata_item_offset u32;\n    metadata_item_size u32;\n    unknown u64;\n}] len .number_of_entries;\n"
 input_file: format_descriptions/vhdx_metadata_table.hbl
 ---
-File@0..259
-  EndiannessDeclaration@0..11
+File@0..266
+  EndiannessDeclaration@0..18
     ExclamationMark@0..1 "!"
     Identifier@1..7 "endian"
-    Whitespace@7..8 " "
-    Identifier@8..10 "le"
-    Semicolon@10..11 ";"
-  Whitespace@11..13 "\n\n"
-  StructField@13..42
-    Identifier@13..22 "signature"
-    Whitespace@22..23 " "
-    BytesParseType@23..28
-      BytesKw@23..28 "bytes"
-    Whitespace@28..29 " "
-    Equals@29..30 "="
-    Whitespace@30..31 " "
-    Atom@31..41
-      StringLiteral@31..41 "\"metadata\""
-    Semicolon@41..42 ";"
-  Whitespace@42..43 "\n"
-  StructField@43..55
-    Identifier@43..50 "unknown"
-    Whitespace@50..51 " "
-    NamedParseType@51..54
-      Identifier@51..54 "u16"
-    Semicolon@54..55 ";"
-  Whitespace@55..56 "\n"
-  StructField@56..78
-    Identifier@56..73 "number_of_entries"
-    Whitespace@73..74 " "
-    NamedParseType@74..77
-      Identifier@74..77 "u16"
-    Semicolon@77..78 ";"
-  Whitespace@78..79 "\n"
-  StructField@79..101
-    Identifier@79..87 "unknown2"
-    Whitespace@87..88 " "
-    BytesParseType@88..100
-      BytesKw@88..93 "bytes"
-      Whitespace@93..94 " "
-      RepeatLenDecl@94..100
-        Identifier@94..97 "len"
-        Whitespace@97..98 " "
-        Atom@98..100
-          DecimalIntegerLiteral@98..100 "20"
-    Semicolon@100..101 ";"
-  Whitespace@101..103 "\n\n"
-  StructField@103..258
-    Identifier@103..110 "entries"
-    Whitespace@110..111 " "
-    RepeatParseType@111..257
-      LBracket@111..112 "["
-      AnonymousStructParseType@112..233
-        StructBlock@112..233
-          LBrace@112..113 "{"
-          Whitespace@113..118 "\n    "
-          StructField@118..156
-            Identifier@118..142 "metadata_item_identifier"
-            Whitespace@142..143 " "
-            BytesParseType@143..155
-              BytesKw@143..148 "bytes"
-              Whitespace@148..149 " "
-              RepeatLenDecl@149..155
-                Identifier@149..152 "len"
-                Whitespace@152..153 " "
-                Atom@153..155
-                  DecimalIntegerLiteral@153..155 "16"
-            Semicolon@155..156 ";"
-          Whitespace@156..161 "\n    "
-          StructField@161..186
-            Identifier@161..181 "metadata_item_offset"
-            Whitespace@181..182 " "
-            NamedParseType@182..185
-              Identifier@182..185 "u32"
-            Semicolon@185..186 ";"
-          Whitespace@186..191 "\n    "
-          StructField@191..214
-            Identifier@191..209 "metadata_item_size"
-            Whitespace@209..210 " "
-            NamedParseType@210..213
-              Identifier@210..213 "u32"
-            Semicolon@213..214 ";"
-          Whitespace@214..219 "\n    "
-          StructField@219..231
-            Identifier@219..226 "unknown"
-            Whitespace@226..227 " "
-            NamedParseType@227..230
-              Identifier@227..230 "u64"
-            Semicolon@230..231 ";"
-          Whitespace@231..232 "\n"
-          RBrace@232..233 "}"
-      RBracket@233..234 "]"
-      Whitespace@234..235 " "
-      RepeatLenDecl@235..257
-        Identifier@235..238 "len"
-        Whitespace@238..239 " "
-        FieldAccess@239..257
-          Dot@239..240 "."
-          BareField@240..257
-            Identifier@240..257 "number_of_entries"
-    Semicolon@257..258 ";"
-  Whitespace@258..259 "\n"
+    LParen@7..8 "("
+    StringLiteral@8..16 "\"little\""
+    RParen@16..17 ")"
+    Semicolon@17..18 ";"
+  Whitespace@18..20 "\n\n"
+  StructField@20..49
+    Identifier@20..29 "signature"
+    Whitespace@29..30 " "
+    BytesParseType@30..35
+      BytesKw@30..35 "bytes"
+    Whitespace@35..36 " "
+    Equals@36..37 "="
+    Whitespace@37..38 " "
+    Atom@38..48
+      StringLiteral@38..48 "\"metadata\""
+    Semicolon@48..49 ";"
+  Whitespace@49..50 "\n"
+  StructField@50..62
+    Identifier@50..57 "unknown"
+    Whitespace@57..58 " "
+    NamedParseType@58..61
+      Identifier@58..61 "u16"
+    Semicolon@61..62 ";"
+  Whitespace@62..63 "\n"
+  StructField@63..85
+    Identifier@63..80 "number_of_entries"
+    Whitespace@80..81 " "
+    NamedParseType@81..84
+      Identifier@81..84 "u16"
+    Semicolon@84..85 ";"
+  Whitespace@85..86 "\n"
+  StructField@86..108
+    Identifier@86..94 "unknown2"
+    Whitespace@94..95 " "
+    BytesParseType@95..107
+      BytesKw@95..100 "bytes"
+      Whitespace@100..101 " "
+      RepeatLenDecl@101..107
+        Identifier@101..104 "len"
+        Whitespace@104..105 " "
+        Atom@105..107
+          DecimalIntegerLiteral@105..107 "20"
+    Semicolon@107..108 ";"
+  Whitespace@108..110 "\n\n"
+  StructField@110..265
+    Identifier@110..117 "entries"
+    Whitespace@117..118 " "
+    RepeatParseType@118..264
+      LBracket@118..119 "["
+      AnonymousStructParseType@119..240
+        StructBlock@119..240
+          LBrace@119..120 "{"
+          Whitespace@120..125 "\n    "
+          StructField@125..163
+            Identifier@125..149 "metadata_item_identifier"
+            Whitespace@149..150 " "
+            BytesParseType@150..162
+              BytesKw@150..155 "bytes"
+              Whitespace@155..156 " "
+              RepeatLenDecl@156..162
+                Identifier@156..159 "len"
+                Whitespace@159..160 " "
+                Atom@160..162
+                  DecimalIntegerLiteral@160..162 "16"
+            Semicolon@162..163 ";"
+          Whitespace@163..168 "\n    "
+          StructField@168..193
+            Identifier@168..188 "metadata_item_offset"
+            Whitespace@188..189 " "
+            NamedParseType@189..192
+              Identifier@189..192 "u32"
+            Semicolon@192..193 ";"
+          Whitespace@193..198 "\n    "
+          StructField@198..221
+            Identifier@198..216 "metadata_item_size"
+            Whitespace@216..217 " "
+            NamedParseType@217..220
+              Identifier@217..220 "u32"
+            Semicolon@220..221 ";"
+          Whitespace@221..226 "\n    "
+          StructField@226..238
+            Identifier@226..233 "unknown"
+            Whitespace@233..234 " "
+            NamedParseType@234..237
+              Identifier@234..237 "u64"
+            Semicolon@237..238 ";"
+          Whitespace@238..239 "\n"
+          RBrace@239..240 "}"
+      RBracket@240..241 "]"
+      Whitespace@241..242 " "
+      RepeatLenDecl@242..264
+        Identifier@242..245 "len"
+        Whitespace@245..246 " "
+        FieldAccess@246..264
+          Dot@246..247 "."
+          BareField@247..264
+            Identifier@247..264 "number_of_entries"
+    Semicolon@264..265 ";"
+  Whitespace@265..266 "\n"
 
 --- diagnostics ---
 no diagnostics

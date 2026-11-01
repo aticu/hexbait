@@ -1,5 +1,3 @@
-!endian le;
-
 let;
 let a;
 let b =;

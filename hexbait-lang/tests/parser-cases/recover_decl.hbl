@@ -1,4 +1,2 @@
-!endian le;
-
 !foo bar;
 a u8;

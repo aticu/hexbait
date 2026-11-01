@@ -1,35 +1,28 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\na {\n    b u8;\n"
+expression: "a {\n    b u8;\n"
 input_file: hexbait-lang/tests/parser-cases/unclosed_block.hbl
 ---
-File@0..27
-  EndiannessDeclaration@0..11
-    ExclamationMark@0..1 "!"
-    Identifier@1..7 "endian"
-    Whitespace@7..8 " "
-    Identifier@8..10 "le"
-    Semicolon@10..11 ";"
-  Whitespace@11..13 "\n\n"
-  StructField@13..26
-    Identifier@13..14 "a"
-    Whitespace@14..15 " "
-    AnonymousStructParseType@15..26
-      StructBlock@15..26
-        LBrace@15..16 "{"
-        Whitespace@16..21 "\n    "
-        StructField@21..26
-          Identifier@21..22 "b"
-          Whitespace@22..23 " "
-          NamedParseType@23..25
-            Identifier@23..25 "u8"
-          Semicolon@25..26 ";"
-  Whitespace@26..27 "\n"
+File@0..14
+  StructField@0..13
+    Identifier@0..1 "a"
+    Whitespace@1..2 " "
+    AnonymousStructParseType@2..13
+      StructBlock@2..13
+        LBrace@2..3 "{"
+        Whitespace@3..8 "\n    "
+        StructField@8..13
+          Identifier@8..9 "b"
+          Whitespace@9..10 " "
+          NamedParseType@10..12
+            Identifier@10..12 "u8"
+          Semicolon@12..13 ";"
+  Whitespace@13..14 "\n"
 
 --- diagnostics ---
 error: expected `}`
-  ┌─ unclosed_block.hbl:5:1
+  ┌─ unclosed_block.hbl:3:1
   │
-4 │     b u8;
-5 │ 
+2 │     b u8;
+3 │ 
   │ ^ found unexpected token end of file

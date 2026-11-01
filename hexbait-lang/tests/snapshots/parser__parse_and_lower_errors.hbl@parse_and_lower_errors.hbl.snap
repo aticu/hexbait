@@ -1,80 +1,81 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\na switch 1 {\n    0 => u8,\n};\nb switch .a {\n    .a => u8,\n    _ => u16,\n};\n"
+expression: "!endian(\"little\");\n\na switch 1 {\n    0 => u8,\n};\nb switch .a {\n    .a => u8,\n    _ => u16,\n};\n"
 input_file: hexbait-lang/tests/parser-cases/parse_and_lower_errors.hbl
 ---
-File@0..87
-  EndiannessDeclaration@0..11
+File@0..94
+  EndiannessDeclaration@0..18
     ExclamationMark@0..1 "!"
     Identifier@1..7 "endian"
-    Whitespace@7..8 " "
-    Identifier@8..10 "le"
-    Semicolon@10..11 ";"
-  Whitespace@11..13 "\n\n"
-  StructField@13..41
-    Identifier@13..14 "a"
-    Whitespace@14..15 " "
-    SwitchParseType@15..40
-      SwitchKw@15..21 "switch"
-      Whitespace@21..22 " "
-      Atom@22..23
-        DecimalIntegerLiteral@22..23 "1"
-      Whitespace@23..24 " "
-      LBrace@24..25 "{"
-      Whitespace@25..30 "\n    "
-      SwitchParseTypeArm@30..38
-        Atom@30..31
-          DecimalIntegerLiteral@30..31 "0"
-        Whitespace@31..32 " "
-        Equals@32..33 "="
-        RAngle@33..34 ">"
-        Whitespace@34..35 " "
-        NamedParseType@35..37
-          Identifier@35..37 "u8"
-        Comma@37..38 ","
-      Whitespace@38..39 "\n"
-      Error@39..39
-      RBrace@39..40 "}"
-    Semicolon@40..41 ";"
-  Whitespace@41..42 "\n"
-  StructField@42..86
-    Identifier@42..43 "b"
-    Whitespace@43..44 " "
-    SwitchParseType@44..85
-      SwitchKw@44..50 "switch"
-      Whitespace@50..51 " "
-      FieldAccess@51..53
-        Dot@51..52 "."
-        BareField@52..53
-          Identifier@52..53 "a"
-      Whitespace@53..54 " "
-      LBrace@54..55 "{"
-      Whitespace@55..60 "\n    "
-      SwitchParseTypeArm@60..69
-        FieldAccess@60..62
-          Dot@60..61 "."
-          BareField@61..62
-            Identifier@61..62 "a"
-        Whitespace@62..63 " "
-        Equals@63..64 "="
-        RAngle@64..65 ">"
-        Whitespace@65..66 " "
-        NamedParseType@66..68
-          Identifier@66..68 "u8"
-        Comma@68..69 ","
-      Whitespace@69..74 "\n    "
-      Underscore@74..75 "_"
-      Whitespace@75..76 " "
-      Equals@76..77 "="
-      RAngle@77..78 ">"
-      Whitespace@78..79 " "
-      NamedParseType@79..82
-        Identifier@79..82 "u16"
-      Comma@82..83 ","
-      Whitespace@83..84 "\n"
-      RBrace@84..85 "}"
-    Semicolon@85..86 ";"
-  Whitespace@86..87 "\n"
+    LParen@7..8 "("
+    StringLiteral@8..16 "\"little\""
+    RParen@16..17 ")"
+    Semicolon@17..18 ";"
+  Whitespace@18..20 "\n\n"
+  StructField@20..48
+    Identifier@20..21 "a"
+    Whitespace@21..22 " "
+    SwitchParseType@22..47
+      SwitchKw@22..28 "switch"
+      Whitespace@28..29 " "
+      Atom@29..30
+        DecimalIntegerLiteral@29..30 "1"
+      Whitespace@30..31 " "
+      LBrace@31..32 "{"
+      Whitespace@32..37 "\n    "
+      SwitchParseTypeArm@37..45
+        Atom@37..38
+          DecimalIntegerLiteral@37..38 "0"
+        Whitespace@38..39 " "
+        Equals@39..40 "="
+        RAngle@40..41 ">"
+        Whitespace@41..42 " "
+        NamedParseType@42..44
+          Identifier@42..44 "u8"
+        Comma@44..45 ","
+      Whitespace@45..46 "\n"
+      Error@46..46
+      RBrace@46..47 "}"
+    Semicolon@47..48 ";"
+  Whitespace@48..49 "\n"
+  StructField@49..93
+    Identifier@49..50 "b"
+    Whitespace@50..51 " "
+    SwitchParseType@51..92
+      SwitchKw@51..57 "switch"
+      Whitespace@57..58 " "
+      FieldAccess@58..60
+        Dot@58..59 "."
+        BareField@59..60
+          Identifier@59..60 "a"
+      Whitespace@60..61 " "
+      LBrace@61..62 "{"
+      Whitespace@62..67 "\n    "
+      SwitchParseTypeArm@67..76
+        FieldAccess@67..69
+          Dot@67..68 "."
+          BareField@68..69
+            Identifier@68..69 "a"
+        Whitespace@69..70 " "
+        Equals@70..71 "="
+        RAngle@71..72 ">"
+        Whitespace@72..73 " "
+        NamedParseType@73..75
+          Identifier@73..75 "u8"
+        Comma@75..76 ","
+      Whitespace@76..81 "\n    "
+      Underscore@81..82 "_"
+      Whitespace@82..83 " "
+      Equals@83..84 "="
+      RAngle@84..85 ">"
+      Whitespace@85..86 " "
+      NamedParseType@86..89
+        Identifier@86..89 "u16"
+      Comma@89..90 ","
+      Whitespace@90..91 "\n"
+      RBrace@91..92 "}"
+    Semicolon@92..93 ";"
+  Whitespace@93..94 "\n"
 
 --- diagnostics ---
 error: expected `_`

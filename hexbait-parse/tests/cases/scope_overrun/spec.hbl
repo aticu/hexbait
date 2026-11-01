@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 scope at 0 until 4 {
   x u16;

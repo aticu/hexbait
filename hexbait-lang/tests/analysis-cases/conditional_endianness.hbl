@@ -1,7 +1,7 @@
 x u8;
 
 if .x == 0 {
-	!endian le;
+	!endian("little");
 }
 
 y u16;

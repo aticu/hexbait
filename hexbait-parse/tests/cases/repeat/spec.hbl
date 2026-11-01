@@ -1,4 +1,4 @@
-!endian le;
+!endian("little");
 
 count u8;
 items [u16] len .count;

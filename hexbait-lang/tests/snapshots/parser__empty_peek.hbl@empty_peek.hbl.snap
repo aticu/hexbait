@@ -1,43 +1,35 @@
 ---
 source: hexbait-lang/tests/parser.rs
-expression: "!endian le;\n\nlet x = peek() + 1;\n"
+expression: "let x = peek() + 1;\n"
 input_file: hexbait-lang/tests/parser-cases/empty_peek.hbl
 ---
-File@0..33
-  EndiannessDeclaration@0..11
-    ExclamationMark@0..1 "!"
-    Identifier@1..7 "endian"
+File@0..20
+  LetStatement@0..19
+    LetKw@0..3 "let"
+    Whitespace@3..4 " "
+    Identifier@4..5 "x"
+    Whitespace@5..6 " "
+    Equals@6..7 "="
     Whitespace@7..8 " "
-    Identifier@8..10 "le"
-    Semicolon@10..11 ";"
-  Whitespace@11..13 "\n\n"
-  LetStatement@13..32
-    LetKw@13..16 "let"
-    Whitespace@16..17 " "
-    Identifier@17..18 "x"
-    Whitespace@18..19 " "
-    Equals@19..20 "="
-    Whitespace@20..21 " "
-    InfixExpr@21..31
-      PeekExpr@21..27
-        PeekKw@21..25 "peek"
-        LParen@25..26 "("
-        Error@26..26
-        RParen@26..27 ")"
-      Whitespace@27..28 " "
-      Op@28..29
-        Plus@28..29 "+"
-      Whitespace@29..30 " "
-      Atom@30..31
-        DecimalIntegerLiteral@30..31 "1"
-    Semicolon@31..32 ";"
-  Whitespace@32..33 "\n"
+    InfixExpr@8..18
+      PeekExpr@8..14
+        PeekKw@8..12 "peek"
+        LParen@12..13 "("
+        Error@13..13
+        RParen@13..14 ")"
+      Whitespace@14..15 " "
+      Op@15..16
+        Plus@15..16 "+"
+      Whitespace@16..17 " "
+      Atom@17..18
+        DecimalIntegerLiteral@17..18 "1"
+    Semicolon@18..19 ";"
+  Whitespace@19..20 "\n"
 
 --- diagnostics ---
 error: expected an identifier, `{`, `[`, `bytes` or `switch`
-  ┌─ empty_peek.hbl:3:14
+  ┌─ empty_peek.hbl:1:14
   │
-2 │ 
-3 │ let x = peek() + 1;
+1 │ let x = peek() + 1;
   │              ^ found unexpected token `)`
-4 │
+2 │
