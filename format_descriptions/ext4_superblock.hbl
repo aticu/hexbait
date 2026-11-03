@@ -16,12 +16,26 @@ s_wtime u32;
 s_mnt_count u16;
 s_max_mnt_count u16;
 s_magic bytes = <53 ef>;
-s_state u16;
-s_errors u16;
+s_state flags u16 {
+    is_clean = 0x1,
+    has_errors = 0x2,
+    recovering_orphan_inodes = 0x4,
+};
+s_errors enum u16 {
+    continue = 1,
+    remount_as_read_only = 2,
+    panic = 3,
+};
 s_minor_rev_level u16;
 s_lastcheck u32;
 s_checkinterval u32;
-s_creator_os u32;
+s_creator_os enum u32 {
+    linux = 0,
+    gnu_hurd = 1,
+    masix = 2,
+    freebsd = 3,
+    lites = 4,
+};
 s_rev_level u32;
 s_def_resuid u16;
 s_def_resgid u16;
