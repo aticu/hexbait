@@ -1,0 +1,1223 @@
+---
+source: hexbait-lang/tests/parser.rs
+expression: "!endian(\"little\");\n\ns_inodes_count u32;\ns_blocks_count_lo u32;\ns_r_blocks_count_lo u32;\ns_free_blocks_count_lo u32;\ns_free_inodes_count u32;\ns_first_data_block u32;\ns_log_block_size u32;\ns_log_cluster_size u32;\ns_blocks_per_group u32;\ns_clusters_per_group u32;\ns_inodes_per_group u32;\ns_mtime u32;\ns_wtime u32;\ns_mnt_count u16;\ns_max_mnt_count u16;\ns_magic bytes = <53 ef>;\ns_state u16;\ns_errors u16;\ns_minor_rev_level u16;\ns_lastcheck u32;\ns_checkinterval u32;\ns_creator_os u32;\ns_rev_level u32;\ns_def_resuid u16;\ns_def_resgid u16;\ns_first_ino u32;\ns_inode_size u16;\ns_block_group_nr u16;\ns_feature_compat flags u32 {\n    COMPAT_DIR_PREALLOC = 0x1,\n    COMPAT_IMAGIC_INODES = 0x2,\n    COMPAT_HAS_JOURNAL = 0x4,\n    COMPAT_EXT_ATTR = 0x8,\n    COMPAT_RESIZE_INODE = 0x10,\n    COMPAT_DIR_INDEX = 0x20,\n    COMPAT_LAZY_BG = 0x40,\n    COMPAT_EXCLUDE_INODE = 0x80,\n    COMPAT_EXCLUDE_BITMAP = 0x100,\n    COMPAT_SPARSE_SUPER2 = 0x200,\n};\ns_feature_incompat flags u32 {\n    INCOMPAT_COMPRESSION = 0x1,\n    INCOMPAT_FILETYPE = 0x2,\n    INCOMPAT_RECOVER = 0x4,\n    INCOMPAT_JOURNAL_DEV = 0x8,\n    INCOMPAT_META_BG = 0x10,\n    INCOMPAT_EXTENTS = 0x40,\n    INCOMPAT_64BIT = 0x80,\n    INCOMPAT_MMP = 0x100,\n    INCOMPAT_FLEX_BG = 0x200,\n    INCOMPAT_EA_INODE = 0x400,\n    INCOMPAT_DIRDATA = 0x1000,\n    INCOMPAT_CSUM_SEED = 0x2000,\n    INCOMPAT_LARGEDIR = 0x4000,\n    INCOMPAT_INLINE_DATA = 0x8000,\n    INCOMPAT_ENCRYPT = 0x10000,\n};\ns_feature_ro_compat flags u32 {\n    RO_COMPAT_SPARSE_SUPER = 0x1,\n    RO_COMPAT_LARGE_FILE = 0x2,\n    RO_COMPAT_BTREE_DIR = 0x4,\n    RO_COMPAT_HUGE_FILE = 0x8,\n    RO_COMPAT_GDT_CSUM = 0x10,\n    RO_COMPAT_DIR_NLINK = 0x20,\n    RO_COMPAT_EXTRA_ISIZE = 0x40,\n    RO_COMPAT_HAS_SNAPSHOT = 0x80,\n    RO_COMPAT_QUOTA = 0x100,\n    RO_COMPAT_BIGALLOC = 0x200,\n    RO_COMPAT_METADATA_CSUM = 0x400,\n    RO_COMPAT_REPLICA = 0x800,\n    RO_COMPAT_READONLY = 0x1000,\n    RO_COMPAT_PROJECT = 0x2000,\n};\ns_uuid bytes len 16;\ns_volume_name bytes len 16;\ns_last_mounted bytes len 64;\ns_algorithm_usage_bitmap u32;\ns_prealloc_blocks u8;\ns_prealloc_dir_blocks u8;\ns_reserved_gdt_blocks u16;\ns_journal_uuid bytes len 16;\ns_journal_inum u32;\ns_journal_dev u32;\ns_last_orphan u32;\ns_hash_seed [u32] len 4;\ns_def_hash_version u8;\ns_jnl_backup_type u8;\ns_desc_size u16;\ns_default_mount_opts u32;\ns_first_meta_bg u32;\ns_mkfs_time u32;\ns_jnl_blocks [u32] len 17;\ns_blocks_count_hi u32;\ns_r_blocks_count_hi u32;\ns_free_blocks_count_hi u32;\ns_min_extra_isize u16;\ns_want_extra_isize u16;\ns_flags u32;\ns_raid_stride u16;\ns_mmp_interval u16;\ns_mmp_block u64;\ns_raid_stripe_width u32;\ns_log_groups_per_flex u8;\ns_checksum_type u8;\ns_reserved_pad u16;\ns_kbytes_written u64;\ns_snapshot_inum u32;\ns_snapshot_id u32;\ns_snapshot_r_blocks_count u64;\ns_snapshot_list u32;\ns_error_count u32;\ns_first_error_time u32;\ns_first_error_ino u32;\ns_first_error_block u64;\ns_first_error_func bytes len 32;\ns_first_error_line u32;\ns_last_error_time u32;\ns_last_error_ino u32;\ns_last_error_line u32;\ns_last_error_block u64;\ns_last_error_func bytes len 32;\ns_mount_opts bytes len 64;\ns_usr_quota_inum u32;\ns_grp_quota_inum u32;\ns_overhead_blocks u32;\ns_backup_bgs [u32] len 2;\ns_encrypt_algos bytes len 4;\ns_encrypt_pw_salt bytes len 16;\ns_lpf_ino u32;\ns_prj_quota_inum u32;\ns_checksum_seed u32;\ns_wtime_hi u8;\ns_mtime_hi u8;\ns_mkfs_time_hi u8;\ns_lastcheck_hi u8;\ns_first_error_time_hi u8;\ns_last_error_time_hi u8;\ns_pad bytes len 2;\ns_reserved bytes len 96 * 4;\ns_checksum u32;\n"
+input_file: format_descriptions/ext4_superblock.hbl
+---
+File@0..3450
+  EndiannessDeclaration@0..18
+    ExclamationMark@0..1 "!"
+    Identifier@1..7 "endian"
+    LParen@7..8 "("
+    StringLiteral@8..16 "\"little\""
+    RParen@16..17 ")"
+    Semicolon@17..18 ";"
+  Whitespace@18..20 "\n\n"
+  StructField@20..39
+    Identifier@20..34 "s_inodes_count"
+    Whitespace@34..35 " "
+    NamedParseType@35..38
+      Identifier@35..38 "u32"
+    Semicolon@38..39 ";"
+  Whitespace@39..40 "\n"
+  StructField@40..62
+    Identifier@40..57 "s_blocks_count_lo"
+    Whitespace@57..58 " "
+    NamedParseType@58..61
+      Identifier@58..61 "u32"
+    Semicolon@61..62 ";"
+  Whitespace@62..63 "\n"
+  StructField@63..87
+    Identifier@63..82 "s_r_blocks_count_lo"
+    Whitespace@82..83 " "
+    NamedParseType@83..86
+      Identifier@83..86 "u32"
+    Semicolon@86..87 ";"
+  Whitespace@87..88 "\n"
+  StructField@88..115
+    Identifier@88..110 "s_free_blocks_count_lo"
+    Whitespace@110..111 " "
+    NamedParseType@111..114
+      Identifier@111..114 "u32"
+    Semicolon@114..115 ";"
+  Whitespace@115..116 "\n"
+  StructField@116..140
+    Identifier@116..135 "s_free_inodes_count"
+    Whitespace@135..136 " "
+    NamedParseType@136..139
+      Identifier@136..139 "u32"
+    Semicolon@139..140 ";"
+  Whitespace@140..141 "\n"
+  StructField@141..164
+    Identifier@141..159 "s_first_data_block"
+    Whitespace@159..160 " "
+    NamedParseType@160..163
+      Identifier@160..163 "u32"
+    Semicolon@163..164 ";"
+  Whitespace@164..165 "\n"
+  StructField@165..186
+    Identifier@165..181 "s_log_block_size"
+    Whitespace@181..182 " "
+    NamedParseType@182..185
+      Identifier@182..185 "u32"
+    Semicolon@185..186 ";"
+  Whitespace@186..187 "\n"
+  StructField@187..210
+    Identifier@187..205 "s_log_cluster_size"
+    Whitespace@205..206 " "
+    NamedParseType@206..209
+      Identifier@206..209 "u32"
+    Semicolon@209..210 ";"
+  Whitespace@210..211 "\n"
+  StructField@211..234
+    Identifier@211..229 "s_blocks_per_group"
+    Whitespace@229..230 " "
+    NamedParseType@230..233
+      Identifier@230..233 "u32"
+    Semicolon@233..234 ";"
+  Whitespace@234..235 "\n"
+  StructField@235..260
+    Identifier@235..255 "s_clusters_per_group"
+    Whitespace@255..256 " "
+    NamedParseType@256..259
+      Identifier@256..259 "u32"
+    Semicolon@259..260 ";"
+  Whitespace@260..261 "\n"
+  StructField@261..284
+    Identifier@261..279 "s_inodes_per_group"
+    Whitespace@279..280 " "
+    NamedParseType@280..283
+      Identifier@280..283 "u32"
+    Semicolon@283..284 ";"
+  Whitespace@284..285 "\n"
+  StructField@285..297
+    Identifier@285..292 "s_mtime"
+    Whitespace@292..293 " "
+    NamedParseType@293..296
+      Identifier@293..296 "u32"
+    Semicolon@296..297 ";"
+  Whitespace@297..298 "\n"
+  StructField@298..310
+    Identifier@298..305 "s_wtime"
+    Whitespace@305..306 " "
+    NamedParseType@306..309
+      Identifier@306..309 "u32"
+    Semicolon@309..310 ";"
+  Whitespace@310..311 "\n"
+  StructField@311..327
+    Identifier@311..322 "s_mnt_count"
+    Whitespace@322..323 " "
+    NamedParseType@323..326
+      Identifier@323..326 "u16"
+    Semicolon@326..327 ";"
+  Whitespace@327..328 "\n"
+  StructField@328..348
+    Identifier@328..343 "s_max_mnt_count"
+    Whitespace@343..344 " "
+    NamedParseType@344..347
+      Identifier@344..347 "u16"
+    Semicolon@347..348 ";"
+  Whitespace@348..349 "\n"
+  StructField@349..373
+    Identifier@349..356 "s_magic"
+    Whitespace@356..357 " "
+    BytesParseType@357..362
+      BytesKw@357..362 "bytes"
+    Whitespace@362..363 " "
+    Equals@363..364 "="
+    Whitespace@364..365 " "
+    ByteConcat@365..372
+      LAngle@365..366 "<"
+      DecimalIntegerLiteral@366..368 "53"
+      Whitespace@368..369 " "
+      Identifier@369..371 "ef"
+      RAngle@371..372 ">"
+    Semicolon@372..373 ";"
+  Whitespace@373..374 "\n"
+  StructField@374..386
+    Identifier@374..381 "s_state"
+    Whitespace@381..382 " "
+    NamedParseType@382..385
+      Identifier@382..385 "u16"
+    Semicolon@385..386 ";"
+  Whitespace@386..387 "\n"
+  StructField@387..400
+    Identifier@387..395 "s_errors"
+    Whitespace@395..396 " "
+    NamedParseType@396..399
+      Identifier@396..399 "u16"
+    Semicolon@399..400 ";"
+  Whitespace@400..401 "\n"
+  StructField@401..423
+    Identifier@401..418 "s_minor_rev_level"
+    Whitespace@418..419 " "
+    NamedParseType@419..422
+      Identifier@419..422 "u16"
+    Semicolon@422..423 ";"
+  Whitespace@423..424 "\n"
+  StructField@424..440
+    Identifier@424..435 "s_lastcheck"
+    Whitespace@435..436 " "
+    NamedParseType@436..439
+      Identifier@436..439 "u32"
+    Semicolon@439..440 ";"
+  Whitespace@440..441 "\n"
+  StructField@441..461
+    Identifier@441..456 "s_checkinterval"
+    Whitespace@456..457 " "
+    NamedParseType@457..460
+      Identifier@457..460 "u32"
+    Semicolon@460..461 ";"
+  Whitespace@461..462 "\n"
+  StructField@462..479
+    Identifier@462..474 "s_creator_os"
+    Whitespace@474..475 " "
+    NamedParseType@475..478
+      Identifier@475..478 "u32"
+    Semicolon@478..479 ";"
+  Whitespace@479..480 "\n"
+  StructField@480..496
+    Identifier@480..491 "s_rev_level"
+    Whitespace@491..492 " "
+    NamedParseType@492..495
+      Identifier@492..495 "u32"
+    Semicolon@495..496 ";"
+  Whitespace@496..497 "\n"
+  StructField@497..514
+    Identifier@497..509 "s_def_resuid"
+    Whitespace@509..510 " "
+    NamedParseType@510..513
+      Identifier@510..513 "u16"
+    Semicolon@513..514 ";"
+  Whitespace@514..515 "\n"
+  StructField@515..532
+    Identifier@515..527 "s_def_resgid"
+    Whitespace@527..528 " "
+    NamedParseType@528..531
+      Identifier@528..531 "u16"
+    Semicolon@531..532 ";"
+  Whitespace@532..533 "\n"
+  StructField@533..549
+    Identifier@533..544 "s_first_ino"
+    Whitespace@544..545 " "
+    NamedParseType@545..548
+      Identifier@545..548 "u32"
+    Semicolon@548..549 ";"
+  Whitespace@549..550 "\n"
+  StructField@550..567
+    Identifier@550..562 "s_inode_size"
+    Whitespace@562..563 " "
+    NamedParseType@563..566
+      Identifier@563..566 "u16"
+    Semicolon@566..567 ";"
+  Whitespace@567..568 "\n"
+  StructField@568..589
+    Identifier@568..584 "s_block_group_nr"
+    Whitespace@584..585 " "
+    NamedParseType@585..588
+      Identifier@585..588 "u16"
+    Semicolon@588..589 ";"
+  Whitespace@589..590 "\n"
+  StructField@590..931
+    Identifier@590..606 "s_feature_compat"
+    Whitespace@606..607 " "
+    FlagsParseType@607..930
+      Identifier@607..612 "flags"
+      Whitespace@612..613 " "
+      NamedParseType@613..616
+        Identifier@613..616 "u32"
+      Whitespace@616..617 " "
+      LBrace@617..618 "{"
+      Whitespace@618..623 "\n    "
+      FlagsParseTypeArm@623..649
+        Identifier@623..642 "COMPAT_DIR_PREALLOC"
+        Whitespace@642..643 " "
+        Equals@643..644 "="
+        Whitespace@644..645 " "
+        FlagsParseTypeRawArm@645..648
+          Atom@645..648
+            HexadecimalIntegerLiteral@645..648 "0x1"
+        Comma@648..649 ","
+      Whitespace@649..654 "\n    "
+      FlagsParseTypeArm@654..681
+        Identifier@654..674 "COMPAT_IMAGIC_INODES"
+        Whitespace@674..675 " "
+        Equals@675..676 "="
+        Whitespace@676..677 " "
+        FlagsParseTypeRawArm@677..680
+          Atom@677..680
+            HexadecimalIntegerLiteral@677..680 "0x2"
+        Comma@680..681 ","
+      Whitespace@681..686 "\n    "
+      FlagsParseTypeArm@686..711
+        Identifier@686..704 "COMPAT_HAS_JOURNAL"
+        Whitespace@704..705 " "
+        Equals@705..706 "="
+        Whitespace@706..707 " "
+        FlagsParseTypeRawArm@707..710
+          Atom@707..710
+            HexadecimalIntegerLiteral@707..710 "0x4"
+        Comma@710..711 ","
+      Whitespace@711..716 "\n    "
+      FlagsParseTypeArm@716..738
+        Identifier@716..731 "COMPAT_EXT_ATTR"
+        Whitespace@731..732 " "
+        Equals@732..733 "="
+        Whitespace@733..734 " "
+        FlagsParseTypeRawArm@734..737
+          Atom@734..737
+            HexadecimalIntegerLiteral@734..737 "0x8"
+        Comma@737..738 ","
+      Whitespace@738..743 "\n    "
+      FlagsParseTypeArm@743..770
+        Identifier@743..762 "COMPAT_RESIZE_INODE"
+        Whitespace@762..763 " "
+        Equals@763..764 "="
+        Whitespace@764..765 " "
+        FlagsParseTypeRawArm@765..769
+          Atom@765..769
+            HexadecimalIntegerLiteral@765..769 "0x10"
+        Comma@769..770 ","
+      Whitespace@770..775 "\n    "
+      FlagsParseTypeArm@775..799
+        Identifier@775..791 "COMPAT_DIR_INDEX"
+        Whitespace@791..792 " "
+        Equals@792..793 "="
+        Whitespace@793..794 " "
+        FlagsParseTypeRawArm@794..798
+          Atom@794..798
+            HexadecimalIntegerLiteral@794..798 "0x20"
+        Comma@798..799 ","
+      Whitespace@799..804 "\n    "
+      FlagsParseTypeArm@804..826
+        Identifier@804..818 "COMPAT_LAZY_BG"
+        Whitespace@818..819 " "
+        Equals@819..820 "="
+        Whitespace@820..821 " "
+        FlagsParseTypeRawArm@821..825
+          Atom@821..825
+            HexadecimalIntegerLiteral@821..825 "0x40"
+        Comma@825..826 ","
+      Whitespace@826..831 "\n    "
+      FlagsParseTypeArm@831..859
+        Identifier@831..851 "COMPAT_EXCLUDE_INODE"
+        Whitespace@851..852 " "
+        Equals@852..853 "="
+        Whitespace@853..854 " "
+        FlagsParseTypeRawArm@854..858
+          Atom@854..858
+            HexadecimalIntegerLiteral@854..858 "0x80"
+        Comma@858..859 ","
+      Whitespace@859..864 "\n    "
+      FlagsParseTypeArm@864..894
+        Identifier@864..885 "COMPAT_EXCLUDE_BITMAP"
+        Whitespace@885..886 " "
+        Equals@886..887 "="
+        Whitespace@887..888 " "
+        FlagsParseTypeRawArm@888..893
+          Atom@888..893
+            HexadecimalIntegerLiteral@888..893 "0x100"
+        Comma@893..894 ","
+      Whitespace@894..899 "\n    "
+      FlagsParseTypeArm@899..928
+        Identifier@899..919 "COMPAT_SPARSE_SUPER2"
+        Whitespace@919..920 " "
+        Equals@920..921 "="
+        Whitespace@921..922 " "
+        FlagsParseTypeRawArm@922..927
+          Atom@922..927
+            HexadecimalIntegerLiteral@922..927 "0x200"
+        Comma@927..928 ","
+      Whitespace@928..929 "\n"
+      RBrace@929..930 "}"
+    Semicolon@930..931 ";"
+  Whitespace@931..932 "\n"
+  StructField@932..1421
+    Identifier@932..950 "s_feature_incompat"
+    Whitespace@950..951 " "
+    FlagsParseType@951..1420
+      Identifier@951..956 "flags"
+      Whitespace@956..957 " "
+      NamedParseType@957..960
+        Identifier@957..960 "u32"
+      Whitespace@960..961 " "
+      LBrace@961..962 "{"
+      Whitespace@962..967 "\n    "
+      FlagsParseTypeArm@967..994
+        Identifier@967..987 "INCOMPAT_COMPRESSION"
+        Whitespace@987..988 " "
+        Equals@988..989 "="
+        Whitespace@989..990 " "
+        FlagsParseTypeRawArm@990..993
+          Atom@990..993
+            HexadecimalIntegerLiteral@990..993 "0x1"
+        Comma@993..994 ","
+      Whitespace@994..999 "\n    "
+      FlagsParseTypeArm@999..1023
+        Identifier@999..1016 "INCOMPAT_FILETYPE"
+        Whitespace@1016..1017 " "
+        Equals@1017..1018 "="
+        Whitespace@1018..1019 " "
+        FlagsParseTypeRawArm@1019..1022
+          Atom@1019..1022
+            HexadecimalIntegerLiteral@1019..1022 "0x2"
+        Comma@1022..1023 ","
+      Whitespace@1023..1028 "\n    "
+      FlagsParseTypeArm@1028..1051
+        Identifier@1028..1044 "INCOMPAT_RECOVER"
+        Whitespace@1044..1045 " "
+        Equals@1045..1046 "="
+        Whitespace@1046..1047 " "
+        FlagsParseTypeRawArm@1047..1050
+          Atom@1047..1050
+            HexadecimalIntegerLiteral@1047..1050 "0x4"
+        Comma@1050..1051 ","
+      Whitespace@1051..1056 "\n    "
+      FlagsParseTypeArm@1056..1083
+        Identifier@1056..1076 "INCOMPAT_JOURNAL_DEV"
+        Whitespace@1076..1077 " "
+        Equals@1077..1078 "="
+        Whitespace@1078..1079 " "
+        FlagsParseTypeRawArm@1079..1082
+          Atom@1079..1082
+            HexadecimalIntegerLiteral@1079..1082 "0x8"
+        Comma@1082..1083 ","
+      Whitespace@1083..1088 "\n    "
+      FlagsParseTypeArm@1088..1112
+        Identifier@1088..1104 "INCOMPAT_META_BG"
+        Whitespace@1104..1105 " "
+        Equals@1105..1106 "="
+        Whitespace@1106..1107 " "
+        FlagsParseTypeRawArm@1107..1111
+          Atom@1107..1111
+            HexadecimalIntegerLiteral@1107..1111 "0x10"
+        Comma@1111..1112 ","
+      Whitespace@1112..1117 "\n    "
+      FlagsParseTypeArm@1117..1141
+        Identifier@1117..1133 "INCOMPAT_EXTENTS"
+        Whitespace@1133..1134 " "
+        Equals@1134..1135 "="
+        Whitespace@1135..1136 " "
+        FlagsParseTypeRawArm@1136..1140
+          Atom@1136..1140
+            HexadecimalIntegerLiteral@1136..1140 "0x40"
+        Comma@1140..1141 ","
+      Whitespace@1141..1146 "\n    "
+      FlagsParseTypeArm@1146..1168
+        Identifier@1146..1160 "INCOMPAT_64BIT"
+        Whitespace@1160..1161 " "
+        Equals@1161..1162 "="
+        Whitespace@1162..1163 " "
+        FlagsParseTypeRawArm@1163..1167
+          Atom@1163..1167
+            HexadecimalIntegerLiteral@1163..1167 "0x80"
+        Comma@1167..1168 ","
+      Whitespace@1168..1173 "\n    "
+      FlagsParseTypeArm@1173..1194
+        Identifier@1173..1185 "INCOMPAT_MMP"
+        Whitespace@1185..1186 " "
+        Equals@1186..1187 "="
+        Whitespace@1187..1188 " "
+        FlagsParseTypeRawArm@1188..1193
+          Atom@1188..1193
+            HexadecimalIntegerLiteral@1188..1193 "0x100"
+        Comma@1193..1194 ","
+      Whitespace@1194..1199 "\n    "
+      FlagsParseTypeArm@1199..1224
+        Identifier@1199..1215 "INCOMPAT_FLEX_BG"
+        Whitespace@1215..1216 " "
+        Equals@1216..1217 "="
+        Whitespace@1217..1218 " "
+        FlagsParseTypeRawArm@1218..1223
+          Atom@1218..1223
+            HexadecimalIntegerLiteral@1218..1223 "0x200"
+        Comma@1223..1224 ","
+      Whitespace@1224..1229 "\n    "
+      FlagsParseTypeArm@1229..1255
+        Identifier@1229..1246 "INCOMPAT_EA_INODE"
+        Whitespace@1246..1247 " "
+        Equals@1247..1248 "="
+        Whitespace@1248..1249 " "
+        FlagsParseTypeRawArm@1249..1254
+          Atom@1249..1254
+            HexadecimalIntegerLiteral@1249..1254 "0x400"
+        Comma@1254..1255 ","
+      Whitespace@1255..1260 "\n    "
+      FlagsParseTypeArm@1260..1286
+        Identifier@1260..1276 "INCOMPAT_DIRDATA"
+        Whitespace@1276..1277 " "
+        Equals@1277..1278 "="
+        Whitespace@1278..1279 " "
+        FlagsParseTypeRawArm@1279..1285
+          Atom@1279..1285
+            HexadecimalIntegerLiteral@1279..1285 "0x1000"
+        Comma@1285..1286 ","
+      Whitespace@1286..1291 "\n    "
+      FlagsParseTypeArm@1291..1319
+        Identifier@1291..1309 "INCOMPAT_CSUM_SEED"
+        Whitespace@1309..1310 " "
+        Equals@1310..1311 "="
+        Whitespace@1311..1312 " "
+        FlagsParseTypeRawArm@1312..1318
+          Atom@1312..1318
+            HexadecimalIntegerLiteral@1312..1318 "0x2000"
+        Comma@1318..1319 ","
+      Whitespace@1319..1324 "\n    "
+      FlagsParseTypeArm@1324..1351
+        Identifier@1324..1341 "INCOMPAT_LARGEDIR"
+        Whitespace@1341..1342 " "
+        Equals@1342..1343 "="
+        Whitespace@1343..1344 " "
+        FlagsParseTypeRawArm@1344..1350
+          Atom@1344..1350
+            HexadecimalIntegerLiteral@1344..1350 "0x4000"
+        Comma@1350..1351 ","
+      Whitespace@1351..1356 "\n    "
+      FlagsParseTypeArm@1356..1386
+        Identifier@1356..1376 "INCOMPAT_INLINE_DATA"
+        Whitespace@1376..1377 " "
+        Equals@1377..1378 "="
+        Whitespace@1378..1379 " "
+        FlagsParseTypeRawArm@1379..1385
+          Atom@1379..1385
+            HexadecimalIntegerLiteral@1379..1385 "0x8000"
+        Comma@1385..1386 ","
+      Whitespace@1386..1391 "\n    "
+      FlagsParseTypeArm@1391..1418
+        Identifier@1391..1407 "INCOMPAT_ENCRYPT"
+        Whitespace@1407..1408 " "
+        Equals@1408..1409 "="
+        Whitespace@1409..1410 " "
+        FlagsParseTypeRawArm@1410..1417
+          Atom@1410..1417
+            HexadecimalIntegerLiteral@1410..1417 "0x10000"
+        Comma@1417..1418 ","
+      Whitespace@1418..1419 "\n"
+      RBrace@1419..1420 "}"
+    Semicolon@1420..1421 ";"
+  Whitespace@1421..1422 "\n"
+  StructField@1422..1910
+    Identifier@1422..1441 "s_feature_ro_compat"
+    Whitespace@1441..1442 " "
+    FlagsParseType@1442..1909
+      Identifier@1442..1447 "flags"
+      Whitespace@1447..1448 " "
+      NamedParseType@1448..1451
+        Identifier@1448..1451 "u32"
+      Whitespace@1451..1452 " "
+      LBrace@1452..1453 "{"
+      Whitespace@1453..1458 "\n    "
+      FlagsParseTypeArm@1458..1487
+        Identifier@1458..1480 "RO_COMPAT_SPARSE_SUPER"
+        Whitespace@1480..1481 " "
+        Equals@1481..1482 "="
+        Whitespace@1482..1483 " "
+        FlagsParseTypeRawArm@1483..1486
+          Atom@1483..1486
+            HexadecimalIntegerLiteral@1483..1486 "0x1"
+        Comma@1486..1487 ","
+      Whitespace@1487..1492 "\n    "
+      FlagsParseTypeArm@1492..1519
+        Identifier@1492..1512 "RO_COMPAT_LARGE_FILE"
+        Whitespace@1512..1513 " "
+        Equals@1513..1514 "="
+        Whitespace@1514..1515 " "
+        FlagsParseTypeRawArm@1515..1518
+          Atom@1515..1518
+            HexadecimalIntegerLiteral@1515..1518 "0x2"
+        Comma@1518..1519 ","
+      Whitespace@1519..1524 "\n    "
+      FlagsParseTypeArm@1524..1550
+        Identifier@1524..1543 "RO_COMPAT_BTREE_DIR"
+        Whitespace@1543..1544 " "
+        Equals@1544..1545 "="
+        Whitespace@1545..1546 " "
+        FlagsParseTypeRawArm@1546..1549
+          Atom@1546..1549
+            HexadecimalIntegerLiteral@1546..1549 "0x4"
+        Comma@1549..1550 ","
+      Whitespace@1550..1555 "\n    "
+      FlagsParseTypeArm@1555..1581
+        Identifier@1555..1574 "RO_COMPAT_HUGE_FILE"
+        Whitespace@1574..1575 " "
+        Equals@1575..1576 "="
+        Whitespace@1576..1577 " "
+        FlagsParseTypeRawArm@1577..1580
+          Atom@1577..1580
+            HexadecimalIntegerLiteral@1577..1580 "0x8"
+        Comma@1580..1581 ","
+      Whitespace@1581..1586 "\n    "
+      FlagsParseTypeArm@1586..1612
+        Identifier@1586..1604 "RO_COMPAT_GDT_CSUM"
+        Whitespace@1604..1605 " "
+        Equals@1605..1606 "="
+        Whitespace@1606..1607 " "
+        FlagsParseTypeRawArm@1607..1611
+          Atom@1607..1611
+            HexadecimalIntegerLiteral@1607..1611 "0x10"
+        Comma@1611..1612 ","
+      Whitespace@1612..1617 "\n    "
+      FlagsParseTypeArm@1617..1644
+        Identifier@1617..1636 "RO_COMPAT_DIR_NLINK"
+        Whitespace@1636..1637 " "
+        Equals@1637..1638 "="
+        Whitespace@1638..1639 " "
+        FlagsParseTypeRawArm@1639..1643
+          Atom@1639..1643
+            HexadecimalIntegerLiteral@1639..1643 "0x20"
+        Comma@1643..1644 ","
+      Whitespace@1644..1649 "\n    "
+      FlagsParseTypeArm@1649..1678
+        Identifier@1649..1670 "RO_COMPAT_EXTRA_ISIZE"
+        Whitespace@1670..1671 " "
+        Equals@1671..1672 "="
+        Whitespace@1672..1673 " "
+        FlagsParseTypeRawArm@1673..1677
+          Atom@1673..1677
+            HexadecimalIntegerLiteral@1673..1677 "0x40"
+        Comma@1677..1678 ","
+      Whitespace@1678..1683 "\n    "
+      FlagsParseTypeArm@1683..1713
+        Identifier@1683..1705 "RO_COMPAT_HAS_SNAPSHOT"
+        Whitespace@1705..1706 " "
+        Equals@1706..1707 "="
+        Whitespace@1707..1708 " "
+        FlagsParseTypeRawArm@1708..1712
+          Atom@1708..1712
+            HexadecimalIntegerLiteral@1708..1712 "0x80"
+        Comma@1712..1713 ","
+      Whitespace@1713..1718 "\n    "
+      FlagsParseTypeArm@1718..1742
+        Identifier@1718..1733 "RO_COMPAT_QUOTA"
+        Whitespace@1733..1734 " "
+        Equals@1734..1735 "="
+        Whitespace@1735..1736 " "
+        FlagsParseTypeRawArm@1736..1741
+          Atom@1736..1741
+            HexadecimalIntegerLiteral@1736..1741 "0x100"
+        Comma@1741..1742 ","
+      Whitespace@1742..1747 "\n    "
+      FlagsParseTypeArm@1747..1774
+        Identifier@1747..1765 "RO_COMPAT_BIGALLOC"
+        Whitespace@1765..1766 " "
+        Equals@1766..1767 "="
+        Whitespace@1767..1768 " "
+        FlagsParseTypeRawArm@1768..1773
+          Atom@1768..1773
+            HexadecimalIntegerLiteral@1768..1773 "0x200"
+        Comma@1773..1774 ","
+      Whitespace@1774..1779 "\n    "
+      FlagsParseTypeArm@1779..1811
+        Identifier@1779..1802 "RO_COMPAT_METADATA_CSUM"
+        Whitespace@1802..1803 " "
+        Equals@1803..1804 "="
+        Whitespace@1804..1805 " "
+        FlagsParseTypeRawArm@1805..1810
+          Atom@1805..1810
+            HexadecimalIntegerLiteral@1805..1810 "0x400"
+        Comma@1810..1811 ","
+      Whitespace@1811..1816 "\n    "
+      FlagsParseTypeArm@1816..1842
+        Identifier@1816..1833 "RO_COMPAT_REPLICA"
+        Whitespace@1833..1834 " "
+        Equals@1834..1835 "="
+        Whitespace@1835..1836 " "
+        FlagsParseTypeRawArm@1836..1841
+          Atom@1836..1841
+            HexadecimalIntegerLiteral@1836..1841 "0x800"
+        Comma@1841..1842 ","
+      Whitespace@1842..1847 "\n    "
+      FlagsParseTypeArm@1847..1875
+        Identifier@1847..1865 "RO_COMPAT_READONLY"
+        Whitespace@1865..1866 " "
+        Equals@1866..1867 "="
+        Whitespace@1867..1868 " "
+        FlagsParseTypeRawArm@1868..1874
+          Atom@1868..1874
+            HexadecimalIntegerLiteral@1868..1874 "0x1000"
+        Comma@1874..1875 ","
+      Whitespace@1875..1880 "\n    "
+      FlagsParseTypeArm@1880..1907
+        Identifier@1880..1897 "RO_COMPAT_PROJECT"
+        Whitespace@1897..1898 " "
+        Equals@1898..1899 "="
+        Whitespace@1899..1900 " "
+        FlagsParseTypeRawArm@1900..1906
+          Atom@1900..1906
+            HexadecimalIntegerLiteral@1900..1906 "0x2000"
+        Comma@1906..1907 ","
+      Whitespace@1907..1908 "\n"
+      RBrace@1908..1909 "}"
+    Semicolon@1909..1910 ";"
+  Whitespace@1910..1911 "\n"
+  StructField@1911..1931
+    Identifier@1911..1917 "s_uuid"
+    Whitespace@1917..1918 " "
+    BytesParseType@1918..1930
+      BytesKw@1918..1923 "bytes"
+      Whitespace@1923..1924 " "
+      RepeatLenDecl@1924..1930
+        Identifier@1924..1927 "len"
+        Whitespace@1927..1928 " "
+        Atom@1928..1930
+          DecimalIntegerLiteral@1928..1930 "16"
+    Semicolon@1930..1931 ";"
+  Whitespace@1931..1932 "\n"
+  StructField@1932..1959
+    Identifier@1932..1945 "s_volume_name"
+    Whitespace@1945..1946 " "
+    BytesParseType@1946..1958
+      BytesKw@1946..1951 "bytes"
+      Whitespace@1951..1952 " "
+      RepeatLenDecl@1952..1958
+        Identifier@1952..1955 "len"
+        Whitespace@1955..1956 " "
+        Atom@1956..1958
+          DecimalIntegerLiteral@1956..1958 "16"
+    Semicolon@1958..1959 ";"
+  Whitespace@1959..1960 "\n"
+  StructField@1960..1988
+    Identifier@1960..1974 "s_last_mounted"
+    Whitespace@1974..1975 " "
+    BytesParseType@1975..1987
+      BytesKw@1975..1980 "bytes"
+      Whitespace@1980..1981 " "
+      RepeatLenDecl@1981..1987
+        Identifier@1981..1984 "len"
+        Whitespace@1984..1985 " "
+        Atom@1985..1987
+          DecimalIntegerLiteral@1985..1987 "64"
+    Semicolon@1987..1988 ";"
+  Whitespace@1988..1989 "\n"
+  StructField@1989..2018
+    Identifier@1989..2013 "s_algorithm_usage_bitmap"
+    Whitespace@2013..2014 " "
+    NamedParseType@2014..2017
+      Identifier@2014..2017 "u32"
+    Semicolon@2017..2018 ";"
+  Whitespace@2018..2019 "\n"
+  StructField@2019..2040
+    Identifier@2019..2036 "s_prealloc_blocks"
+    Whitespace@2036..2037 " "
+    NamedParseType@2037..2039
+      Identifier@2037..2039 "u8"
+    Semicolon@2039..2040 ";"
+  Whitespace@2040..2041 "\n"
+  StructField@2041..2066
+    Identifier@2041..2062 "s_prealloc_dir_blocks"
+    Whitespace@2062..2063 " "
+    NamedParseType@2063..2065
+      Identifier@2063..2065 "u8"
+    Semicolon@2065..2066 ";"
+  Whitespace@2066..2067 "\n"
+  StructField@2067..2093
+    Identifier@2067..2088 "s_reserved_gdt_blocks"
+    Whitespace@2088..2089 " "
+    NamedParseType@2089..2092
+      Identifier@2089..2092 "u16"
+    Semicolon@2092..2093 ";"
+  Whitespace@2093..2094 "\n"
+  StructField@2094..2122
+    Identifier@2094..2108 "s_journal_uuid"
+    Whitespace@2108..2109 " "
+    BytesParseType@2109..2121
+      BytesKw@2109..2114 "bytes"
+      Whitespace@2114..2115 " "
+      RepeatLenDecl@2115..2121
+        Identifier@2115..2118 "len"
+        Whitespace@2118..2119 " "
+        Atom@2119..2121
+          DecimalIntegerLiteral@2119..2121 "16"
+    Semicolon@2121..2122 ";"
+  Whitespace@2122..2123 "\n"
+  StructField@2123..2142
+    Identifier@2123..2137 "s_journal_inum"
+    Whitespace@2137..2138 " "
+    NamedParseType@2138..2141
+      Identifier@2138..2141 "u32"
+    Semicolon@2141..2142 ";"
+  Whitespace@2142..2143 "\n"
+  StructField@2143..2161
+    Identifier@2143..2156 "s_journal_dev"
+    Whitespace@2156..2157 " "
+    NamedParseType@2157..2160
+      Identifier@2157..2160 "u32"
+    Semicolon@2160..2161 ";"
+  Whitespace@2161..2162 "\n"
+  StructField@2162..2180
+    Identifier@2162..2175 "s_last_orphan"
+    Whitespace@2175..2176 " "
+    NamedParseType@2176..2179
+      Identifier@2176..2179 "u32"
+    Semicolon@2179..2180 ";"
+  Whitespace@2180..2181 "\n"
+  StructField@2181..2205
+    Identifier@2181..2192 "s_hash_seed"
+    Whitespace@2192..2193 " "
+    RepeatParseType@2193..2204
+      LBracket@2193..2194 "["
+      NamedParseType@2194..2197
+        Identifier@2194..2197 "u32"
+      RBracket@2197..2198 "]"
+      Whitespace@2198..2199 " "
+      RepeatLenDecl@2199..2204
+        Identifier@2199..2202 "len"
+        Whitespace@2202..2203 " "
+        Atom@2203..2204
+          DecimalIntegerLiteral@2203..2204 "4"
+    Semicolon@2204..2205 ";"
+  Whitespace@2205..2206 "\n"
+  StructField@2206..2228
+    Identifier@2206..2224 "s_def_hash_version"
+    Whitespace@2224..2225 " "
+    NamedParseType@2225..2227
+      Identifier@2225..2227 "u8"
+    Semicolon@2227..2228 ";"
+  Whitespace@2228..2229 "\n"
+  StructField@2229..2250
+    Identifier@2229..2246 "s_jnl_backup_type"
+    Whitespace@2246..2247 " "
+    NamedParseType@2247..2249
+      Identifier@2247..2249 "u8"
+    Semicolon@2249..2250 ";"
+  Whitespace@2250..2251 "\n"
+  StructField@2251..2267
+    Identifier@2251..2262 "s_desc_size"
+    Whitespace@2262..2263 " "
+    NamedParseType@2263..2266
+      Identifier@2263..2266 "u16"
+    Semicolon@2266..2267 ";"
+  Whitespace@2267..2268 "\n"
+  StructField@2268..2293
+    Identifier@2268..2288 "s_default_mount_opts"
+    Whitespace@2288..2289 " "
+    NamedParseType@2289..2292
+      Identifier@2289..2292 "u32"
+    Semicolon@2292..2293 ";"
+  Whitespace@2293..2294 "\n"
+  StructField@2294..2314
+    Identifier@2294..2309 "s_first_meta_bg"
+    Whitespace@2309..2310 " "
+    NamedParseType@2310..2313
+      Identifier@2310..2313 "u32"
+    Semicolon@2313..2314 ";"
+  Whitespace@2314..2315 "\n"
+  StructField@2315..2331
+    Identifier@2315..2326 "s_mkfs_time"
+    Whitespace@2326..2327 " "
+    NamedParseType@2327..2330
+      Identifier@2327..2330 "u32"
+    Semicolon@2330..2331 ";"
+  Whitespace@2331..2332 "\n"
+  StructField@2332..2358
+    Identifier@2332..2344 "s_jnl_blocks"
+    Whitespace@2344..2345 " "
+    RepeatParseType@2345..2357
+      LBracket@2345..2346 "["
+      NamedParseType@2346..2349
+        Identifier@2346..2349 "u32"
+      RBracket@2349..2350 "]"
+      Whitespace@2350..2351 " "
+      RepeatLenDecl@2351..2357
+        Identifier@2351..2354 "len"
+        Whitespace@2354..2355 " "
+        Atom@2355..2357
+          DecimalIntegerLiteral@2355..2357 "17"
+    Semicolon@2357..2358 ";"
+  Whitespace@2358..2359 "\n"
+  StructField@2359..2381
+    Identifier@2359..2376 "s_blocks_count_hi"
+    Whitespace@2376..2377 " "
+    NamedParseType@2377..2380
+      Identifier@2377..2380 "u32"
+    Semicolon@2380..2381 ";"
+  Whitespace@2381..2382 "\n"
+  StructField@2382..2406
+    Identifier@2382..2401 "s_r_blocks_count_hi"
+    Whitespace@2401..2402 " "
+    NamedParseType@2402..2405
+      Identifier@2402..2405 "u32"
+    Semicolon@2405..2406 ";"
+  Whitespace@2406..2407 "\n"
+  StructField@2407..2434
+    Identifier@2407..2429 "s_free_blocks_count_hi"
+    Whitespace@2429..2430 " "
+    NamedParseType@2430..2433
+      Identifier@2430..2433 "u32"
+    Semicolon@2433..2434 ";"
+  Whitespace@2434..2435 "\n"
+  StructField@2435..2457
+    Identifier@2435..2452 "s_min_extra_isize"
+    Whitespace@2452..2453 " "
+    NamedParseType@2453..2456
+      Identifier@2453..2456 "u16"
+    Semicolon@2456..2457 ";"
+  Whitespace@2457..2458 "\n"
+  StructField@2458..2481
+    Identifier@2458..2476 "s_want_extra_isize"
+    Whitespace@2476..2477 " "
+    NamedParseType@2477..2480
+      Identifier@2477..2480 "u16"
+    Semicolon@2480..2481 ";"
+  Whitespace@2481..2482 "\n"
+  StructField@2482..2494
+    Identifier@2482..2489 "s_flags"
+    Whitespace@2489..2490 " "
+    NamedParseType@2490..2493
+      Identifier@2490..2493 "u32"
+    Semicolon@2493..2494 ";"
+  Whitespace@2494..2495 "\n"
+  StructField@2495..2513
+    Identifier@2495..2508 "s_raid_stride"
+    Whitespace@2508..2509 " "
+    NamedParseType@2509..2512
+      Identifier@2509..2512 "u16"
+    Semicolon@2512..2513 ";"
+  Whitespace@2513..2514 "\n"
+  StructField@2514..2533
+    Identifier@2514..2528 "s_mmp_interval"
+    Whitespace@2528..2529 " "
+    NamedParseType@2529..2532
+      Identifier@2529..2532 "u16"
+    Semicolon@2532..2533 ";"
+  Whitespace@2533..2534 "\n"
+  StructField@2534..2550
+    Identifier@2534..2545 "s_mmp_block"
+    Whitespace@2545..2546 " "
+    NamedParseType@2546..2549
+      Identifier@2546..2549 "u64"
+    Semicolon@2549..2550 ";"
+  Whitespace@2550..2551 "\n"
+  StructField@2551..2575
+    Identifier@2551..2570 "s_raid_stripe_width"
+    Whitespace@2570..2571 " "
+    NamedParseType@2571..2574
+      Identifier@2571..2574 "u32"
+    Semicolon@2574..2575 ";"
+  Whitespace@2575..2576 "\n"
+  StructField@2576..2601
+    Identifier@2576..2597 "s_log_groups_per_flex"
+    Whitespace@2597..2598 " "
+    NamedParseType@2598..2600
+      Identifier@2598..2600 "u8"
+    Semicolon@2600..2601 ";"
+  Whitespace@2601..2602 "\n"
+  StructField@2602..2621
+    Identifier@2602..2617 "s_checksum_type"
+    Whitespace@2617..2618 " "
+    NamedParseType@2618..2620
+      Identifier@2618..2620 "u8"
+    Semicolon@2620..2621 ";"
+  Whitespace@2621..2622 "\n"
+  StructField@2622..2641
+    Identifier@2622..2636 "s_reserved_pad"
+    Whitespace@2636..2637 " "
+    NamedParseType@2637..2640
+      Identifier@2637..2640 "u16"
+    Semicolon@2640..2641 ";"
+  Whitespace@2641..2642 "\n"
+  StructField@2642..2663
+    Identifier@2642..2658 "s_kbytes_written"
+    Whitespace@2658..2659 " "
+    NamedParseType@2659..2662
+      Identifier@2659..2662 "u64"
+    Semicolon@2662..2663 ";"
+  Whitespace@2663..2664 "\n"
+  StructField@2664..2684
+    Identifier@2664..2679 "s_snapshot_inum"
+    Whitespace@2679..2680 " "
+    NamedParseType@2680..2683
+      Identifier@2680..2683 "u32"
+    Semicolon@2683..2684 ";"
+  Whitespace@2684..2685 "\n"
+  StructField@2685..2703
+    Identifier@2685..2698 "s_snapshot_id"
+    Whitespace@2698..2699 " "
+    NamedParseType@2699..2702
+      Identifier@2699..2702 "u32"
+    Semicolon@2702..2703 ";"
+  Whitespace@2703..2704 "\n"
+  StructField@2704..2734
+    Identifier@2704..2729 "s_snapshot_r_blocks_c ..."
+    Whitespace@2729..2730 " "
+    NamedParseType@2730..2733
+      Identifier@2730..2733 "u64"
+    Semicolon@2733..2734 ";"
+  Whitespace@2734..2735 "\n"
+  StructField@2735..2755
+    Identifier@2735..2750 "s_snapshot_list"
+    Whitespace@2750..2751 " "
+    NamedParseType@2751..2754
+      Identifier@2751..2754 "u32"
+    Semicolon@2754..2755 ";"
+  Whitespace@2755..2756 "\n"
+  StructField@2756..2774
+    Identifier@2756..2769 "s_error_count"
+    Whitespace@2769..2770 " "
+    NamedParseType@2770..2773
+      Identifier@2770..2773 "u32"
+    Semicolon@2773..2774 ";"
+  Whitespace@2774..2775 "\n"
+  StructField@2775..2798
+    Identifier@2775..2793 "s_first_error_time"
+    Whitespace@2793..2794 " "
+    NamedParseType@2794..2797
+      Identifier@2794..2797 "u32"
+    Semicolon@2797..2798 ";"
+  Whitespace@2798..2799 "\n"
+  StructField@2799..2821
+    Identifier@2799..2816 "s_first_error_ino"
+    Whitespace@2816..2817 " "
+    NamedParseType@2817..2820
+      Identifier@2817..2820 "u32"
+    Semicolon@2820..2821 ";"
+  Whitespace@2821..2822 "\n"
+  StructField@2822..2846
+    Identifier@2822..2841 "s_first_error_block"
+    Whitespace@2841..2842 " "
+    NamedParseType@2842..2845
+      Identifier@2842..2845 "u64"
+    Semicolon@2845..2846 ";"
+  Whitespace@2846..2847 "\n"
+  StructField@2847..2879
+    Identifier@2847..2865 "s_first_error_func"
+    Whitespace@2865..2866 " "
+    BytesParseType@2866..2878
+      BytesKw@2866..2871 "bytes"
+      Whitespace@2871..2872 " "
+      RepeatLenDecl@2872..2878
+        Identifier@2872..2875 "len"
+        Whitespace@2875..2876 " "
+        Atom@2876..2878
+          DecimalIntegerLiteral@2876..2878 "32"
+    Semicolon@2878..2879 ";"
+  Whitespace@2879..2880 "\n"
+  StructField@2880..2903
+    Identifier@2880..2898 "s_first_error_line"
+    Whitespace@2898..2899 " "
+    NamedParseType@2899..2902
+      Identifier@2899..2902 "u32"
+    Semicolon@2902..2903 ";"
+  Whitespace@2903..2904 "\n"
+  StructField@2904..2926
+    Identifier@2904..2921 "s_last_error_time"
+    Whitespace@2921..2922 " "
+    NamedParseType@2922..2925
+      Identifier@2922..2925 "u32"
+    Semicolon@2925..2926 ";"
+  Whitespace@2926..2927 "\n"
+  StructField@2927..2948
+    Identifier@2927..2943 "s_last_error_ino"
+    Whitespace@2943..2944 " "
+    NamedParseType@2944..2947
+      Identifier@2944..2947 "u32"
+    Semicolon@2947..2948 ";"
+  Whitespace@2948..2949 "\n"
+  StructField@2949..2971
+    Identifier@2949..2966 "s_last_error_line"
+    Whitespace@2966..2967 " "
+    NamedParseType@2967..2970
+      Identifier@2967..2970 "u32"
+    Semicolon@2970..2971 ";"
+  Whitespace@2971..2972 "\n"
+  StructField@2972..2995
+    Identifier@2972..2990 "s_last_error_block"
+    Whitespace@2990..2991 " "
+    NamedParseType@2991..2994
+      Identifier@2991..2994 "u64"
+    Semicolon@2994..2995 ";"
+  Whitespace@2995..2996 "\n"
+  StructField@2996..3027
+    Identifier@2996..3013 "s_last_error_func"
+    Whitespace@3013..3014 " "
+    BytesParseType@3014..3026
+      BytesKw@3014..3019 "bytes"
+      Whitespace@3019..3020 " "
+      RepeatLenDecl@3020..3026
+        Identifier@3020..3023 "len"
+        Whitespace@3023..3024 " "
+        Atom@3024..3026
+          DecimalIntegerLiteral@3024..3026 "32"
+    Semicolon@3026..3027 ";"
+  Whitespace@3027..3028 "\n"
+  StructField@3028..3054
+    Identifier@3028..3040 "s_mount_opts"
+    Whitespace@3040..3041 " "
+    BytesParseType@3041..3053
+      BytesKw@3041..3046 "bytes"
+      Whitespace@3046..3047 " "
+      RepeatLenDecl@3047..3053
+        Identifier@3047..3050 "len"
+        Whitespace@3050..3051 " "
+        Atom@3051..3053
+          DecimalIntegerLiteral@3051..3053 "64"
+    Semicolon@3053..3054 ";"
+  Whitespace@3054..3055 "\n"
+  StructField@3055..3076
+    Identifier@3055..3071 "s_usr_quota_inum"
+    Whitespace@3071..3072 " "
+    NamedParseType@3072..3075
+      Identifier@3072..3075 "u32"
+    Semicolon@3075..3076 ";"
+  Whitespace@3076..3077 "\n"
+  StructField@3077..3098
+    Identifier@3077..3093 "s_grp_quota_inum"
+    Whitespace@3093..3094 " "
+    NamedParseType@3094..3097
+      Identifier@3094..3097 "u32"
+    Semicolon@3097..3098 ";"
+  Whitespace@3098..3099 "\n"
+  StructField@3099..3121
+    Identifier@3099..3116 "s_overhead_blocks"
+    Whitespace@3116..3117 " "
+    NamedParseType@3117..3120
+      Identifier@3117..3120 "u32"
+    Semicolon@3120..3121 ";"
+  Whitespace@3121..3122 "\n"
+  StructField@3122..3147
+    Identifier@3122..3134 "s_backup_bgs"
+    Whitespace@3134..3135 " "
+    RepeatParseType@3135..3146
+      LBracket@3135..3136 "["
+      NamedParseType@3136..3139
+        Identifier@3136..3139 "u32"
+      RBracket@3139..3140 "]"
+      Whitespace@3140..3141 " "
+      RepeatLenDecl@3141..3146
+        Identifier@3141..3144 "len"
+        Whitespace@3144..3145 " "
+        Atom@3145..3146
+          DecimalIntegerLiteral@3145..3146 "2"
+    Semicolon@3146..3147 ";"
+  Whitespace@3147..3148 "\n"
+  StructField@3148..3176
+    Identifier@3148..3163 "s_encrypt_algos"
+    Whitespace@3163..3164 " "
+    BytesParseType@3164..3175
+      BytesKw@3164..3169 "bytes"
+      Whitespace@3169..3170 " "
+      RepeatLenDecl@3170..3175
+        Identifier@3170..3173 "len"
+        Whitespace@3173..3174 " "
+        Atom@3174..3175
+          DecimalIntegerLiteral@3174..3175 "4"
+    Semicolon@3175..3176 ";"
+  Whitespace@3176..3177 "\n"
+  StructField@3177..3208
+    Identifier@3177..3194 "s_encrypt_pw_salt"
+    Whitespace@3194..3195 " "
+    BytesParseType@3195..3207
+      BytesKw@3195..3200 "bytes"
+      Whitespace@3200..3201 " "
+      RepeatLenDecl@3201..3207
+        Identifier@3201..3204 "len"
+        Whitespace@3204..3205 " "
+        Atom@3205..3207
+          DecimalIntegerLiteral@3205..3207 "16"
+    Semicolon@3207..3208 ";"
+  Whitespace@3208..3209 "\n"
+  StructField@3209..3223
+    Identifier@3209..3218 "s_lpf_ino"
+    Whitespace@3218..3219 " "
+    NamedParseType@3219..3222
+      Identifier@3219..3222 "u32"
+    Semicolon@3222..3223 ";"
+  Whitespace@3223..3224 "\n"
+  StructField@3224..3245
+    Identifier@3224..3240 "s_prj_quota_inum"
+    Whitespace@3240..3241 " "
+    NamedParseType@3241..3244
+      Identifier@3241..3244 "u32"
+    Semicolon@3244..3245 ";"
+  Whitespace@3245..3246 "\n"
+  StructField@3246..3266
+    Identifier@3246..3261 "s_checksum_seed"
+    Whitespace@3261..3262 " "
+    NamedParseType@3262..3265
+      Identifier@3262..3265 "u32"
+    Semicolon@3265..3266 ";"
+  Whitespace@3266..3267 "\n"
+  StructField@3267..3281
+    Identifier@3267..3277 "s_wtime_hi"
+    Whitespace@3277..3278 " "
+    NamedParseType@3278..3280
+      Identifier@3278..3280 "u8"
+    Semicolon@3280..3281 ";"
+  Whitespace@3281..3282 "\n"
+  StructField@3282..3296
+    Identifier@3282..3292 "s_mtime_hi"
+    Whitespace@3292..3293 " "
+    NamedParseType@3293..3295
+      Identifier@3293..3295 "u8"
+    Semicolon@3295..3296 ";"
+  Whitespace@3296..3297 "\n"
+  StructField@3297..3315
+    Identifier@3297..3311 "s_mkfs_time_hi"
+    Whitespace@3311..3312 " "
+    NamedParseType@3312..3314
+      Identifier@3312..3314 "u8"
+    Semicolon@3314..3315 ";"
+  Whitespace@3315..3316 "\n"
+  StructField@3316..3334
+    Identifier@3316..3330 "s_lastcheck_hi"
+    Whitespace@3330..3331 " "
+    NamedParseType@3331..3333
+      Identifier@3331..3333 "u8"
+    Semicolon@3333..3334 ";"
+  Whitespace@3334..3335 "\n"
+  StructField@3335..3360
+    Identifier@3335..3356 "s_first_error_time_hi"
+    Whitespace@3356..3357 " "
+    NamedParseType@3357..3359
+      Identifier@3357..3359 "u8"
+    Semicolon@3359..3360 ";"
+  Whitespace@3360..3361 "\n"
+  StructField@3361..3385
+    Identifier@3361..3381 "s_last_error_time_hi"
+    Whitespace@3381..3382 " "
+    NamedParseType@3382..3384
+      Identifier@3382..3384 "u8"
+    Semicolon@3384..3385 ";"
+  Whitespace@3385..3386 "\n"
+  StructField@3386..3404
+    Identifier@3386..3391 "s_pad"
+    Whitespace@3391..3392 " "
+    BytesParseType@3392..3403
+      BytesKw@3392..3397 "bytes"
+      Whitespace@3397..3398 " "
+      RepeatLenDecl@3398..3403
+        Identifier@3398..3401 "len"
+        Whitespace@3401..3402 " "
+        Atom@3402..3403
+          DecimalIntegerLiteral@3402..3403 "2"
+    Semicolon@3403..3404 ";"
+  Whitespace@3404..3405 "\n"
+  StructField@3405..3433
+    Identifier@3405..3415 "s_reserved"
+    Whitespace@3415..3416 " "
+    BytesParseType@3416..3432
+      BytesKw@3416..3421 "bytes"
+      Whitespace@3421..3422 " "
+      RepeatLenDecl@3422..3432
+        Identifier@3422..3425 "len"
+        Whitespace@3425..3426 " "
+        InfixExpr@3426..3432
+          Atom@3426..3428
+            DecimalIntegerLiteral@3426..3428 "96"
+          Whitespace@3428..3429 " "
+          Op@3429..3430
+            Star@3429..3430 "*"
+          Whitespace@3430..3431 " "
+          Atom@3431..3432
+            DecimalIntegerLiteral@3431..3432 "4"
+    Semicolon@3432..3433 ";"
+  Whitespace@3433..3434 "\n"
+  StructField@3434..3449
+    Identifier@3434..3444 "s_checksum"
+    Whitespace@3444..3445 " "
+    NamedParseType@3445..3448
+      Identifier@3445..3448 "u32"
+    Semicolon@3448..3449 ";"
+  Whitespace@3449..3450 "\n"
+
+--- diagnostics ---
+no diagnostics
