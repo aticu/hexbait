@@ -5,11 +5,7 @@ use std::sync::{Arc, atomic::AtomicU32, mpsc};
 use arc_swap::ArcSwap;
 use hexbait_common::{Input, Len};
 
-use crate::{
-    state::{ScrollState, Settings},
-    statistics::StatisticsMetrics,
-    window::Window,
-};
+use crate::{state::ScrollState, statistics::StatisticsMetrics, window::Window};
 
 use super::BigramStatistics;
 
@@ -222,14 +218,9 @@ impl StatisticsHandler {
     /// Signals to the statistics handler that a frame has ended.
     ///
     /// The `changed` parameter corresponds to the change state of the scrollbars.
-    pub fn end_of_frame(&mut self, settings: &Settings, scroll_state: &ScrollState) {
+    pub fn end_of_frame(&mut self, scroll_state: &ScrollState) {
         if scroll_state.changed().is_changed() {
-            self.bins_per_window = (scroll_state.effective_height()
-                * if settings.fine_grained_scrollbars() {
-                    16
-                } else {
-                    1
-                }) as u64;
+            self.bins_per_window = (scroll_state.effective_height() * 16) as u64;
 
             self.request_channel
                 .send(Request {

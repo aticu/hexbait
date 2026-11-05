@@ -12,8 +12,11 @@ use crate::{
     window::Window,
 };
 
-/// Whether or not fine grained scrollbars are used.
-type FineGrainedScrollbars = bool;
+/// Whether linear byte colors are used.
+type LinearByteColors = bool;
+
+/// How much to oversample the overview map.
+type Oversampling = u64;
 
 /// Whether or not the main image had full quality.
 type FullQuality = bool;
@@ -29,14 +32,14 @@ pub struct ScrollState {
     /// The number of rows that have been scrolled down from the start in hex view.
     pub hex_scroll_offset: u64,
     /// The cached image for the sidebar in the hex view.
-    pub hex_sidebar_cached_image: CachedImage<(u64, u64, FineGrainedScrollbars)>,
+    pub hex_sidebar_cached_image: CachedImage<(u64, u64, LinearByteColors)>,
     /// The cached image for the gilbert map.
-    pub gilbert_map_cached_image: CachedImage<(Window, FineGrainedScrollbars)>,
+    pub gilbert_map_cached_image: CachedImage<(Window, LinearByteColors, Oversampling)>,
     /// The blurred version of the gilbert map.
     pub gilbert_map_blurred_image:
-        Cached<(Rect, Window, FineGrainedScrollbars, FullQuality), ColorImage>,
+        Cached<(Rect, Window, LinearByteColors, Oversampling, FullQuality), ColorImage>,
     /// The cached image for the gilbert map hover overlay.
-    pub gilbert_map_hover_cached_image: CachedImage<(f32, Option<f32>, FullQuality)>,
+    pub gilbert_map_hover_cached_image: CachedImage<(f32, Option<f32>, Oversampling, FullQuality)>,
     /// The gilbert curve that is rendered.
     pub gilbert_curve: Cached<(u32, u32), GilbertCurve>,
     /// The percentage of the hovered section of the innermost bar.
@@ -94,7 +97,6 @@ impl ScrollState {
         let state = self.selection_state();
         self.prev_selection_state = state;
 
-        self.fine_grained_scrollbars = settings.fine_grained_scrollbars();
         self.hex_char_height = settings.char_height();
         self.height = height;
     }
@@ -332,17 +334,11 @@ pub struct Scrollbar {
     ///
     /// This does not depend on the selection.
     /// This is handled by the selection_overlay.
-    pub cached_image: CachedImage<(Window, FineGrainedScrollbars)>,
+    pub cached_image: CachedImage<Window>,
     /// The blurred image of the scrollbar.
-    pub blurred_image: Cached<(Rect, Window, FineGrainedScrollbars, FullQuality), ColorImage>,
+    pub blurred_image: Cached<(Rect, Window, FullQuality), ColorImage>,
     /// The overlay for the current selection.
-    pub selection_overlay: CachedImage<(
-        Selection,
-        Window,
-        FineGrainedScrollbars,
-        HoveredGilbertMap,
-        FullQuality,
-    )>,
+    pub selection_overlay: CachedImage<(Selection, Window, HoveredGilbertMap, FullQuality)>,
 }
 
 impl Scrollbar {

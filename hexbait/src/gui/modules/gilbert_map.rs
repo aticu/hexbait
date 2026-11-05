@@ -9,9 +9,6 @@ use crate::{
     statistics::MetricsQuality,
 };
 
-/// How many bytes to show per pixel when there is enough data.
-const OVERSAMPLE: u64 = 4;
-
 /// Shows the gilbert curve in the GUI.
 pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     let rect = ui.max_rect().intersect(ui.cursor());
@@ -26,7 +23,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     state.scroll_state.gilbert_pixel_budget = pixel_budget;
 
     let selected_window = state.scroll_state.selected_window();
-    let byte_view_threshold = Len::from(pixel_budget * OVERSAMPLE);
+    let byte_view_threshold = Len::from(pixel_budget * state.settings.overview_map_oversampling());
     let len = byte_view_threshold.min(selected_window.size());
     let show_byte_colors = selected_window.size() <= byte_view_threshold;
 
@@ -76,7 +73,11 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
         state.scroll_state.gilbert_map_cached_image.paint_at(
             ui,
             rect,
-            (selected_window, state.settings.linear_byte_colors()),
+            (
+                selected_window,
+                state.settings.linear_byte_colors(),
+                state.settings.overview_map_oversampling(),
+            ),
             || input.read_at(selected_window.start(), len, None),
             |data, x, y| {
                 let Ok(data) = data else {
@@ -112,7 +113,11 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
         state.scroll_state.gilbert_map_cached_image.paint_at(
             ui,
             rect,
-            (selected_window, state.settings.linear_byte_colors()),
+            (
+                selected_window,
+                state.settings.linear_byte_colors(),
+                state.settings.overview_map_oversampling(),
+            ),
             || {
                 state
                     .statistics_handler
@@ -165,6 +170,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
         (
             state.scroll_state.hover_selection_size,
             hover_position,
+            state.settings.overview_map_oversampling(),
             full_quality,
         ),
         || {
@@ -173,6 +179,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
                     rect,
                     selected_window,
                     state.settings.linear_byte_colors(),
+                    state.settings.overview_map_oversampling(),
                     full_quality,
                 ),
                 |_| {

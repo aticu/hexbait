@@ -16,11 +16,6 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
             "Use linear byte colors",
         );
 
-        ui.checkbox(
-            state.settings.fine_grained_scrollbars_mut(),
-            "Use fine grained scrollbars",
-        );
-
         ui.horizontal(|ui| {
             ui.label("Show in main content:");
             ComboBox::new("view_kind", "")
@@ -61,6 +56,11 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
         ui.horizontal(|ui| {
             ui.label("Scale:");
             ui.add(Slider::new(state.settings.scale_mut(), 10.0..=50.0));
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Overview map oversampling:");
+            ui.add(Slider::new(state.settings.overview_map_oversampling_mut(), 1..=250));
         });
 
         ui.horizontal(|ui| {

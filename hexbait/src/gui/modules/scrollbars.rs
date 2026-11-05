@@ -133,12 +133,7 @@ pub fn show(ui: &mut Ui, state: &mut State, _: &Input) {
         let metrics_access = state.statistics_handler.get_bar_metrics_access(
             i,
             window,
-            rect.height().trunc() as usize
-                * if state.settings.fine_grained_scrollbars() {
-                    16
-                } else {
-                    1
-                },
+            rect.height().trunc() as usize * 16,
         );
         let bar_response = render_bar(
             ui,
@@ -392,7 +387,7 @@ fn render_bar(
     scrollbar.cached_image.paint_at(
         ui,
         rect,
-        (window, settings.fine_grained_scrollbars()),
+        window,
         || (),
         |_, x, y| {
             if x >= side_start {
@@ -429,20 +424,15 @@ fn render_bar(
         (
             selection_state,
             window,
-            settings.fine_grained_scrollbars(),
             selected_window,
             full_quality_scrollbar,
         ),
         || {
-            scrollbar.blurred_image.get(
-                (
-                    rect,
-                    window,
-                    settings.fine_grained_scrollbars(),
-                    full_quality_scrollbar,
-                ),
-                |_| blur_image(scrollbar.cached_image.raw(), settings),
-            )
+            scrollbar
+                .blurred_image
+                .get((rect, window, full_quality_scrollbar), |_| {
+                    blur_image(scrollbar.cached_image.raw(), settings)
+                })
         },
         |blurred_image, x, y| {
             if x >= side_start {

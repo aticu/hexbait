@@ -38,12 +38,12 @@ pub struct Settings {
     color_map: ColorMap,
     /// Whether to use linear colors for bytes.
     linear_byte_colors: bool,
-    /// Whether to use fine grained displays in scroll bars.
-    fine_grained_scrollbars: bool,
     /// The thing to display in the main screen.
     view_kind: ViewKind,
     /// How much to use gamma smoothing in the statistics display.
     statistics_gamma_factor: f64,
+    /// How much to oversample the overview map in bytes view.
+    oversample_map: u64,
 }
 
 impl Settings {
@@ -53,9 +53,9 @@ impl Settings {
             scale: 20.0,
             color_map: ColorMap::Viridis,
             linear_byte_colors: false,
-            fine_grained_scrollbars: true,
             view_kind: ViewKind::Auto,
             statistics_gamma_factor: 1.0,
+            oversample_map: 4,
         }
     }
 
@@ -79,16 +79,6 @@ impl Settings {
     /// Whether linear byte colors are used.
     pub fn linear_byte_colors(&self) -> bool {
         self.linear_byte_colors
-    }
-
-    /// Mutable access to the field determining whether fine grained scrollbars are used.
-    pub fn fine_grained_scrollbars_mut(&mut self) -> &mut bool {
-        &mut self.fine_grained_scrollbars
-    }
-
-    /// Whether fine grained scrollbars are used.
-    pub fn fine_grained_scrollbars(&self) -> bool {
-        self.fine_grained_scrollbars
     }
 
     /// Mutable access to the scale.
@@ -183,6 +173,16 @@ impl Settings {
     /// The color representing missing data.
     pub fn missing_color(&self) -> Color32 {
         Color32::GRAY
+    }
+
+    /// How much to oversample byte values in the bytes view.
+    pub fn overview_map_oversampling(&self) -> u64 {
+        self.oversample_map
+    }
+
+    /// Mutable access to how much to oversample byte values in the bytes view.
+    pub fn overview_map_oversampling_mut(&mut self) -> &mut u64 {
+        &mut self.oversample_map
     }
 
     /// The size of the selection border.
