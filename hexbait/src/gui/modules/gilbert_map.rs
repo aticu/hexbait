@@ -41,6 +41,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     if response.hovered()
         && let Some(pos) = ui.input(|input| input.pointer.hover_pos())
         && rect.contains(pos)
+        && rect.bottom() != pos.y
     {
         let pos = pos - rect.left_top();
         state.scroll_state.gilbert_hover_position = Some(
