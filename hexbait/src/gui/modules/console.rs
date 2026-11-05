@@ -1,6 +1,6 @@
 //! Implements the console module.
 
-use egui::Ui;
+use egui::{Key, Ui};
 use hexbait_common::{AbsoluteOffset, Input, Len};
 use hexbait_lang::{
     compile::{CompileResult, compile_expr},
@@ -47,6 +47,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     if ui
         .text_edit_singleline(state.console.current_text())
         .lost_focus()
+        && ui.input(|i| i.key_pressed(Key::Enter))
     {
         let query = state.console.current_text().to_string();
         state.console.current_text().clear();
