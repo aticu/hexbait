@@ -17,11 +17,13 @@ use crate::{
 pub use analysis::{check_expr, check_file};
 pub use expr::*;
 pub use lowering::{lower_expr, lower_file};
+pub use magic_finding::MagicValue;
 pub use str::str_lit_content_to_bytes;
 
 mod analysis;
 mod expr;
 mod lowering;
+mod magic_finding;
 pub mod path;
 mod str;
 
