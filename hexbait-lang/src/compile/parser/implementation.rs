@@ -12,8 +12,8 @@ use super::infrastructure::Parser;
 
 mod expressions;
 
-/// Parses the root node of the grammar.
-pub(crate) fn root(p: &mut Parser) {
+/// Parses a file.
+pub(crate) fn file(p: &mut Parser) {
     p.node(|p| {
         while p.cur().is_some() {
             p.ensure_progress(|p| {
@@ -22,6 +22,20 @@ pub(crate) fn root(p: &mut Parser) {
         }
 
         NodeKind::File
+    });
+}
+
+/// Parses a REPL statement.
+pub(crate) fn repl_statement(p: &mut Parser) {
+    p.node(|p| {
+        expr(p);
+
+        if p.cur().is_some() {
+            p.expect_error(&["end of input"]);
+            p.recover();
+        }
+
+        NodeKind::ReplStatement
     });
 }
 

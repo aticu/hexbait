@@ -3,7 +3,7 @@
 use egui::{Key, Ui};
 use hexbait_common::{AbsoluteOffset, Input, Len};
 use hexbait_lang::{
-    compile::{CompileResult, compile_expr},
+    compile::{CompileResult, compile_repl_statement},
     eval::{ValueKind, View, eval_repl_statement},
 };
 
@@ -53,7 +53,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
         state.console.current_text().clear();
 
         if !query.is_empty() {
-            let (ir, diagnostics) = match compile_expr("console_input", &query) {
+            let (ir, diagnostics) = match compile_repl_statement("console_input", &query) {
                 CompileResult::NoDiagnostics { ir } => (Some(ir), None),
                 CompileResult::WithWarnings { ir, diagnostics } => (Some(ir), Some(diagnostics)),
                 CompileResult::Failure { diagnostics } => (None, Some(diagnostics)),

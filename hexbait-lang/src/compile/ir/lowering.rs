@@ -63,11 +63,21 @@ pub fn lower_file(file: ast::File, diagnostics: &mut Diagnostics) -> File {
 }
 
 /// Lowers the given REPL statement AST to IR.
-pub fn lower_repl_statement(expr: ast::Expr, diagnostics: &mut Diagnostics) -> ReplStatement {
+pub fn lower_repl_statement(
+    repl_statement: ast::ReplStatement,
+    diagnostics: &mut Diagnostics,
+) -> ReplStatement {
     let mut structs = Vec::new();
     let mut ctx = LoweringCtx::new(diagnostics, &mut structs);
 
-    let expr = ctx.lower_expr(expr);
+    let expr = repl_statement
+        .expr()
+        .map(|expr| ctx.lower_expr(expr))
+        .unwrap_or(Expr {
+            kind: ExprKind::Error,
+            span: repl_statement.span(),
+        });
+
     ReplStatement {
         structs: structs
             .into_iter()
@@ -222,8 +232,18 @@ impl LoweringCtx<'_> {
                 .lower_struct_field(struct_field)
                 .map(StructContentKind::Field),
             ast::StructContent::Struct(named_struct) => {
-                let name = Symbol::from(named_struct.name()?);
-                let idx = self.resolve_name(&name).unwrap().idx;
+                let name = Spanned::<Symbol>::from(named_struct.name()?);
+                if let Some(suffix) = name.inner.as_str().strip_prefix(['u', 'i'])
+                    && suffix.parse::<u32>().is_ok()
+                {
+                    self.add_diagnostic(Diagnostic::error(
+                        format!("named struct cannot be named `{}`", name.inner.as_str()),
+                        Label::new("illegal name", span),
+                    ));
+                    return None;
+                }
+
+                let idx = self.resolve_name(&name.inner).unwrap().idx;
                 if self.structs[idx].is_some() {
                     // for duplicate structs keep the first definition for later passes
                     return None;

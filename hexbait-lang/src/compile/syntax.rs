@@ -79,8 +79,12 @@ const _: () = {
 pub enum NodeKind {
     /// A file.
     ///
-    /// This is the root node of a parse tree.
+    /// This is the root node of a parse tree for a file.
     File,
+    /// A REPL statement.
+    ///
+    /// This is the root node of a parse tree for a REPL statement.
+    ReplStatement,
 
     // Definitions
     /// Defines a named struct.

@@ -2,7 +2,7 @@
 
 use crate::compile::{
     Diagnostic,
-    ast::{AstNode, Expr, File},
+    ast::{AstNode, File, ReplStatement},
     lexer::{Token, lex},
     syntax::{NodeKind, SyntaxKind},
 };
@@ -23,14 +23,12 @@ pub struct Parse<Result> {
 
 /// Parses the given file content.
 pub fn parse_file(source: &str) -> Parse<File> {
-    parse(source, implementation::root)
+    parse(source, implementation::file)
 }
 
 /// Parses the given expression.
-pub fn parse_expr(source: &str) -> Parse<Expr> {
-    parse(source, |p| {
-        implementation::expr(p);
-    })
+pub fn parse_expr(source: &str) -> Parse<ReplStatement> {
+    parse(source, implementation::repl_statement)
 }
 
 /// Parses the given text.

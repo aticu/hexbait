@@ -55,8 +55,8 @@ pub fn compile_file(name: &str, content: &str) -> CompileResult<ir::File> {
     }
 }
 
-/// Compiles an expression to IR.
-pub fn compile_expr(name: &str, content: &str) -> CompileResult<ir::ReplStatement> {
+/// Compiles a REPL statement to IR.
+pub fn compile_repl_statement(name: &str, content: &str) -> CompileResult<ir::ReplStatement> {
     let mut diagnostics = Diagnostics::new(name, content);
 
     let parse = parse_expr(content);

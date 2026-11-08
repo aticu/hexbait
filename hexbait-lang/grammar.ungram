@@ -19,6 +19,10 @@
 File =
   StructContent*
 
+// A statement that can be entered into the REPL.
+ReplStatement =
+  Expr
+
 // Anything that can be written inside a `struct` (a file is counted as a large `struct` body).
 StructContent =
   Declaration
