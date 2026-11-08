@@ -1,8 +1,8 @@
 //! Implements finding of magic values in a struct.
 
 use crate::compile::ir::{
-    Block, DeclarationKind, Expr, ExprKind, File, Lit, ParseType, ParseTypeKind, RepeatKind,
-    Repetition, StructContent, StructContentKind,
+    Block, DeclarationKind, Expr, ExprKind, Lit, ParseType, ParseTypeKind, RepeatKind, Repetition,
+    Struct, StructContent, StructContentKind,
 };
 
 /// A magic value in a format definition.
@@ -26,7 +26,7 @@ impl<'file> MagicValue<'file> {
     }
 }
 
-impl File {
+impl Struct {
     /// Finds the magic bytes for the format described by the `File`.
     pub fn magic(&self) -> Option<MagicValue<'_>> {
         let mut offset = 0;

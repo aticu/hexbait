@@ -14,9 +14,9 @@ use crate::{
     compile::{Span, syntax::SyntaxToken},
 };
 
-pub use analysis::{check_expr, check_file};
+pub use analysis::{check_file, check_repl_statement};
 pub use expr::*;
-pub use lowering::{lower_expr, lower_file};
+pub use lowering::{lower_file, lower_repl_statement};
 pub use magic_finding::MagicValue;
 pub use str::str_lit_content_to_bytes;
 
@@ -83,8 +83,62 @@ impl<T: From<SyntaxToken>> From<SyntaxToken> for Spanned<T> {
 /// A single file in the hexbait language.
 #[derive(Debug)]
 pub struct File {
-    /// The content that makes up the file.
+    /// The main struct of the file.
+    structs: Vec<Struct>,
+}
+
+impl File {
+    /// The main struct of the file.
+    pub fn main_struct_id(&self) -> LocalStructId {
+        LocalStructId { idx: 0 }
+    }
+
+    /// Returns the struct with the given ID.
+    pub fn struct_with_id(&self, id: LocalStructId) -> Option<&Struct> {
+        self.structs.get(id.idx)
+    }
+}
+
+/// A single REPL statement.
+#[derive(Debug)]
+pub struct ReplStatement {
+    /// Local structs defined within the statement.
+    structs: Vec<Struct>,
+    /// The expression that should be evaluated.
+    expr: Expr,
+}
+
+impl ReplStatement {
+    /// Returns the expression to evaluate.
+    pub fn expr(&self) -> &Expr {
+        &self.expr
+    }
+
+    /// Returns the struct with the given ID.
+    pub fn struct_with_id(&self, id: LocalStructId) -> Option<&Struct> {
+        self.structs.get(id.idx)
+    }
+}
+
+/// A named struct in the hexbait language.
+#[derive(Debug)]
+pub struct Struct {
+    /// The content of the struct.
     pub content: Vec<StructContent>,
+}
+
+/// The identifier of a struct within a single file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct LocalStructId {
+    /// The index into the `Vec<Struct>` of the file.
+    idx: usize,
+}
+
+/// A reference to a named struct.
+#[derive(Debug)]
+pub enum NamedStructRef {
+    /// A reference to a struct in the same file.
+    Local(LocalStructId),
 }
 
 /// The content of a struct.
@@ -243,8 +297,8 @@ pub struct ParseType {
 pub enum ParseTypeKind {
     /// Parses a type of the given name.
     Named {
-        /// The name of the type to parse.
-        name: Spanned<Symbol>,
+        /// The reference to the type to parse.
+        struct_ref: NamedStructRef,
     },
     /// Parses an integer with a given bit width from the input.
     Integer {

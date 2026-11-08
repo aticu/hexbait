@@ -4,7 +4,7 @@ use egui::{Key, Ui};
 use hexbait_common::{AbsoluteOffset, Input, Len};
 use hexbait_lang::{
     compile::{CompileResult, compile_expr},
-    eval::{ValueKind, View, eval_expr},
+    eval::{ValueKind, View, eval_repl_statement},
 };
 
 use crate::{
@@ -62,7 +62,7 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
             let result = if let Some(ir) = &ir {
                 let view = View::from_input(input.clone());
 
-                Some(eval_expr(ir, state.endianness, view))
+                Some(eval_repl_statement(ir, state.endianness, view))
             } else {
                 None
             };

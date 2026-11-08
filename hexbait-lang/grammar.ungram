@@ -218,7 +218,6 @@ RepeatWhileDecl =
 
 // Declares a named `struct`.
 // This can be referred to by the `NamedParseType`.
-// WARNING: Currently unimplemented.
 Struct =
   'struct' name:'ident' StructBlock
 

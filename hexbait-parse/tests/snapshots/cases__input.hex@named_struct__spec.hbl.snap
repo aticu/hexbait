@@ -1,0 +1,41 @@
+---
+source: hexbait-parse/tests/cases.rs
+expression: "\n=== Spec ===\nstruct a {\n\tx u8;\n\ty a;\n\tz a;\n\n\tstruct a {\n\t\t!endian(\"little\");\n\t\tx u16;\n\t}\n}\n\nx a;\n\n\n=== Hex ===\n00 01 02 03 04\n"
+input_file: hexbait-parse/tests/cases/named_struct/spec.hbl
+---
+{
+  "value": {
+    "value": {
+      "x": {
+        "value": {
+          "x": {
+            "value": 0,
+            "provenance": "0..=0"
+          },
+          "y": {
+            "value": {
+              "x": {
+                "value": 513,
+                "provenance": "1..=2"
+              }
+            },
+            "provenance": "1..=2"
+          },
+          "z": {
+            "value": {
+              "x": {
+                "value": 1027,
+                "provenance": "3..=4"
+              }
+            },
+            "provenance": "3..=4"
+          }
+        },
+        "provenance": "0..=4"
+      }
+    },
+    "provenance": "0..=4"
+  },
+  "errors": [],
+  "warnings": []
+}

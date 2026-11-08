@@ -12,7 +12,7 @@ pub use diagnostics::{Diagnostic, DiagnosticEmitter, Diagnostics, RgbColor, Styl
 pub use span::Span;
 
 use crate::compile::{
-    ir::{check_expr, check_file, lower_expr, lower_file},
+    ir::{check_file, check_repl_statement, lower_file, lower_repl_statement},
     parser::{parse_expr, parse_file},
 };
 
@@ -56,13 +56,13 @@ pub fn compile_file(name: &str, content: &str) -> CompileResult<ir::File> {
 }
 
 /// Compiles an expression to IR.
-pub fn compile_expr(name: &str, content: &str) -> CompileResult<ir::Expr> {
+pub fn compile_expr(name: &str, content: &str) -> CompileResult<ir::ReplStatement> {
     let mut diagnostics = Diagnostics::new(name, content);
 
     let parse = parse_expr(content);
     diagnostics.add_diagnostics(parse.diagnostics);
-    let ir = lower_expr(parse.ast, &mut diagnostics);
-    check_expr(&ir, &mut diagnostics);
+    let ir = lower_repl_statement(parse.ast, &mut diagnostics);
+    check_repl_statement(&ir, &mut diagnostics);
 
     if diagnostics.contains_errors() {
         CompileResult::Failure { diagnostics }

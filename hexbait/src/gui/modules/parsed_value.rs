@@ -141,7 +141,12 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
 
     let view = View::from_input(input.clone());
     let view = view.subview(parse_offset.to_relative()..view.len().as_relative_offset());
-    let result = hexbait_lang::eval::eval_ir(parse_type, view, RelativeOffset::ZERO);
+    let result = hexbait_lang::eval::eval_struct(
+        parse_type,
+        parse_type.main_struct_id(),
+        view,
+        RelativeOffset::ZERO,
+    );
 
     ScrollArea::vertical()
         .auto_shrink([false, true])

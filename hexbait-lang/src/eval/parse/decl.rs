@@ -20,7 +20,7 @@ use crate::{
     },
 };
 
-impl ParseContext {
+impl ParseContext<'_> {
     /// Determines if a seek to the given offset is possible.
     pub fn probe_seek(
         &mut self,

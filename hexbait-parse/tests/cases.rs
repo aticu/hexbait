@@ -5,7 +5,7 @@ use std::{ffi::OsStr, path::Path};
 use hexbait_common::{Input, RelativeOffset};
 use hexbait_lang::{
     compile::{CompileResult, compile_file},
-    eval::{View, eval_ir},
+    eval::{View, eval_struct},
 };
 use hexbait_parse::result_to_json;
 
@@ -58,7 +58,7 @@ fn render(name: &str, spec: &str, input: &[u8], path: &Path) -> String {
     };
 
     let view = View::from_input(Input::from_bytes(input));
-    let result = eval_ir(&ir, view, RelativeOffset::ZERO);
+    let result = eval_struct(&ir, ir.main_struct_id(), view, RelativeOffset::ZERO);
 
     serde_json::to_string_pretty(&result_to_json(&result, true)).unwrap()
 }

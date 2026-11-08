@@ -1,0 +1,7 @@
+struct a {
+	a b;
+
+	struct b {}
+}
+
+a b;

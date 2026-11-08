@@ -9,7 +9,7 @@ use crate::{
     Int,
     compile::{
         Span,
-        ir::{Expr, ParseType, ParseTypeKind, RepeatKind},
+        ir::{Expr, NamedStructRef, ParseType, ParseTypeKind, RepeatKind},
     },
     eval::{
         BytesValue, Provenance, Value, ValueKind,
@@ -25,7 +25,7 @@ use crate::{
     },
 };
 
-impl ParseContext {
+impl ParseContext<'_> {
     /// Reads a bytes value.
     fn read_bytes_value(&mut self, count: u64, span: Span, cursor: &mut Cursor) -> Result<Value> {
         let start = cursor.offset();
@@ -128,8 +128,16 @@ impl ParseContext {
         struct_ctx: &StructContext,
     ) -> Result<Value> {
         let value = match &parse_type.kind {
-            ParseTypeKind::Named { name } => {
-                todo!("trying to parse named `{name:?}` unimplemented")
+            ParseTypeKind::Named { struct_ref } => {
+                let r#struct = match struct_ref {
+                    NamedStructRef::Local(local_struct_id) => {
+                        self.local_struct_ctx.struct_with_id(*local_struct_id)
+                    }
+                };
+
+                let mut struct_ctx = StructContext::new();
+                self.eval_struct_content(&r#struct.content, cursor, &mut struct_ctx)?;
+                struct_ctx.into_value()
             }
             ParseTypeKind::Bytes { repetition } => match &repetition.kind {
                 RepeatKind::Len { count: count_expr } => {

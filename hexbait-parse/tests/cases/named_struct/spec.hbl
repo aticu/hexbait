@@ -1,0 +1,12 @@
+struct a {
+	x u8;
+	y a;
+	z a;
+
+	struct a {
+		!endian("little");
+		x u16;
+	}
+}
+
+x a;

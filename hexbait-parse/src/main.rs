@@ -14,7 +14,7 @@ use hexbait_builtin_parsers::built_in_format_descriptions;
 use hexbait_common::{Input, RelativeOffset};
 use hexbait_lang::{
     compile::{CompileResult, compile_file},
-    eval::{DiagnosticLevel, View, eval_ir},
+    eval::{DiagnosticLevel, View, eval_struct},
 };
 use hexbait_parse::result_to_json;
 
@@ -101,7 +101,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let view = View::from_input(input);
 
-    let result = eval_ir(&parser, view, RelativeOffset::ZERO);
+    let result = eval_struct(&parser, parser.main_struct_id(), view, RelativeOffset::ZERO);
     let as_json = result_to_json(&result, config.detailed);
 
     match writeln!(io::stdout().lock(), "{as_json}") {

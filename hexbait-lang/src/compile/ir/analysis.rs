@@ -4,7 +4,7 @@ use crate::compile::{
     Diagnostic, Diagnostics, Span,
     diagnostics::Label,
     ir::{
-        Expr,
+        LocalStructId, ReplStatement, Struct,
         analysis::{
             expr::ExtraExprCtx,
             ty::{StructTy, Ty, TyKind},
@@ -28,21 +28,28 @@ mod ty;
 
 /// Checks if the file is well formed.
 pub fn check_file(file: &File, diagnostics: &mut Diagnostics) {
-    let mut ctx = AnalysisCtx::new(diagnostics);
-    let mut env = Env {
-        parent: None,
-        values: StructTy::empty(),
-        endianness_state: EndiannessState::Undefined,
-    };
+    let mut struct_states = Vec::from_iter(
+        (0..file.structs.len()).map(|i| StructLoweringState::NotStarted(&file.structs[i])),
+    );
 
-    for content in &file.content {
-        env.check_struct_content(&mut ctx, content);
+    let mut ctx = AnalysisCtx::new(diagnostics, &mut struct_states);
+
+    let mut i = 0;
+    while i < ctx.struct_states.len() {
+        ctx.ensure_lowered(LocalStructId { idx: i });
+
+        i += 1;
     }
 }
 
-/// Checks if an expression is well formed.
-pub fn check_expr(expr: &Expr, diagnostics: &mut Diagnostics) {
-    let mut ctx = AnalysisCtx::new(diagnostics);
+/// Checks if a REPL statement is well formed.
+pub fn check_repl_statement(repl_statement: &ReplStatement, diagnostics: &mut Diagnostics) {
+    let mut struct_states = Vec::from_iter(
+        (0..repl_statement.structs.len())
+            .map(|i| StructLoweringState::NotStarted(&repl_statement.structs[i])),
+    );
+
+    let mut ctx = AnalysisCtx::new(diagnostics, &mut struct_states);
     let env = Env {
         parent: None,
         values: StructTy::empty(),
@@ -50,24 +57,73 @@ pub fn check_expr(expr: &Expr, diagnostics: &mut Diagnostics) {
         endianness_state: EndiannessState::Set,
     };
 
-    env.check_expr(&mut ctx, expr, &ExtraExprCtx::none());
+    env.check_expr(&mut ctx, repl_statement.expr(), &ExtraExprCtx::none());
+}
+
+/// The different lowering states a struct can be in.
+enum StructLoweringState<'ir> {
+    /// Lowering of the struct was not started.
+    NotStarted(&'ir Struct),
+    /// Lowering was started but is not yet finished.
+    Started,
+    /// Lowering was finished.
+    Finished {
+        /// The type of the struct.
+        ty: StructTy,
+    },
 }
 
 /// The analysis context.
 struct AnalysisCtx<'ctx> {
     /// The diagnostics.
     diagnostics: &'ctx mut Diagnostics,
+    /// The lowering states of all structs.
+    struct_states: &'ctx mut Vec<StructLoweringState<'ctx>>,
 }
 
-impl AnalysisCtx<'_> {
+impl<'ctx> AnalysisCtx<'ctx> {
     /// Creates a new analysis context.
-    fn new(diagnostics: &mut Diagnostics) -> AnalysisCtx<'_> {
-        AnalysisCtx { diagnostics }
+    fn new(
+        diagnostics: &'ctx mut Diagnostics,
+        struct_states: &'ctx mut Vec<StructLoweringState<'ctx>>,
+    ) -> AnalysisCtx<'ctx> {
+        AnalysisCtx {
+            diagnostics,
+            struct_states,
+        }
     }
 
     /// Adds a diagnostic to the analysis context.
     fn add_diagnostic(&mut self, diagnostic: Diagnostic) {
         self.diagnostics.add_diagnostic(diagnostic);
+    }
+
+    /// Ensures that the struct with the given struct id is lowered.
+    fn ensure_lowered(&mut self, id: LocalStructId) -> &StructTy {
+        let idx = id.idx;
+
+        match &self.struct_states[idx] {
+            StructLoweringState::NotStarted(_) => {
+                let StructLoweringState::NotStarted(r#struct) =
+                    std::mem::replace(&mut self.struct_states[idx], StructLoweringState::Started)
+                else {
+                    unreachable!()
+                };
+
+                let mut env = Env::new_for_struct();
+                for content in &r#struct.content {
+                    env.check_struct_content(self, content);
+                }
+                self.struct_states[idx] = StructLoweringState::Finished { ty: env.values };
+            }
+            StructLoweringState::Started => unreachable!(),
+            StructLoweringState::Finished { .. } => (),
+        }
+
+        match &self.struct_states[idx] {
+            StructLoweringState::Finished { ty } => ty,
+            _ => unreachable!(),
+        }
     }
 
     /// Adds a type error to the context.
@@ -113,6 +169,15 @@ struct Env<'parent> {
 }
 
 impl<'parent> Env<'parent> {
+    /// Creates a new environment for a struct.
+    fn new_for_struct() -> Env<'parent> {
+        Env {
+            parent: None,
+            values: StructTy::empty(),
+            endianness_state: EndiannessState::Undefined,
+        }
+    }
+
     /// Creates a child environment.
     fn child(&'parent self) -> Env<'parent> {
         Env {

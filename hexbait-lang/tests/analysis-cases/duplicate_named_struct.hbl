@@ -1,0 +1,7 @@
+struct a {
+	x u8;
+}
+
+struct a {
+	y u8;
+}

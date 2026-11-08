@@ -8,8 +8,8 @@ use crate::compile::{
     Diagnostic, Span,
     diagnostics::Label,
     ir::{
-        BinOp, EnumInfo, EnumVariantKind, Expr, ExprKind, FlagsInfo, Lit, ParseType, ParseTypeKind,
-        RepeatKind, Repetition, Spanned, StructContent, Symbol,
+        BinOp, EnumInfo, EnumVariantKind, Expr, ExprKind, FlagsInfo, Lit, NamedStructRef,
+        ParseType, ParseTypeKind, RepeatKind, Repetition, StructContent,
         analysis::{
             AnalysisCtx, Env,
             expr::ExtraExprCtx,
@@ -23,7 +23,7 @@ impl Env<'_> {
     pub fn check_parse_type(&self, ctx: &mut AnalysisCtx, parse_ty: &ParseType) -> Ty {
         let kind = {
             match &parse_ty.kind {
-                ParseTypeKind::Named { name } => self.check_named_parse_ty(ctx, name),
+                ParseTypeKind::Named { struct_ref } => self.check_named_parse_ty(ctx, struct_ref),
                 ParseTypeKind::Integer { bit_width, signed } => {
                     self.check_int_parse_ty(ctx, Some(*bit_width), *signed, parse_ty.span)
                 }
@@ -63,13 +63,15 @@ impl Env<'_> {
     }
 
     /// Checks the given named parse type.
-    fn check_named_parse_ty(&self, ctx: &mut AnalysisCtx, name: &Spanned<Symbol>) -> TyKind {
-        ctx.add_diagnostic(Diagnostic::error(
-            "named parse types currently unsupported",
-            Label::new("unsupported feature use here", name.span),
-        ));
-
-        TyKind::Error
+    fn check_named_parse_ty(&self, ctx: &mut AnalysisCtx, name: &NamedStructRef) -> TyKind {
+        match name {
+            NamedStructRef::Local(local_struct_id) => {
+                let struct_ty = ctx.ensure_lowered(*local_struct_id);
+                TyKind::Struct {
+                    struct_ty: struct_ty.clone(),
+                }
+            }
+        }
     }
 
     /// Checks an integer kind with the given size in bits and signedness.

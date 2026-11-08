@@ -4,8 +4,8 @@ use std::fmt;
 
 use crate::{
     compile::ir::{
-        Block, Expr, File, IfChain, LetStatement, Scope, ScopeKind, StructContent,
-        StructContentKind, StructField,
+        Block, File, IfChain, LetStatement, LocalStructId, ReplStatement, Scope, ScopeKind, Struct,
+        StructContent, StructContentKind, StructField,
     },
     eval::{
         Provenance, ValueKind,
@@ -41,7 +41,12 @@ pub struct ParseResult {
 }
 
 /// Evaluates the given IR on the given input.
-pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseResult {
+pub fn eval_struct(
+    file: &File,
+    struct_id: LocalStructId,
+    view: View,
+    start_offset: RelativeOffset,
+) -> ParseResult {
     let mut struct_ctx = StructContext::new();
     // the start offset should always be valid
     // static analysis makes sure that the endianness is set to the correct value before parsing
@@ -49,10 +54,15 @@ pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseRe
 
     let mut parse_ctx = ParseContext {
         diagnostics: Diagnostics::new(),
+        local_struct_ctx: LocalStructCtx::File(file),
     };
 
     parse_ctx
-        .eval_struct_content(&file.content, &mut cursor, &mut struct_ctx)
+        .eval_struct_content(
+            &file.struct_with_id(struct_id).unwrap().content,
+            &mut cursor,
+            &mut struct_ctx,
+        )
         .ok();
 
     ParseResult {
@@ -61,16 +71,26 @@ pub fn eval_ir(file: &File, view: View, start_offset: RelativeOffset) -> ParseRe
     }
 }
 
-/// Evaluates the given IR expression on the given view.
-pub fn eval_expr(expr: &Expr, endianness: Endianness, view: View) -> ParseResult {
+/// Evaluates the given IR REPL statement on the given view.
+pub fn eval_repl_statement(
+    repl_statement: &ReplStatement,
+    endianness: Endianness,
+    view: View,
+) -> ParseResult {
     let struct_ctx = StructContext::new();
     let cursor = Cursor::new(view, RelativeOffset::ZERO, endianness).static_analysis_expect();
 
     let mut parse_ctx = ParseContext {
         diagnostics: Diagnostics::new(),
+        local_struct_ctx: LocalStructCtx::ReplStatement(repl_statement),
     };
 
-    match parse_ctx.eval_expr(expr, &cursor, &struct_ctx, Default::default()) {
+    match parse_ctx.eval_expr(
+        repl_statement.expr(),
+        &cursor,
+        &struct_ctx,
+        Default::default(),
+    ) {
         Ok(value) => ParseResult {
             value,
             diagnostics: parse_ctx.diagnostics.into_diagnostics(),
@@ -88,14 +108,36 @@ pub fn eval_expr(expr: &Expr, endianness: Endianness, view: View) -> ParseResult
     }
 }
 
-/// The context used during parsing.
+/// The context that is used to resolve local struct IDs.
 #[derive(Debug)]
-struct ParseContext {
-    /// Stores the diagnostics during parsing.
-    diagnostics: Diagnostics,
+enum LocalStructCtx<'ir> {
+    /// Local struct IDs come from the given file.
+    File(&'ir File),
+    /// Local struct IDs come from the given REPL statment.
+    ReplStatement(&'ir ReplStatement),
 }
 
-impl ParseContext {
+impl<'ir> LocalStructCtx<'ir> {
+    /// Resolves a local struct ID.
+    fn struct_with_id(&self, id: LocalStructId) -> &'ir Struct {
+        match self {
+            LocalStructCtx::File(file) => file.struct_with_id(id),
+            LocalStructCtx::ReplStatement(repl_statement) => repl_statement.struct_with_id(id),
+        }
+        .static_analysis_expect()
+    }
+}
+
+/// The context used during parsing.
+#[derive(Debug)]
+struct ParseContext<'ir> {
+    /// Stores the diagnostics during parsing.
+    diagnostics: Diagnostics,
+    /// The context used to evaluate local struct IDs.
+    local_struct_ctx: LocalStructCtx<'ir>,
+}
+
+impl ParseContext<'_> {
     /// Evaluates the given `if` chain.
     fn eval_if_chain(
         &mut self,

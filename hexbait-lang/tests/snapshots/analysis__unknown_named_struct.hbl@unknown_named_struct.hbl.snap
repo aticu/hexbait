@@ -1,0 +1,12 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "struct a {\n\ta b;\n\n\tstruct b {}\n}\n\na b;\n"
+input_file: hexbait-lang/tests/analysis-cases/unknown_named_struct.hbl
+---
+error: unknown named parse type `b`
+  ┌─ unknown_named_struct.hbl:7:3
+  │
+6 │ 
+7 │ a b;
+  │   ^ unknown named parse type
+8 │

@@ -19,7 +19,7 @@ header {
     };
     used_entry_size u32;
     total_entry_size u32;
-    base_record_file_reference u64;
+    base_record_file_reference file_reference;
     first_attribute_identifier u16;
 
     !seek(to: 44);
@@ -151,7 +151,7 @@ scope in ._parse_buf {
                                 }
                             },
                             enum.FILE_NAME => {
-                                parent_file_reference u64;
+                                parent_file_reference file_reference;
                                 creation_time u64;
                                 modification_time u64;
                                 changed_time u64;
@@ -233,4 +233,11 @@ scope in ._parse_buf {
         }
         !seek(by: .size);
     }] while peek(bytes len 4) != <ff ff ff ff>;
+}
+
+struct file_reference {
+    !endian("little");
+    
+    entry_index u48;
+    sequence_number u16;
 }

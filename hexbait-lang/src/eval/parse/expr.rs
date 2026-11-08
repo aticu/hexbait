@@ -20,7 +20,7 @@ use crate::{
     },
 };
 
-impl ParseContext {
+impl ParseContext<'_> {
     /// Evaluates the given expression.
     pub fn eval_expr(
         &mut self,

@@ -48,7 +48,6 @@ impl<'parent> StructContext<'parent> {
 
     /// Inserts a field with the given name into the `struct`.
     pub fn insert(&mut self, field_name: Symbol, value: Value) {
-        // TODO: use resolved names here later
         self.content.push(StructContent::Field {
             name: field_name,
             value,

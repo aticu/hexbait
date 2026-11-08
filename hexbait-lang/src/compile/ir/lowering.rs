@@ -1,6 +1,9 @@
 //! Implements lowering the AST to the IR.
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 use crate::{
     Int,
@@ -10,8 +13,8 @@ use crate::{
         diagnostics::Label,
         ir::{
             Block, ConcatArg, DeclarationKind, EnumInfo, EnumVariant, EnumVariantKind, FlagsInfo,
-            IfBlock, IfChain, ParseTypeKind, Repetition, Scope, ScopeKind, StructContentKind,
-            StructRef, StructRefPart,
+            IfBlock, IfChain, LocalStructId, NamedStructRef, ParseTypeKind, Repetition,
+            ReplStatement, Scope, ScopeKind, Struct, StructContentKind, StructRef, StructRefPart,
         },
         lexer::TokenKind,
         span::Span,
@@ -35,27 +38,58 @@ macro_rules! parser_unreachable {
 
 /// Lowers the given file AST to IR.
 pub fn lower_file(file: ast::File, diagnostics: &mut Diagnostics) -> File {
-    let mut ctx = LoweringCtx::new(diagnostics);
+    let mut structs = vec![None];
+    let mut ctx = LoweringCtx::new(diagnostics, &mut structs);
     let mut out = Vec::new();
 
+    ctx.reserve_names(file.struct_content());
     for content in file.struct_content() {
-        out.push(ctx.lower_struct_content(content));
+        if let Some(struct_content) = ctx.lower_struct_content(content) {
+            out.push(struct_content);
+        }
     }
 
-    File { content: out }
+    structs[0] = Some(Struct { content: out });
+
+    File {
+        structs: structs
+            .into_iter()
+            .map(|s| match s {
+                Some(s) => s,
+                None => parser_unreachable!(),
+            })
+            .collect(),
+    }
 }
 
-/// Lowers the given expression AST to IR.
-pub fn lower_expr(expr: ast::Expr, diagnostics: &mut Diagnostics) -> Expr {
-    let mut ctx = LoweringCtx::new(diagnostics);
+/// Lowers the given REPL statement AST to IR.
+pub fn lower_repl_statement(expr: ast::Expr, diagnostics: &mut Diagnostics) -> ReplStatement {
+    let mut structs = Vec::new();
+    let mut ctx = LoweringCtx::new(diagnostics, &mut structs);
 
-    ctx.lower_expr(expr)
+    let expr = ctx.lower_expr(expr);
+    ReplStatement {
+        structs: structs
+            .into_iter()
+            .map(|s| match s {
+                Some(s) => s,
+                None => parser_unreachable!(),
+            })
+            .collect(),
+        expr,
+    }
 }
 
 /// The context in which lowering is performed.
 struct LoweringCtx<'ctx> {
     /// The diagnostics.
     diagnostics: &'ctx mut Diagnostics,
+    /// The structs that are being lowered in this file.
+    ///
+    /// This `Vec` uses `Option` to reserve spots before the structs are lowered.
+    structs: &'ctx mut Vec<Option<Struct>>,
+    /// The names of structs defined in the current scope.
+    names: Vec<HashMap<Symbol, (LocalStructId, Span)>>,
 }
 
 /// Accesses a required field in the given value.
@@ -101,8 +135,15 @@ fn missing_part_error_span(node: &SyntaxNode) -> Span {
 
 impl LoweringCtx<'_> {
     /// Creates a new lowering context.
-    fn new(diagnostics: &mut Diagnostics) -> LoweringCtx<'_> {
-        LoweringCtx { diagnostics }
+    fn new<'ctx>(
+        diagnostics: &'ctx mut Diagnostics,
+        structs: &'ctx mut Vec<Option<Struct>>,
+    ) -> LoweringCtx<'ctx> {
+        LoweringCtx {
+            diagnostics,
+            structs,
+            names: vec![HashMap::new()],
+        }
     }
 
     /// Shows the given error message for the given span.
@@ -110,8 +151,68 @@ impl LoweringCtx<'_> {
         self.diagnostics.add_diagnostic(diagnostic);
     }
 
+    /// Evaluates the closure in a new name scope.
+    fn with_name_scope<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        self.names.push(HashMap::new());
+        let result = f(self);
+        self.names.pop();
+
+        result
+    }
+
+    /// Resolves the given name in the current scope.
+    fn resolve_name(&self, name: &Symbol) -> Option<LocalStructId> {
+        self.names
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(name).map(|(id, _)| *id))
+    }
+
+    /// Reserves a new struct name to the current scope.
+    fn reserve_name(&mut self, name: Symbol, span: Span) -> Option<LocalStructId> {
+        if let Some((_, prev_span)) = self.names.last().unwrap().get(&name) {
+            self.add_diagnostic(
+                Diagnostic::error(
+                    format!(
+                        "a struct named `{}` is already defined in this scope",
+                        name.as_str()
+                    ),
+                    Label::new("duplicate struct definition", span),
+                )
+                .with_label(Label::new("previous definition was here", *prev_span)),
+            );
+            return None;
+        }
+
+        let id = LocalStructId {
+            idx: self.structs.len(),
+        };
+        self.structs.push(None);
+        self.names.last_mut().unwrap().insert(name, (id, span));
+
+        Some(id)
+    }
+
+    /// Reserves names in the current scope.
+    fn reserve_names(&mut self, contents: impl Iterator<Item = ast::StructContent>) {
+        for content in contents {
+            if let ast::StructContent::Struct(named_struct) = content {
+                let span = named_struct.span();
+                let Some(name) = named_struct.name() else {
+                    continue;
+                };
+
+                let name = Symbol::from(name);
+                self.reserve_name(name, span);
+            }
+        }
+    }
+
     /// Lowers the given `struct` content AST to IR.
-    fn lower_struct_content(&mut self, struct_content: ast::StructContent) -> StructContent {
+    fn lower_struct_content(
+        &mut self,
+        struct_content: ast::StructContent,
+    ) -> Option<StructContent> {
         let span = struct_content.span();
         let kind = match struct_content {
             ast::StructContent::Declaration(declaration) => self
@@ -120,12 +221,24 @@ impl LoweringCtx<'_> {
             ast::StructContent::StructField(struct_field) => self
                 .lower_struct_field(struct_field)
                 .map(StructContentKind::Field),
-            ast::StructContent::Struct(_) => {
-                self.add_diagnostic(Diagnostic::error(
-                    "named `struct`s currently unsupported",
-                    Label::new("unsupported language feature", struct_content.span()),
-                ));
-                None
+            ast::StructContent::Struct(named_struct) => {
+                let name = Symbol::from(named_struct.name()?);
+                let idx = self.resolve_name(&name).unwrap().idx;
+                if self.structs[idx].is_some() {
+                    // for duplicate structs keep the first definition for later passes
+                    return None;
+                }
+
+                let content = if let Some(block) = named_struct.struct_block() {
+                    self.lower_block(block).content
+                } else {
+                    // pretend that structs without a body are empty so that they are still added and name resolution still works for them
+                    Vec::new()
+                };
+
+                self.structs[idx] = Some(Struct { content });
+
+                return None;
             }
             ast::StructContent::LetStatement(let_statement) => self
                 .lower_let_statement(let_statement)
@@ -139,18 +252,21 @@ impl LoweringCtx<'_> {
         }
         .unwrap_or(StructContentKind::Error);
 
-        StructContent { kind, span }
+        Some(StructContent { kind, span })
     }
 
     /// Lowers the given `struct` block AST to IR.
     fn lower_block(&mut self, block: ast::StructBlock) -> Block {
-        Block {
-            content: block
-                .struct_content()
-                .map(|content| self.lower_struct_content(content))
-                .collect(),
-            span: block.span(),
-        }
+        self.with_name_scope(|this| {
+            this.reserve_names(block.struct_content());
+            Block {
+                content: block
+                    .struct_content()
+                    .filter_map(|content| this.lower_struct_content(content))
+                    .collect(),
+                span: block.span(),
+            }
+        })
     }
 
     /// Lowers the given AST `struct` field to IR.
@@ -200,8 +316,17 @@ impl LoweringCtx<'_> {
                         signed: name.starts_with("i"),
                     }
                 } else {
+                    let name = Spanned::<Symbol>::from(name_token);
+                    let Some(id) = self.resolve_name(&name.inner) else {
+                        self.add_diagnostic(Diagnostic::error(
+                            format!("unknown named parse type `{}`", name.inner.as_str()),
+                            Label::new("unknown named parse type", name.span)
+                        ));
+                        return ParseTypeKind::Error
+                    };
+
                     ParseTypeKind::Named {
-                        name: Spanned::<Symbol>::from(name_token),
+                        struct_ref: NamedStructRef::Local(id),
                     }
                 }
             }

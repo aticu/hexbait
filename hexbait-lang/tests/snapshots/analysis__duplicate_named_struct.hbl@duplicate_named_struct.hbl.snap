@@ -1,0 +1,18 @@
+---
+source: hexbait-lang/tests/analysis.rs
+expression: "struct a {\n\tx u8;\n}\n\nstruct a {\n\ty u8;\n}\n"
+input_file: hexbait-lang/tests/analysis-cases/duplicate_named_struct.hbl
+---
+error: a struct named `a` is already defined in this scope
+  ┌─ duplicate_named_struct.hbl:5:1
+  │    
+1 │   ╭ struct a {
+2 │   │     x u8;
+3 │   │ }
+  │   ╰─' previous definition was here
+4 │     
+5 │ ╭   struct a {
+6 │ │       y u8;
+7 │ │   }
+  │ ╰───^ duplicate struct definition
+8 │
