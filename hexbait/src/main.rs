@@ -8,13 +8,20 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use egui::{CentralPanel, Frame, MenuBar, Panel, TextStyle, Ui};
+use egui::{CentralPanel, Frame, Key, KeyboardShortcut, MenuBar, Modifiers, Panel, TextStyle, Ui};
 use egui_dock::{DockArea, DockState, SurfaceIndex};
 use hexbait::{
-    gui::modules::{Context, TabType, hex_dock_state},
-    state::State,
+    gui::{
+        diagnostic_emitter::emit_diagnostics,
+        modules::{Context, TabType, hex_dock_state},
+    },
+    state::{JumpToError, State},
 };
-use hexbait_common::Input;
+use hexbait_common::{AbsoluteOffset, Input};
+use hexbait_lang::{
+    compile::{CompileResult, compile_repl_statement},
+    eval::{ValueKind, View, eval_repl_statement},
+};
 
 // TODO: change font to render more characters
 // TODO: implement to-disk caching for some statistic sizes to decrease re-load times
@@ -116,6 +123,115 @@ impl eframe::App for HexbaitApp {
                         }
                     }
                 });
+
+                if !self
+                    .context
+                    .state
+                    .format_discovery
+                    .is_in_format_discovery_mode()
+                {
+                    ui.label("Jump to:");
+
+                    let id = ui.make_persistent_id("jump_to");
+
+                    let shortcut = KeyboardShortcut::new(Modifiers::CTRL, Key::G);
+                    let shortcut_pressed = ui.input_mut(|i| i.consume_shortcut(&shortcut));
+                    if shortcut_pressed {
+                        ui.memory_mut(|m| m.request_focus(id));
+                    }
+
+                    let mut jump_to_text = egui::TextEdit::singleline(
+                        &mut self.context.state.general_gui_state.jump_to_expr,
+                    )
+                    .id(id)
+                    .return_key(None)
+                    .hint_text("Press Ctrl+G to focus")
+                    .show(ui);
+
+                    if jump_to_text.response.gained_focus() || shortcut_pressed {
+                        jump_to_text.state.cursor.set_char_range(Some(
+                            egui::text::CCursorRange::select_all(&jump_to_text.galley),
+                        ));
+                        jump_to_text.state.store(ui.ctx(), id);
+                    }
+
+                    if jump_to_text.response.changed() || jump_to_text.response.lost_focus() {
+                        self.context.state.general_gui_state.jump_to_error = None;
+                    }
+
+                    if jump_to_text.response.has_focus() && ui.input(|i| i.key_pressed(Key::Enter))
+                    {
+                        let (ir, diagnostics) = match compile_repl_statement(
+                            "jump_to_input",
+                            &self.context.state.general_gui_state.jump_to_expr,
+                        ) {
+                            CompileResult::NoDiagnostics { ir } => (Some(ir), None),
+                            CompileResult::WithWarnings { ir, diagnostics } => {
+                                (Some(ir), Some(diagnostics))
+                            }
+                            CompileResult::Failure { diagnostics } => (None, Some(diagnostics)),
+                        };
+
+                        if let Some(diagnostics) = diagnostics {
+                            self.context.state.general_gui_state.jump_to_error =
+                                Some(JumpToError::Compile(diagnostics));
+                        }
+
+                        if let Some(ir) = &ir {
+                            let view = View::from_input(self.context.input.clone());
+                            let eval_result =
+                                eval_repl_statement(ir, self.context.state.endianness, view);
+
+                            if let ValueKind::Integer(int) = &eval_result.value.kind {
+                                if let Ok(offset) = u64::try_from(int)
+                                    && let offset = AbsoluteOffset::from(offset)
+                                    && offset.as_len() < self.context.input.len()
+                                {
+                                    self.context
+                                        .state
+                                        .scroll_state
+                                        .rearrange_bars_for_point(0, offset);
+                                } else {
+                                    self.context.state.general_gui_state.jump_to_error =
+                                        Some(JumpToError::Message(format!(
+                                            "`{:?}` is out of range",
+                                            eval_result.value.kind
+                                        )));
+                                }
+                            } else {
+                                self.context.state.general_gui_state.jump_to_error =
+                                    Some(JumpToError::Message(format!(
+                                        "`{:?}` is not an integer",
+                                        eval_result.value.kind
+                                    )));
+                            }
+
+                            if !eval_result.diagnostics.is_empty() {
+                                self.context.state.general_gui_state.jump_to_error =
+                                    Some(JumpToError::Eval(eval_result));
+                            }
+                        }
+                    }
+
+                    egui::Popup::from_response(&jump_to_text.response)
+                        .open(self.context.state.general_gui_state.jump_to_error.is_some())
+                        .show(
+                            |ui| match &self.context.state.general_gui_state.jump_to_error {
+                                Some(JumpToError::Compile(diagnostics)) => {
+                                    emit_diagnostics(ui, diagnostics)
+                                }
+                                Some(JumpToError::Eval(result)) => {
+                                    for diagnostic in &result.diagnostics {
+                                        ui.label(&diagnostic.message);
+                                    }
+                                }
+                                Some(JumpToError::Message(msg)) => {
+                                    ui.label(msg);
+                                }
+                                None => {}
+                            },
+                        );
+                }
 
                 if let Some(fps) = 1_000_000_000u128.checked_div(self.frame_time.as_nanos()) {
                     ui.painter().text(

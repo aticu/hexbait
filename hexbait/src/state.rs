@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use arboard::Clipboard;
 pub use console_state::{ConsoleEntry, ConsoleState};
 pub use format_discovery_state::{ColumnInfo, ColumnType, FormatDiscoveryState};
+pub use general_gui_state::{GeneralGuiState, JumpToError};
 use hexbait_common::{Endianness, Input};
 pub use marking_menu_state::MarkingMenuState;
 pub use parse_state::{ParseState, ParseType};
@@ -21,6 +22,7 @@ use crate::{
 
 mod console_state;
 mod format_discovery_state;
+mod general_gui_state;
 mod marking_menu_state;
 mod parse_state;
 mod scroll_state;
@@ -35,6 +37,8 @@ pub struct State {
     pub clipboard: Clipboard,
     /// The user settings.
     pub settings: Settings,
+    /// The general GUI state.
+    pub general_gui_state: GeneralGuiState,
     /// The search state.
     pub search: SearchState,
     /// The state of the scrollbars.
@@ -65,6 +69,7 @@ impl State {
         State {
             clipboard: Clipboard::new().unwrap(),
             settings: Settings::new(),
+            general_gui_state: GeneralGuiState::new(),
             search: SearchState::new(input),
             scroll_state: ScrollState::new(input),
             selection_state: SelectionState::new(),
