@@ -94,9 +94,6 @@ impl ScrollState {
 
     /// Sets the height of the scroll scroll bar area.
     pub fn update_parameters(&mut self, height: f32, settings: &Settings) {
-        let state = self.selection_state();
-        self.prev_selection_state = state;
-
         self.hex_char_height = settings.char_height();
         self.height = height;
     }
@@ -315,6 +312,11 @@ impl ScrollState {
 
             amount_left = self.scrollbars[i].scroll_down(amount_left, parent_size[i]);
         }
+    }
+
+    /// Performs required maintenance at the end of a frame.
+    pub fn end_of_frame(&mut self) {
+        self.prev_selection_state = self.selection_state();
     }
 }
 

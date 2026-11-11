@@ -12,6 +12,7 @@ use super::BigramStatistics;
 mod background;
 
 /// A request from the frontend to the backend.
+#[derive(Debug)]
 struct Request {
     /// Pre-aligned windows for the backend to fill.
     ///
