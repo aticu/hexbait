@@ -357,6 +357,10 @@ impl Scrollbar {
 
     /// Returns the window of this scrollbar given the parent window.
     pub fn window(&self, parent_window: Window, min_size: Len) -> Window {
+        if parent_window.size() < min_size {
+            return parent_window;
+        }
+
         let len = self.selection_len.clamp(min_size, parent_window.size());
 
         let tentative_window =
