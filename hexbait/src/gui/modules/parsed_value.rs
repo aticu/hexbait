@@ -1,7 +1,7 @@
 //! Implements showing of a parsed value.
 
-use egui::{FontId, Key, Layout, Response, RichText, ScrollArea, TextStyle, Ui, UiBuilder};
-use hexbait_common::{AbsoluteOffset, Input, RelativeOffset};
+use egui::{FontId, Layout, Response, RichText, ScrollArea, TextStyle, Ui, UiBuilder};
+use hexbait_common::{AbsoluteOffset, Input, Len, RelativeOffset};
 use hexbait_lang::{
     compile::{
         CompileResult, compile_file,
@@ -59,41 +59,22 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
             });
     });
 
-    ui.horizontal(|ui| {
-        ui.label("Parse offset:");
-        if ui
-            .text_edit_singleline(&mut state.parse_state.parse_offset)
-            .lost_focus()
-            && ui.input(|i| i.key_pressed(Key::Enter))
-            && let Ok(offset) = state
-                .parse_state
-                .parse_offset
-                .parse()
-                .map(AbsoluteOffset::from)
-        {
-            state.scroll_state.rearrange_bars_for_point(0, offset);
-        }
-
-        if ui
-            .add_enabled(
-                state.parse_state.parse_offset.parse::<u64>().is_ok(),
-                egui::Button::new("Jump to offset"),
-            )
-            .clicked()
-            && let Ok(offset) = state
-                .parse_state
-                .parse_offset
-                .parse()
-                .map(AbsoluteOffset::from)
-        {
-            state.scroll_state.rearrange_bars_for_point(0, offset);
-        }
-    });
-
-    ui.checkbox(
-        &mut state.parse_state.sync_parse_offset_to_selection_start,
-        "Sync parse offset to selection start",
-    );
+    if ui
+        .label(format!(
+            "Parse offset: {} (0x{:x}, {})",
+            state.parse_state.parse_offset.as_u64(),
+            state.parse_state.parse_offset.as_u64(),
+            state.parse_state.parse_offset.human(),
+        ))
+        .hovered()
+    {
+        state
+            .marked_locations
+            .mark_hovered_parsed_value(vec![Window::from_start_len(
+                state.parse_state.parse_offset,
+                Len::from(1),
+            )]);
+    }
 
     let ir;
     let parse_type = 'parse_type: {
@@ -130,17 +111,10 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     };
 
     let Some(parse_type) = parse_type else { return };
-    let Ok(parse_offset) = state
-        .parse_state
-        .parse_offset
-        .parse()
-        .map(AbsoluteOffset::from)
-    else {
-        return;
-    };
 
     let view = View::from_input(input.clone());
-    let view = view.subview(parse_offset.to_relative()..view.len().as_relative_offset());
+    let view =
+        view.subview(state.parse_state.parse_offset.to_relative()..view.len().as_relative_offset());
     let result = hexbait_lang::eval::eval_struct(
         parse_type,
         parse_type.main_struct_id(),

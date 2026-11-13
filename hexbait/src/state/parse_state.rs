@@ -3,6 +3,7 @@
 use std::{borrow::Cow, collections::BTreeMap, path::PathBuf};
 
 use hexbait_builtin_parsers::built_in_format_descriptions;
+use hexbait_common::AbsoluteOffset;
 
 /// The type of parser to use.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -48,9 +49,7 @@ pub struct ParseState {
     /// The name of the type that should be parsed.
     pub parse_type: ParseType,
     /// The offset at which to parse.
-    pub parse_offset: String,
-    /// Whether the parse offset should be synced to the start of the selection.
-    pub sync_parse_offset_to_selection_start: bool,
+    pub parse_offset: AbsoluteOffset,
     /// The built-in format description.
     pub built_in_format_descriptions: BTreeMap<&'static str, hexbait_lang::compile::ir::File>,
     /// The path to the custom parser definitions.
@@ -62,8 +61,7 @@ impl ParseState {
     pub fn new(custom_parsers: Vec<PathBuf>) -> ParseState {
         ParseState {
             parse_type: ParseType::None,
-            parse_offset: String::from("0"),
-            sync_parse_offset_to_selection_start: true,
+            parse_offset: AbsoluteOffset::from(0),
             built_in_format_descriptions: built_in_format_descriptions(),
             custom_parsers,
         }

@@ -194,6 +194,10 @@ fn byte_context_menu(ui: &mut Ui, state: &mut State, input: &Input, offset: Abso
         }
     }
 
+    if ui.button("Parse from here").clicked() {
+        state.parse_state.parse_offset = offset;
+    }
+
     if ui.button("Copy offset").clicked() {
         ui.ctx().copy_text(format!("{}", offset));
     }
