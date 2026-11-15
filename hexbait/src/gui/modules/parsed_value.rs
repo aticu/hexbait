@@ -59,21 +59,25 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
             });
     });
 
-    if ui
-        .label(format!(
-            "Parse offset: {} (0x{:x}, {})",
-            state.parse_state.parse_offset.as_u64(),
-            state.parse_state.parse_offset.as_u64(),
-            state.parse_state.parse_offset.human(),
-        ))
-        .hovered()
-    {
+    let response = ui.label(format!(
+        "Parse offset: {} (0x{:x}, {})",
+        state.parse_state.parse_offset.as_u64(),
+        state.parse_state.parse_offset.as_u64(),
+        state.parse_state.parse_offset.human(),
+    ));
+
+    if response.hovered() {
         state
             .marked_locations
             .mark_hovered_parsed_value(vec![Window::from_start_len(
                 state.parse_state.parse_offset,
                 Len::from(1),
             )]);
+    }
+    if response.clicked() {
+        state
+            .scroll_state
+            .rearrange_bars_for_point(0, state.parse_state.parse_offset);
     }
 
     let ir;
