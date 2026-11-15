@@ -23,7 +23,8 @@ impl BigramStatistics {
     /// Creates empty statistics.
     pub fn empty() -> Self {
         BigramStatistics {
-            follow: Box::new([[0; 256]; 256]),
+            // use into_boxed_slice to ensure that stack usage cannot be too high
+            follow: vec![[0; 256]; 256].into_boxed_slice().try_into().unwrap(),
             contained_regions: RangeSetBlaze::new(),
         }
     }
@@ -80,7 +81,9 @@ impl Statistics for BigramStatistics {
     }
 
     fn compute(input: &Input, window: Window) -> Result<BigramStatistics, io::Error> {
-        let mut follow = Box::new([[0; 256]; 256]);
+        // use into_boxed_slice to ensure that stack usage cannot be too high
+        let mut follow: Box<[[u64; 256]; 256]> =
+            vec![[0; 256]; 256].into_boxed_slice().try_into().unwrap();
 
         const WINDOW_SIZE: usize = 4 * 1024 * 1024;
 

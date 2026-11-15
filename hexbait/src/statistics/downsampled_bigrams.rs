@@ -59,6 +59,10 @@ impl DownsampledBigramStatistics {
         let total = self.num_covered_bytes().as_u64() as f32;
 
         let mut text_mass = 0.0f32;
+        #[expect(
+            clippy::needless_range_loop,
+            reason = "this code reads cleaner like this"
+        )]
         for i in 2..8 {
             for j in 2..8 {
                 text_mass += self.follow[i][j] as f32 / total;
@@ -95,6 +99,10 @@ impl DownsampledBigramStatistics {
         let total = self.num_covered_bytes().as_u64() as f32;
 
         let mut weighted = 0.0f32;
+        #[expect(
+            clippy::needless_range_loop,
+            reason = "this code reads cleaner like this"
+        )]
         for i in 0..16 {
             for j in 0..16 {
                 let p = self.follow[i][j] as f32 / total;

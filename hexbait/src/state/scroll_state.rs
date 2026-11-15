@@ -299,8 +299,8 @@ impl ScrollState {
         let mut window = Window::from_start_len(AbsoluteOffset::ZERO, self.file_size());
 
         parent_size.push(window.size());
-        for i in 0..=bar {
-            window = self.scrollbars[i].window(window, min_size);
+        for bar in &self.scrollbars {
+            window = bar.window(window, min_size);
             parent_size.push(window.size());
         }
 
