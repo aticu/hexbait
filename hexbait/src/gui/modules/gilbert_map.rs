@@ -1,6 +1,6 @@
 //! Implements the byte-view gilbert module.
 
-use egui::{Color32, Sense, Stroke, Ui, vec2};
+use egui::{Color32, Rect, Sense, Stroke, Ui, vec2};
 use hexbait_common::{Input, Len};
 
 use crate::{
@@ -12,13 +12,15 @@ use crate::{
 /// Shows the gilbert curve in the GUI.
 pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     let rect = ui.max_rect().intersect(ui.cursor());
+    // snap to whole points
+    let rect = Rect::from_min_size(rect.min, rect.size().floor());
     if rect.area() <= 0.0 {
         return;
     }
     let response = ui.allocate_rect(rect, Sense::click());
 
-    let width = rect.width().ceil() as u32;
-    let height = rect.height().ceil() as u32;
+    let width = rect.width() as u32;
+    let height = rect.height() as u32;
     let pixel_budget = (width * height) as u64;
     state.scroll_state.gilbert_pixel_budget = pixel_budget;
 
@@ -38,13 +40,13 @@ pub fn show(ui: &mut Ui, state: &mut State, input: &Input) {
     if response.hovered()
         && let Some(pos) = ui.input(|input| input.pointer.hover_pos())
         && rect.contains(pos)
-        && rect.bottom() != pos.y
     {
+        // `Rect::contains` includes the right and bottom edges
         let pos = pos - rect.left_top();
-        state.scroll_state.gilbert_hover_position = Some(
-            gilbert_curve.index_from_point(pos.x as usize, pos.y as usize) as f32
-                / pixel_budget as f32,
-        );
+        let x = (pos.x as usize).min(width as usize - 1);
+        let y = (pos.y as usize).min(height as usize - 1);
+        state.scroll_state.gilbert_hover_position =
+            Some(gilbert_curve.index_from_point(x, y) as f32 / pixel_budget as f32);
     } else {
         state.scroll_state.gilbert_hover_position = None;
     }
